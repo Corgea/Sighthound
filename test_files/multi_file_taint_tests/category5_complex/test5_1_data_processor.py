@@ -3,6 +3,7 @@
 
 from test5_1_user_input import get_input, get_safe_data
 
+
 def process_input():
     """
     PROPAGATION: Takes user input and processes it
@@ -11,6 +12,7 @@ def process_input():
     raw_data = get_input()  # Receives tainted data from file 1
     return f"processed_{raw_data}"  # Processes but keeps taint
 
+
 def process_safe_input():
     """
     Safe processing for contrast
@@ -18,10 +20,11 @@ def process_safe_input():
     safe_data = get_safe_data()  # Non-tainted data
     return f"processed_{safe_data}"
 
+
 def sanitize_input():
     """
     Example of potential sanitization (though our current system doesn't detect this)
     """
     raw_data = get_input()
     # In a real system, this might sanitize the input
-    return raw_data.replace(";", "").replace("&", "") 
+    return raw_data.replace(";", "").replace("&", "")

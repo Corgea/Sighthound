@@ -6,6 +6,7 @@
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
             file_types: Some((
                 extensions: Some([".py"]),
                 include_patterns: None,

@@ -1,7 +1,13 @@
 # Level 2: First Degree Taint Propagation
 # This file receives taint from level1 and propagates it further
 
-from level1_source import get_user_input, get_user_data, get_config_from_user, safe_constant
+from level1_source import (
+    get_user_input,
+    get_user_data,
+    get_config_from_user,
+    safe_constant,
+)
+
 
 def process_user_command():
     """
@@ -11,6 +17,7 @@ def process_user_command():
     processed = f"processed_{raw_command}"
     return processed  # Propagates taint to level 3
 
+
 def transform_user_data():
     """
     LEVEL 2 PROPAGATION: Transforms tainted data from level 1
@@ -18,6 +25,7 @@ def transform_user_data():
     raw_data = get_user_data()  # Receives taint from level 1
     transformed = raw_data.upper()
     return f"transformed_{transformed}"  # Propagates taint to level 3
+
 
 def combine_tainted_inputs():
     """
@@ -29,6 +37,7 @@ def combine_tainted_inputs():
     combined = f"{cmd}|{data}|{config}"
     return combined  # Propagates combined taint to level 3
 
+
 def mix_safe_and_tainted():
     """
     LEVEL 2 PROPAGATION: Mixes safe and tainted data
@@ -37,6 +46,7 @@ def mix_safe_and_tainted():
     tainted = get_user_input()  # Tainted
     mixed = f"{safe}_{tainted}"
     return mixed  # Should still be considered tainted
+
 
 def process_with_validation():
     """
@@ -48,5 +58,6 @@ def process_with_validation():
         return validated  # Still tainted despite validation
     return "empty"
 
+
 if __name__ == "__main__":
-    print("Level 2: Taint propagation layer initialized") 
+    print("Level 2: Taint propagation layer initialized")

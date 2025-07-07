@@ -5,6 +5,7 @@ from test5_1_data_processor import process_input, process_safe_input
 import os
 import subprocess
 
+
 def run_command():
     """
     SINK: Final destination of tainted data through 3-file chain
@@ -13,6 +14,7 @@ def run_command():
     processed = process_input()  # Receives processed but still tainted data
     os.system(processed)  # SINK - should trace back through all 3 files
 
+
 def run_safe_command():
     """
     Safe operation using non-tainted data
@@ -20,8 +22,9 @@ def run_safe_command():
     safe_processed = process_safe_input()  # Non-tainted data path
     subprocess.run(["echo", safe_processed])  # Safe operation
 
+
 def run_direct_command():
     """
     Direct safe command for contrast
     """
-    os.system("echo 'Hello World'")  # Safe - hardcoded command 
+    os.system("echo 'Hello World'")  # Safe - hardcoded command

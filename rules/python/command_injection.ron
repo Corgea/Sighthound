@@ -19,6 +19,7 @@
             finding_type: Some("Command Injection"),
             severity: Some("High"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-78"),
             description: Some("Command execution detected - verify input is properly sanitized"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -43,6 +44,7 @@
             finding_type: Some("Command Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
             description: Some("Command constructed using string formatting, highly vulnerable to injection"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -64,6 +66,7 @@
             finding_type: Some("Command Injection"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
             description: Some("Command constructed using string concatenation, vulnerable to injection"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -111,6 +114,7 @@
             finding_type: Some("Command Injection via Taint Flow"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
             description: Some("User input flows directly to command execution without proper sanitization"),
             file_types: Some((
                 extensions: Some([".py"])

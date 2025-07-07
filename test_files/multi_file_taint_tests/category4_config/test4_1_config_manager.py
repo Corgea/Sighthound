@@ -3,6 +3,7 @@
 
 import os
 
+
 def setup_environment():
     """
     CONFIGURATION: These should NOT be flagged as sources
@@ -10,11 +11,12 @@ def setup_environment():
     """
     # These are configuration operations, not user input
     os.environ.setdefault("DEBUG", "False")
-    os.environ.setdefault("LOG_LEVEL", "INFO") 
+    os.environ.setdefault("LOG_LEVEL", "INFO")
     os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
     os.environ.setdefault("SECRET_KEY", "dev-key-not-for-production")
-    
+
     return "Configuration complete"
+
 
 def configure_logging():
     """
@@ -23,8 +25,9 @@ def configure_logging():
     log_level = os.environ.setdefault("LOG_LEVEL", "WARNING")
     return f"Logging configured to {log_level}"
 
+
 def get_config_value(key, default):
     """
     Safe configuration getter
     """
-    return os.environ.setdefault(key, default) 
+    return os.environ.setdefault(key, default)

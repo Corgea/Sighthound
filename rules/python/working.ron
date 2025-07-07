@@ -7,6 +7,7 @@
             finding_type: Some("Dangerous Function"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
             file_types: Some((
                 extensions: Some([".py"]),
                 include_patterns: None,
@@ -31,6 +32,7 @@
             finding_type: Some("Code Execution"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
             file_types: Some((
                 extensions: Some([".py"]),
                 include_patterns: None,
@@ -55,6 +57,7 @@
             finding_type: Some("Command Execution"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
             file_types: Some((
                 extensions: Some([".py"]),
                 include_patterns: None,
@@ -79,6 +82,7 @@
             finding_type: Some("Unsafe Deserialization"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-502"),
             file_types: Some((
                 extensions: Some([".py"]),
                 include_patterns: None,

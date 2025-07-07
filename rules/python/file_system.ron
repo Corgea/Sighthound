@@ -15,6 +15,7 @@
             finding_type: Some("Path Traversal"),
             severity: Some("High"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-22"),
             description: Some("Potential path traversal vulnerability detected"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -36,6 +37,7 @@
             finding_type: Some("Path Traversal"),
             severity: Some("Medium"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-22"),
             description: Some("File path constructed dynamically, verify input validation"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -59,6 +61,7 @@
             finding_type: Some("Insecure File Permissions"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-732"),
             description: Some("File permissions set to world-writable or overly permissive"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -79,6 +82,7 @@
             finding_type: Some("Insecure Temporary File"),
             severity: Some("Medium"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-377"),
             description: Some("Insecure temporary file usage detected"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -100,6 +104,7 @@
             finding_type: Some("File Upload Vulnerability"),
             severity: Some("Medium"),
             confidence: Some("Low"),
+            cwe_id: Some("cwe-434"),
             description: Some("File upload detected - verify file type validation and restrictions"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -147,6 +152,7 @@
             finding_type: Some("Path Traversal via Taint Flow"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-22"),
             description: Some("User input flows to file system operations without proper path validation"),
             file_types: Some((
                 extensions: Some([".py"])

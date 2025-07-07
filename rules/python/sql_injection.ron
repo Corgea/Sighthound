@@ -19,6 +19,7 @@
             finding_type: Some("Dangerous SQL Keywords"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
             description: Some("Dangerous SQL keywords detected that could indicate SQL injection attempts or malicious queries"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -46,6 +47,7 @@
             finding_type: Some("SQL Injection Data Flow"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
             description: Some("User input flows to SQL execution without proper sanitization, creating SQL injection vulnerability"),
             file_types: Some((
                 extensions: Some([".py"])

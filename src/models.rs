@@ -17,6 +17,8 @@ pub struct Finding {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwe_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub source_info: Option<SourceInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sink_info: Option<SinkInfo>,
@@ -226,6 +228,10 @@ pub struct UnifiedRule {
     
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
+    pub cwe_id: Option<String>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub message: Option<String>,
 }
 
@@ -273,6 +279,8 @@ pub struct Condition {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ancestor_types: Option<Vec<String>>,
 }
+
+
 
 /// CLI configuration structure
 #[derive(clap::Parser)]
@@ -378,6 +386,7 @@ impl Finding {
             severity: "Medium".to_string(),
             confidence: "Medium".to_string(),
             description: None,
+            cwe_id: None,
             source_info: None,
             sink_info: None,
             traces: None,
@@ -395,5 +404,34 @@ impl Finding {
         } else {
             self.traces = Some(vec![trace]);
         }
+    }
+    
+    /// Extract CWE ID from tags field and set the cwe_id field
+    pub fn extract_cwe_id(&mut self) {
+        if let Some(ref tags) = self.tags {
+            // Look for tags that start with "cwe-" and extract the first one
+            for tag in tags {
+                if tag.starts_with("cwe-") {
+                    self.cwe_id = Some(tag.clone());
+                    break;
+                }
+            }
+        }
+    }
+    
+    /// Extract CWE ID from tags if present
+    pub fn extract_cwe_id_from_tags(tags: &Option<Vec<String>>) -> Option<String> {
+        tags.as_ref()
+            .and_then(|tag_list| {
+                tag_list.iter()
+                    .find(|tag| tag.starts_with("cwe-"))
+                    .map(|tag| tag.to_string())
+            })
+    }
+    
+    /// Extract CWE ID from rule tags (kept for backward compatibility)
+    pub fn extract_cwe_id_with_fallback(tags: &[String], _finding_type: &str) -> Option<String> {
+        // Get CWE from rule tags only
+        Finding::extract_cwe_id_from_tags(&Some(tags.to_vec()))
     }
 } 

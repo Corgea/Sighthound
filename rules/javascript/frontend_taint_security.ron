@@ -97,6 +97,7 @@
             finding_type: Some("DOM-based XSS"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
             
             description: Some("User input flows to dangerous DOM manipulation without sanitization"),
             
@@ -270,6 +271,7 @@
             finding_type: Some("Cross-Site Scripting"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
             
             description: Some("User input flows to output context without proper encoding"),
             
@@ -408,6 +410,7 @@
             finding_type: Some("Information Disclosure"),
             severity: Some("High"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-200"),
             
             description: Some("Sensitive information may be exposed through logging, network requests, or URL parameters"),
             
@@ -485,6 +488,7 @@
             finding_type: Some("Improper Output Encoding"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-116"),
             
             description: Some("User data is output without proper context-specific encoding"),
             
@@ -551,6 +555,7 @@
             finding_type: Some("Template Injection"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-1336"),
             
             description: Some("User input flows to template compilation/rendering without sanitization"),
             
@@ -643,6 +648,7 @@
             finding_type: Some("Open Redirect"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-601"),
             
             description: Some("User-controlled input flows to URL redirection without validation"),
             
@@ -763,6 +769,7 @@
             finding_type: Some("Insecure postMessage"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-346"),
             
             description: Some("postMessage data is used in dangerous operations without proper validation"),
             
@@ -818,6 +825,7 @@
             finding_type: Some("Missing Origin Validation"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-346"),
             
             description: Some("postMessage data is processed without validating the message origin"),
             
@@ -970,7 +978,7 @@
             finding_type: Some("Insecure Storage"),
             severity: Some("Medium"),
             confidence: Some("High"),
-            
+            cwe_id: Some("cwe-922"),
             description: Some("Sensitive authentication or cryptographic data is stored in browser storage without proper encryption"),
             
             file_types: Some((
@@ -1060,7 +1068,7 @@
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
-            
+            cwe_id: Some("cwe-95"),
             description: Some("User-controlled input flows to code evaluation functions"),
             
             file_types: Some((
@@ -1124,6 +1132,7 @@
             finding_type: Some("ReDoS"),
             severity: Some("Medium"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-1333"),
             
             description: Some("User input flows to regex operations without validation, potentially causing ReDoS"),
             
@@ -1190,6 +1199,7 @@
             finding_type: Some("Weak Randomness"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
             
             description: Some("Weak random values are used in security-sensitive contexts"),
             
@@ -1376,6 +1386,7 @@
             finding_type: Some("Clear-text Transmission"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-319"),
             
             description: Some("Sensitive data is transmitted over unencrypted connections"),
             
@@ -1487,7 +1498,7 @@
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
-            
+            cwe_id: Some("cwe-95"),
             description: Some("User-controlled data flows to code execution functions without validation"),
             
             file_types: Some((
@@ -1583,6 +1594,7 @@
             finding_type: Some("Open Redirect"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-601"),
             
             description: Some("User-controlled data flows to navigation without validation, enabling open redirects"),
             
@@ -1674,6 +1686,7 @@
             finding_type: Some("Dynamic Code Loading"),
             severity: Some("High"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-95"),
             
             description: Some("User-controlled module paths can lead to arbitrary code execution"),
             
@@ -1761,7 +1774,7 @@
             finding_type: Some("URL Manipulation"),
             severity: Some("Medium"),
             confidence: Some("Medium"),
-            
+            cwe_id: Some("cwe-601"),
             description: Some("User input flows to URL construction without validation"),
             
             file_types: Some((
@@ -1770,4 +1783,4 @@
             tags: Some(["url-manipulation", "cwe-601"])
         )
     ]
-) 
+)

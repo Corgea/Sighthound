@@ -149,7 +149,7 @@ def count_users():
         println!("Found {} findings", findings.len());
         for finding in &findings {
             println!("Finding: {} in {} at line {} - {}", 
-                finding.finding_type, finding.file, finding.line, finding.code);
+                finding.finding_type, finding.file, finding.line, finding.snippet);
         }
 
         // Should find 3 vulnerabilities in vulnerable.py, none in safe.py
@@ -216,7 +216,7 @@ def run_safe_command():
         println!("Found {} command injection findings", findings.len());
         for finding in &findings {
             println!("Finding: {} in {} at line {} - {}", 
-                finding.finding_type, finding.file, finding.line, finding.code);
+                finding.finding_type, finding.file, finding.line, finding.snippet);
         }
 
         // Should find command injection vulnerabilities
@@ -274,7 +274,7 @@ public class VulnerableService {
             use find_vulns::parser::LanguageParser;
             use find_vulns::language::LanguageSupport;
             use find_vulns::rules::check_for_injection_pattern;
-            use find_vulns::scanner::types::Finding;
+            use find_vulns::models::Finding;
             
             // Create findings vector to store our results
             let mut findings = Vec::new();
@@ -330,12 +330,20 @@ public class VulnerableService {
                                             findings.push(Finding {
                                                 file: filepath.to_string(),
                                                 line,
+                                                column: 0,
+                                                end_line: line,
+                                                end_column: 0,
                                                 function: func_name.to_string(),
                                                 finding_type: "sql_injection".to_string(),
-                                                code: node_text.to_string(),
+                                                snippet: node_text.to_string(),
                                                 severity: "High".to_string(),
-                                                source: None,
-                                                sink: None,
+                                                confidence: "High".to_string(),
+                                                description: None,
+                                                cwe_id: None,
+                                                source_info: None,
+                                                sink_info: None,
+                                                traces: None,
+                                                tags: None,
                                             });
                                         }
                                     }
@@ -365,12 +373,20 @@ public class VulnerableService {
                                             findings.push(Finding {
                                                 file: filepath.to_string(),
                                                 line,
+                                                column: 0,
+                                                end_line: line,
+                                                end_column: 0,
                                                 function: func_name.to_string(),
                                                 finding_type: "command_injection".to_string(),
-                                                code: node_text.to_string(),
+                                                snippet: node_text.to_string(),
                                                 severity: "High".to_string(),
-                                                source: None,
-                                                sink: None,
+                                                confidence: "High".to_string(),
+                                                description: None,
+                                                cwe_id: None,
+                                                source_info: None,
+                                                sink_info: None,
+                                                traces: None,
+                                                tags: None,
                                             });
                                         }
                                     }
@@ -395,7 +411,7 @@ public class VulnerableService {
             println!("\nFound {} Java findings", findings.len());
             for finding in &findings {
                 println!("Finding: {} in {} at line {} - {}", 
-                    finding.finding_type, finding.file, finding.line, finding.code);
+                    finding.finding_type, finding.file, finding.line, finding.snippet);
             }
             
             // Verify results
@@ -502,7 +518,7 @@ function safeQuery() {
         println!("Found {} JavaScript findings", findings.len());
         for finding in &findings {
             println!("Finding: {} in {} at line {} - {}", 
-                finding.finding_type, finding.file, finding.line, finding.code);
+                finding.finding_type, finding.file, finding.line, finding.snippet);
         }
 
         // Should find multiple vulnerabilities
@@ -561,7 +577,7 @@ def safe_print():
             println!("Found {} findings in safe code (should be 0)", findings.len());
             for finding in &findings {
                 println!("Unexpected finding: {} in {} at line {} - {}", 
-                    finding.finding_type, finding.file, finding.line, finding.code);
+                    finding.finding_type, finding.file, finding.line, finding.snippet);
             }
 
             // Should find no vulnerabilities in safe code

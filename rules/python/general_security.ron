@@ -12,6 +12,7 @@
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
             description: Some("Use of eval() can lead to arbitrary code execution"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -29,6 +30,7 @@
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
             description: Some("Use of exec() can lead to arbitrary code execution"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -47,6 +49,7 @@
             finding_type: Some("Dynamic Import"),
             severity: Some("Medium"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-95"),
             description: Some("Dynamic imports can be dangerous if user input is involved"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -70,6 +73,7 @@
             finding_type: Some("Unsafe Deserialization"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-502"),
             description: Some("Pickle deserialization is unsafe with untrusted data"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -88,6 +92,7 @@
             finding_type: Some("Unsafe Deserialization"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-502"),
             description: Some("YAML load() is unsafe, use safe_load() instead"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -109,6 +114,7 @@
             finding_type: Some("SSL Verification Disabled"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-295"),
             description: Some("SSL certificate verification is disabled"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -128,6 +134,7 @@
             finding_type: Some("Insecure HTTP URL"),
             severity: Some("Low"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-319"),
             description: Some("HTTP URLs should be HTTPS in production"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -149,6 +156,7 @@
             finding_type: Some("Debug Mode Enabled"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-489"),
             description: Some("Debug mode should be disabled in production"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -168,6 +176,7 @@
             finding_type: Some("Information Disclosure"),
             severity: Some("Low"),
             confidence: Some("Low"),
+            cwe_id: Some("cwe-209"),
             description: Some("Exception handling may disclose sensitive information"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -208,6 +217,7 @@
             finding_type: Some("Code Injection via Taint Flow"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
             description: Some("User input flows to code execution functions without proper validation"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -241,6 +251,7 @@
             finding_type: Some("Unsafe Deserialization via Taint Flow"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-502"),
             description: Some("User input flows to unsafe deserialization functions"),
             file_types: Some((
                 extensions: Some([".py"])

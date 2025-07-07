@@ -5,6 +5,7 @@ from test4_2_env_reader import get_user_command, get_user_input_path, safe_confi
 import subprocess
 import os
 
+
 def execute_user_command():
     """
     VULNERABLE: Should detect taint flow from user env var to subprocess
@@ -13,6 +14,7 @@ def execute_user_command():
     if cmd:
         subprocess.run(cmd, shell=True)  # SINK - dangerous!
 
+
 def process_user_file():
     """
     Another vulnerability with file operations
@@ -20,9 +22,10 @@ def process_user_file():
     user_path = get_user_input_path()  # Tainted path
     os.system(f"cat {user_path}")  # SINK - path injection
 
+
 def safe_config_operation():
     """
     Safe operation using configuration
     """
     config_dir = safe_config_read()  # Safe config value
-    subprocess.run(["ls", config_dir])  # Safe - config not user input 
+    subprocess.run(["ls", config_dir])  # Safe - config not user input

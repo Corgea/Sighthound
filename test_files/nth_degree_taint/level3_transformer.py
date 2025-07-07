@@ -2,12 +2,13 @@
 # This file receives taint from level2 and propagates it further
 
 from level2_processor import (
-    process_user_command, 
-    transform_user_data, 
+    process_user_command,
+    transform_user_data,
     combine_tainted_inputs,
     mix_safe_and_tainted,
-    process_with_validation
+    process_with_validation,
 )
+
 
 def advanced_command_processing():
     """
@@ -17,6 +18,7 @@ def advanced_command_processing():
     advanced = f"advanced_{processed_cmd}"
     return advanced  # Propagates taint to level 4
 
+
 def data_transformation_pipeline():
     """
     LEVEL 3 PROPAGATION: Data transformation pipeline
@@ -25,6 +27,7 @@ def data_transformation_pipeline():
     pipelined = f"pipeline_{transformed}"
     return pipelined  # Propagates taint to level 4
 
+
 def complex_data_merger():
     """
     LEVEL 3 PROPAGATION: Complex merger of multiple tainted sources
@@ -32,9 +35,10 @@ def complex_data_merger():
     combined = combine_tainted_inputs()  # Receives taint from level 2
     mixed = mix_safe_and_tainted()  # Receives taint from level 2
     validated = process_with_validation()  # Receives taint from level 2
-    
+
     merged = f"merged_{combined}_{mixed}_{validated}"
     return merged  # Propagates complex taint to level 4
+
 
 def conditional_processing():
     """
@@ -46,19 +50,22 @@ def conditional_processing():
         return conditional  # Propagates taint to level 4
     return "no_processing"
 
+
 def class_based_processing():
     """
     LEVEL 3 PROPAGATION: Class-based taint propagation
     """
+
     class TaintProcessor:
         def __init__(self):
             self.data = transform_user_data()  # Receives taint from level 2
-        
+
         def process(self):
             return f"class_processed_{self.data}"  # Propagates taint
-    
+
     processor = TaintProcessor()
     return processor.process()  # Propagates taint to level 4
 
+
 if __name__ == "__main__":
-    print("Level 3: Advanced taint transformation layer initialized") 
+    print("Level 3: Advanced taint transformation layer initialized")

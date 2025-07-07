@@ -1,2 +1,2 @@
 # Simple eval test
-x = eval("1+1") 
+x = eval("1+1")

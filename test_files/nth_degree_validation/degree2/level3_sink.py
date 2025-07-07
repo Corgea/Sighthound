@@ -4,6 +4,7 @@
 import os
 from level2_processor import process_user_command
 
+
 def execute_processed_command():
     """
     LEVEL 3 SINK: 2nd degree taint reception
@@ -12,6 +13,7 @@ def execute_processed_command():
     processed_cmd = process_user_command()  # 2nd degree taint
     os.system(processed_cmd)  # SINK - Should detect 2nd degree taint
 
+
 if __name__ == "__main__":
     print("Level 3: 2nd degree taint sink")
-    execute_processed_command() 
+    execute_processed_command()

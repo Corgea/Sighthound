@@ -111,6 +111,7 @@
             finding_type: Some("Open Redirect"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-601"),
             
             description: Some("User-controlled data flows to HTTP redirect headers without validation"),
             
@@ -215,6 +216,7 @@
             finding_type: Some("Command Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
             
             description: Some("User-controlled data flows to command execution without sanitization"),
             
@@ -319,6 +321,7 @@
             finding_type: Some("SQL Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
             
             description: Some("User-controlled data flows to SQL queries without parameterization"),
             
@@ -424,6 +427,7 @@
             finding_type: Some("Path Traversal"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-22"),
             
             description: Some("User-controlled data flows to file system operations without path validation"),
             
@@ -506,6 +510,7 @@
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
             
             description: Some("User-controlled data flows to code execution without validation"),
             

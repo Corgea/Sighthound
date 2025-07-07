@@ -6,8 +6,9 @@ from level3_transformer import (
     data_transformation_pipeline,
     complex_data_merger,
     conditional_processing,
-    class_based_processing
+    class_based_processing,
 )
+
 
 def enterprise_data_aggregation():
     """
@@ -15,9 +16,10 @@ def enterprise_data_aggregation():
     """
     advanced = advanced_command_processing()  # Receives taint from level 3
     pipeline = data_transformation_pipeline()  # Receives taint from level 3
-    
+
     aggregated = f"enterprise_{advanced}_{pipeline}"
     return aggregated  # Propagates taint to level 5
+
 
 def multi_source_consolidation():
     """
@@ -26,9 +28,10 @@ def multi_source_consolidation():
     merged = complex_data_merger()  # Receives taint from level 3
     conditional = conditional_processing()  # Receives taint from level 3
     class_based = class_based_processing()  # Receives taint from level 3
-    
+
     consolidated = f"consolidated_{merged}_{conditional}_{class_based}"
     return consolidated  # Propagates taint to level 5
+
 
 def workflow_orchestration():
     """
@@ -39,11 +42,12 @@ def workflow_orchestration():
         data_transformation_pipeline(),  # Tainted
         complex_data_merger(),  # Tainted
         conditional_processing(),  # Tainted
-        class_based_processing()  # Tainted
+        class_based_processing(),  # Tainted
     ]
-    
+
     orchestrated = "orchestrated_" + "_".join(all_sources)
     return orchestrated  # Propagates complex taint to level 5
+
 
 def distributed_processing():
     """
@@ -53,9 +57,12 @@ def distributed_processing():
     node1_data = advanced_command_processing()  # Tainted from level 3
     node2_data = data_transformation_pipeline()  # Tainted from level 3
     node3_data = complex_data_merger()  # Tainted from level 3
-    
-    distributed = f"distributed_node1_{node1_data}_node2_{node2_data}_node3_{node3_data}"
+
+    distributed = (
+        f"distributed_node1_{node1_data}_node2_{node2_data}_node3_{node3_data}"
+    )
     return distributed  # Propagates distributed taint to level 5
+
 
 def caching_layer():
     """
@@ -65,5 +72,6 @@ def caching_layer():
     cache_key = f"cache_{hash(cached_data) % 10000}"
     return f"{cache_key}_{cached_data}"  # Propagates cached taint to level 5
 
+
 if __name__ == "__main__":
-    print("Level 4: Enterprise aggregation layer initialized") 
+    print("Level 4: Enterprise aggregation layer initialized")

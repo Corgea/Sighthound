@@ -559,6 +559,17 @@ impl ScanningLogic {
         finding.confidence = rule.get_confidence().to_string();
         finding.description = rule.description.clone();
         finding.tags = rule.tags.clone();
+        
+        // Use CWE ID directly from rule, with fallback to tags for backward compatibility
+        finding.cwe_id = rule.cwe_id.clone()
+            .or_else(|| {
+                // Fallback: extract from tags if rule doesn't have cwe_id field
+                if let Some(ref tags) = rule.tags {
+                    crate::models::Finding::extract_cwe_id_from_tags(&Some(tags.clone()))
+                } else {
+                    None
+                }
+            });
     }
 
     pub fn create_finding(
@@ -581,6 +592,7 @@ impl ScanningLogic {
             confidence: "Medium".to_string(),
             snippet: crate::parser::get_node_text(node, source),
             description: None,
+            cwe_id: None,
             source_info: None,
             sink_info: None,
             traces: None,
@@ -1043,8 +1055,7 @@ impl ScanningLogic {
         _tree: &tree_sitter::Tree,
         _source_bytes: &[u8],
     ) -> crate::models::Finding {
-
-        crate::models::Finding {
+        let mut finding = crate::models::Finding {
             file: sink.file.clone(),
             line: sink.line,
             column: 0,
@@ -1059,6 +1070,7 @@ impl ScanningLogic {
                 "Taint flow detected from {} (line {}) to {} (line {})",
                 source.operation, source.line, sink.operation, sink.line
             ))),
+            cwe_id: None,
             source_info: Some(crate::models::SourceInfo {
                 source_type: source.operation.clone(),
                 location: format!("{}:{}", source.file, source.line),
@@ -1076,7 +1088,20 @@ impl ScanningLogic {
                 "data_flow".to_string(),
                 rule.category.clone().unwrap_or_else(|| "injection".to_string()),
             ]),
-        }
+        };
+
+        // Use CWE ID directly from rule, with fallback to tags for backward compatibility
+        finding.cwe_id = rule.cwe_id.clone()
+            .or_else(|| {
+                // Fallback: extract from tags if rule doesn't have cwe_id field
+                if let Some(ref tags) = rule.tags {
+                    crate::models::Finding::extract_cwe_id_from_tags(&Some(tags.clone()))
+                } else {
+                    None
+                }
+            });
+
+        finding
     }
 
 
@@ -1726,11 +1751,23 @@ impl ScanningLogic {
             severity: rule.get_severity().to_string(),
             confidence: rule.get_confidence().to_string(),
             description: rule.description.clone(),
+            cwe_id: None,
             source_info: None,
             sink_info: None,
             traces: None,
             tags: rule.tags.clone(),
         };
+
+        // Use CWE ID directly from rule, with fallback to tags for backward compatibility
+        finding.cwe_id = rule.cwe_id.clone()
+            .or_else(|| {
+                // Fallback: extract from tags if rule doesn't have cwe_id field
+                if let Some(ref tags) = rule.tags {
+                    crate::models::Finding::extract_cwe_id_from_tags(&Some(tags.clone()))
+                } else {
+                    None
+                }
+            });
 
         // Add enhanced source and sink information if taint context is available
         if let Some((tainted_var, taint_info)) = taint_context_info {
@@ -1881,13 +1918,14 @@ pub fn print_findings_json(findings: &[Finding]) {
 
 /// Print findings in CSV format
 pub fn print_findings_csv(findings: &[Finding]) {
-    println!("file,line,function,finding_type,code,severity,confidence,source_type,source_context,sink_type,sink_function,traces");
+    println!("file,line,function,finding_type,code,severity,confidence,cwe_id,source_type,source_context,sink_type,sink_function,traces");
     for finding in findings {
         let code = finding.snippet.replace('"', "\"\"");
         let source_type = finding.source_info.as_ref().map(|s| s.source_type.as_str()).unwrap_or("");
         let source_context = finding.source_info.as_ref().map(|s| s.context.as_str()).unwrap_or("");
         let sink_type = finding.sink_info.as_ref().map(|s| s.sink_type.as_str()).unwrap_or("");
         let sink_function = finding.sink_info.as_ref().map(|s| s.function_name.as_str()).unwrap_or("");
+        let cwe_id = finding.cwe_id.as_deref().unwrap_or("");
 
         let traces = if let Some(traces) = &finding.traces {
             traces.iter()
@@ -1898,9 +1936,9 @@ pub fn print_findings_csv(findings: &[Finding]) {
             String::new()
         };
 
-        println!("{},{},{},{},\"{}\",{},{},{},{},{},{},\"{}\"",
+        println!("{},{},{},{},\"{}\",{},{},{},{},{},{},{},\"{}\"",
                 finding.file, finding.line, finding.function, finding.finding_type,
-                code, finding.severity, finding.confidence, source_type, source_context, sink_type, sink_function, traces);
+                code, finding.severity, finding.confidence, cwe_id, source_type, source_context, sink_type, sink_function, traces);
     }
 }
 
@@ -1957,10 +1995,16 @@ pub fn print_findings_text(findings: &[Finding], _verbose: bool, summary_only: b
             let end_line = (line_num + 3).min(lines.len());
 
             println!("");
-            println!("    {}{}●\x1b[0m {} on line {}",
+            let cwe_info = if let Some(ref cwe_id) = finding.cwe_id {
+                format!(" ({})", cwe_id)
+            } else {
+                String::new()
+            };
+            println!("    {}{}●\x1b[0m {}{} on line {}",
                     severity_color,
                     severity_color,
                     finding.finding_type,
+                    cwe_info,
                     line_num);
 
             // Display source and sink information if available
@@ -2422,7 +2466,7 @@ impl MultiFileTaintAnalyzer {
                 flow.call_chain.len())
         };
 
-        crate::models::Finding {
+        let mut finding = crate::models::Finding {
             file: flow.sink_file.clone(),
             line: flow.sink_line,
             column: 0,
@@ -2434,6 +2478,7 @@ impl MultiFileTaintAnalyzer {
             severity: rule.severity.clone().unwrap_or_else(|| "Medium".to_string()),
             confidence: rule.confidence.clone().unwrap_or_else(|| "High".to_string()),
             description: Some(description),
+            cwe_id: None,
             source_info: Some(crate::models::SourceInfo {
                 source_type: flow.source_pattern.clone(),
                 location: format!("{}:{}", flow.source_file, flow.source_line),
@@ -2447,7 +2492,20 @@ impl MultiFileTaintAnalyzer {
             }),
             traces: None,
             tags: Some(vec!["taint_analysis".to_string(), "cross_file".to_string()]),
-        }
+        };
+
+        // Use CWE ID directly from rule, with fallback to tags for backward compatibility
+        finding.cwe_id = rule.cwe_id.clone()
+            .or_else(|| {
+                // Fallback: extract from tags if rule doesn't have cwe_id field
+                if let Some(ref tags) = rule.tags {
+                    crate::models::Finding::extract_cwe_id_from_tags(&Some(tags.clone()))
+                } else {
+                    None
+                }
+            });
+
+        finding
     }
 
     /// Build import/export maps for all files
@@ -2869,7 +2927,7 @@ impl MultiFileTaintAnalyzer {
             branch_id: None,
         };
 
-        crate::models::Finding {
+        let mut finding = crate::models::Finding {
             file: flow.sink_file.clone(),
             line: flow.sink_line,
             column: 0,
@@ -2884,6 +2942,7 @@ impl MultiFileTaintAnalyzer {
                 "Cross-file taint flow detected from {} (line {}) to {} (line {})",
                 flow.source_function, flow.source_line, flow.sink_function, flow.sink_line
             ))),
+            cwe_id: None,
             source_info: Some(crate::models::SourceInfo {
                 source_type: "cross_file_import".to_string(),
                 location: format!("{}:{}", flow.source_file, flow.source_line),
@@ -2902,7 +2961,20 @@ impl MultiFileTaintAnalyzer {
                 "data_flow".to_string(),
                 flow.rule.category.clone().unwrap_or_else(|| "injection".to_string()),
             ]),
-        }
+        };
+
+        // Use CWE ID directly from rule, with fallback to tags for backward compatibility
+        finding.cwe_id = flow.rule.cwe_id.clone()
+            .or_else(|| {
+                // Fallback: extract from tags if rule doesn't have cwe_id field
+                if let Some(ref tags) = flow.rule.tags {
+                    crate::models::Finding::extract_cwe_id_from_tags(&Some(tags.clone()))
+                } else {
+                    None
+                }
+            });
+
+        finding
     }
 
     /// Extract import information from node text - FIXED for multi-line imports and parentheses

@@ -15,6 +15,7 @@
             finding_type: Some("Weak Cryptography"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
             description: Some("MD5 is cryptographically broken and should not be used for security purposes"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -35,6 +36,7 @@
             finding_type: Some("Weak Cryptography"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
             description: Some("SHA1 is cryptographically weak and should be replaced with SHA-256 or higher"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -54,6 +56,7 @@
             finding_type: Some("Weak Cryptography"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
             description: Some("DES encryption is obsolete and easily broken"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -73,6 +76,7 @@
             finding_type: Some("Weak Cryptography"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
             description: Some("RC4 stream cipher has known vulnerabilities and should not be used"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -93,6 +97,7 @@
             finding_type: Some("Hardcoded Cryptographic Material"),
             severity: Some("High"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-798"),
             description: Some("Hardcoded cryptographic keys or secrets detected"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -113,6 +118,7 @@
             finding_type: Some("Weak Random Number Generation"),
             severity: Some("Medium"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-338"),
             description: Some("Standard random module is not cryptographically secure, use secrets module instead"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -132,6 +138,7 @@
             finding_type: Some("Weak Cryptography"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
             description: Some("ECB mode encryption is insecure and reveals patterns in plaintext"),
             file_types: Some((
                 extensions: Some([".py"])
@@ -162,6 +169,7 @@
             finding_type: Some("Hardcoded Cryptographic Material in Data Flow"),
             severity: Some("High"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-798"),
             description: Some("Hardcoded string flows to cryptographic operations"),
             file_types: Some((
                 extensions: Some([".py"])

@@ -40,6 +40,7 @@
             finding_type: Some("DOM XSS"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
             description: Some("Direct assignment to innerHTML with user input can lead to DOM-XSS"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["xss", "dom", "frontend", "cwe-79"])
@@ -74,6 +75,7 @@
             finding_type: Some("DOM XSS"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
             description: Some("Using document.write with dynamic content can lead to DOM-based XSS"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["xss", "dom", "frontend", "cwe-79"])
@@ -89,6 +91,7 @@
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
             description: Some("eval() with dynamic content can lead to code injection"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["code-injection", "frontend", "cwe-80", "cwe-95"])
@@ -104,6 +107,7 @@
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
             description: Some("Function constructor with dynamic content can lead to code injection"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["code-injection", "frontend", "cwe-80", "cwe-95"])
@@ -117,6 +121,7 @@
             finding_type: Some("Insecure postMessage"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-346"),
             description: Some("Using postMessage with \"*\" origin can leak data to any site"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["postmessage", "origin-validation", "frontend", "cwe-1173", "cwe-927"])
@@ -133,6 +138,7 @@
             finding_type: Some("Insecure Storage"),
             severity: Some("High"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-922"),
             description: Some("Storing secrets in web storage is insecure"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["insecure-storage", "frontend", "cwe-922", "cwe-200"])
@@ -158,10 +164,11 @@
             finding_type: Some("Prototype Pollution"),
             severity: Some("High"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-1321"),
             description: Some("Direct prototype manipulation can poison objects"),
             file_types: Some((
                 extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
-            tags: Some(["prototype-pollution", "frontend"])
+            tags: Some(["prototype-pollution", "frontend", "cwe-1321"])
         ),
         (
             id: Some("js-cleartext-001"),
@@ -176,6 +183,7 @@
             finding_type: Some("Cleartext Network Request"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-319"),
             description: Some("HTTP requests send data in cleartext – use HTTPS"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["cleartext", "network", "https", "frontend", "cwe-319"])
@@ -189,6 +197,7 @@
             finding_type: Some("Cleartext Network Request"),
             severity: Some("Medium"),
             confidence: Some("High"),
+            cwe_id: Some("cwe-319"),
             description: Some("XHR over HTTP transmits data in cleartext"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["cleartext", "network", "xhr", "frontend", "cwe-319"])
@@ -229,6 +238,7 @@
                     "*encodeURIComponent(*)*"
                 ])
             )),
+            cwe_id: Some("cwe-601"),
             tags: Some(["open-redirect","frontend","cwe-601"])
         ),
         (
@@ -240,6 +250,7 @@
             finding_type: Some("Open Redirect"),
             severity: Some("Low"),
             confidence: Some("Low"),
+            cwe_id: Some("cwe-601"),
             description: Some("Manipulating location.hash can enable client-side attacks"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["open-redirect","hash-manipulation","frontend","cwe-601"])
@@ -256,6 +267,7 @@
             finding_type: Some("Dynamic Code Loading"),
             severity: Some("High"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-95"),
             description: Some("User-controlled module paths can lead to code injection"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["code-injection","dynamic-import","frontend","cwe-95"])
@@ -275,6 +287,7 @@
             finding_type: Some("Regular Expression DoS"),
             severity: Some("Medium"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-1333"),
             description: Some("Dynamic regex patterns can cause ReDoS"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["redos","regex","frontend","cwe-1333"])
@@ -288,6 +301,7 @@
             finding_type: Some("URL Manipulation"),
             severity: Some("Medium"),
             confidence: Some("Medium"),
+            cwe_id: Some("cwe-601"),
             description: Some("Building URLs from untrusted data can be risky"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["url-manipulation","frontend","cwe-601"])

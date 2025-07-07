@@ -5,6 +5,7 @@
 import os
 # NOTE: NO IMPORT from test2_1_module_a - this is intentional!
 
+
 def dangerous_function():
     """
     SINK: This function has same variable name as module_a but NO connection
@@ -14,8 +15,9 @@ def dangerous_function():
     user_data = "safe_constant"  # This is NOT the same variable from module_a
     os.system(user_data)  # Should NOT detect flow - different variable entirely
 
+
 def legitimate_function():
     """
     A realistic function that could exist in this module
     """
-    return "module_b_functionality" 
+    return "module_b_functionality"
