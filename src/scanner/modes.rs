@@ -90,8 +90,18 @@ impl ScanContext {
     }
 }
 
+/// Resolve whether to use embedded rules (use_file_rules overrides use_embedded_rules)
+fn should_use_embedded_rules(cli: &Cli) -> bool {
+    cli.use_embedded_rules && !cli.use_file_rules
+}
+
 /// Load rules based on CLI configuration
 fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
+    // If using embedded rules, load them directly
+    if should_use_embedded_rules(cli) {
+        return Rules::load_all_embedded_rules(&context.detected_languages, cli.code_type.as_deref());
+    }
+    
     match (&cli.language, &cli.rules_path) {
         (Some(_language), Some(rules_path)) => Rules::load_from_path(rules_path),
         (None, None) => {
@@ -112,9 +122,10 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
             };
             
             for language in &context.detected_languages {
+                let base_rules_dir = cli.rules_dir.as_deref().unwrap_or("rules");
                 let rules_dir = match language.as_str() {
-                    "tsx" => "rules/javascript".to_string(),
-                    _ => format!("rules/{}", language),
+                    "tsx" => format!("{}/javascript", base_rules_dir),
+                    _ => format!("{}/{}", base_rules_dir, language),
                 };
                 if let Ok(rules) = Rules::load_from_directory_with_exclusions(&rules_dir, pattern_type) {
                     all_rules.push(rules);
@@ -124,8 +135,9 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
                 if matches!(language.as_str(), "javascript" | "tsx") {
                     if let Some(code_type) = &cli.code_type {
                         if code_type != "frontend" {
-                            let backend_rules_file = "rules/backend_javascript/backend_security.ron";
-                            if let Ok(backend_rules) = Rules::load_from_file(backend_rules_file) {
+                            let base_rules_dir = cli.rules_dir.as_deref().unwrap_or("rules");
+                            let backend_rules_file = format!("{}/backend_javascript/backend_security.ron", base_rules_dir);
+                            if let Ok(backend_rules) = Rules::load_from_file(&backend_rules_file) {
                                 all_rules.push(backend_rules);
                             }
                         }
@@ -147,17 +159,23 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
 pub fn run_explicit_scan(cli: &Cli, show_progress: bool) -> Result<Vec<Finding>> {
     let language = cli.language.as_ref()
         .ok_or_else(|| anyhow::anyhow!("Language required for explicit scan"))?;
-    let rules_path = cli.rules_path.as_ref()
-        .ok_or_else(|| anyhow::anyhow!("Rules path required for explicit scan"))?;
     
-    let mut all_rules = vec![Rules::load_from_path(rules_path)?];
+    let mut all_rules = if should_use_embedded_rules(cli) {
+        vec![Rules::load_embedded_rules(language, cli.code_type.as_deref())?]
+    } else {
+        let rules_path = cli.rules_path.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Rules path required for explicit scan when not using embedded rules"))?;
+        vec![Rules::load_from_path(rules_path)?]
+    };
     
     // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
-    if matches!(language.as_str(), "javascript" | "tsx") {
+    // (Note: For embedded rules, backend rules are already loaded in load_embedded_rules)
+    if !should_use_embedded_rules(cli) && matches!(language.as_str(), "javascript" | "tsx") {
         if let Some(code_type) = &cli.code_type {
             if code_type != "frontend"{
-                let backend_rules_file = "rules/javascript/backend_security.ron";
-                if let Ok(backend_rules) = Rules::load_from_file(backend_rules_file) {
+                let base_rules_dir = cli.rules_dir.as_deref().unwrap_or("rules");
+                let backend_rules_file = format!("{}/backend_javascript/backend_security.ron", base_rules_dir);
+                if let Ok(backend_rules) = Rules::load_from_file(&backend_rules_file) {
                     all_rules.push(backend_rules);
                 }
             }
@@ -198,11 +216,15 @@ pub fn run_explicit_scan(cli: &Cli, show_progress: bool) -> Result<Vec<Finding>>
         println!("📂 Target directory: {}", cli.root_dir);
         println!("🔧 Language: {}", language);
         
-        let path = std::path::Path::new(rules_path);
-        if path.is_dir() {
-            println!("📋 Rules directory: {}", rules_path);
-        } else {
-            println!("📋 Rules file: {}", rules_path);
+        if should_use_embedded_rules(cli) {
+            println!("📋 Using embedded rules");
+        } else if let Some(rules_path) = &cli.rules_path {
+            let path = std::path::Path::new(rules_path);
+            if path.is_dir() {
+                println!("📋 Rules directory: {}", rules_path);
+            } else {
+                println!("📋 Rules file: {}", rules_path);
+            }
         }
         
         println!("🔍 Running scan with {} rules", total_rules);
@@ -266,38 +288,47 @@ pub fn run_auto_detection_scan(cli: &Cli, show_progress: bool) -> Result<Vec<Fin
     
     // Process languages sequentially to avoid nested parallelism deadlocks
     for (language, files) in lang_jobs {
+        let base_rules_dir = cli.rules_dir.as_deref().unwrap_or("rules");
         let rules_dir = match language.as_str() {
-            "tsx" => "rules/javascript".to_string(),
-            _ => format!("rules/{}", language),
+            "tsx" => format!("{}/javascript", base_rules_dir),
+            _ => format!("{}/{}", base_rules_dir, language),
         };
         
-        // Load base rules for the language with centralized exclusions
+        // Load rules - either embedded or from files
         let mut all_rules = Vec::new();
         
-        // Determine exclusion pattern type based on code_type
-        let pattern_type = if let Some(code_type) = &cli.code_type {
-            if code_type == "backend" {
-                "backend"
-            } else if code_type == "frontend" {
-                "frontend"
-            } else {
-                "frontend" // default for "both" or other values
+        if should_use_embedded_rules(cli) {
+            // Use embedded rules
+            if let Ok(embedded_rules) = Rules::load_embedded_rules(&language, cli.code_type.as_deref()) {
+                all_rules.push(embedded_rules);
             }
         } else {
-            "frontend" // default when no code_type specified
-        };
-        
-        if let Ok(base_rules) = Rules::load_from_directory_with_exclusions(&rules_dir, pattern_type) {
-            all_rules.push(base_rules);
-        }
-        
-        // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
-        if matches!(language.as_str(), "javascript" | "tsx") {
-            if let Some(code_type) = &cli.code_type {
-                if code_type != "frontend" {
-                    let backend_rules_dir = "rules/javascript/backend_security.ron";
-                    if let Ok(backend_rules) = Rules::load_from_file(backend_rules_dir) {
-                        all_rules.push(backend_rules);
+            // Load base rules for the language with centralized exclusions
+            // Determine exclusion pattern type based on code_type
+            let pattern_type = if let Some(code_type) = &cli.code_type {
+                if code_type == "backend" {
+                    "backend"
+                } else if code_type == "frontend" {
+                    "frontend"
+                } else {
+                    "frontend" // default for "both" or other values
+                }
+            } else {
+                "frontend" // default when no code_type specified
+            };
+            
+            if let Ok(base_rules) = Rules::load_from_directory_with_exclusions(&rules_dir, pattern_type) {
+                all_rules.push(base_rules);
+            }
+            
+            // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
+            if matches!(language.as_str(), "javascript" | "tsx") {
+                if let Some(code_type) = &cli.code_type {
+                    if code_type != "frontend" {
+                        let backend_rules_dir = format!("{}/backend_javascript/backend_security.ron", base_rules_dir);
+                        if let Ok(backend_rules) = Rules::load_from_file(&backend_rules_dir) {
+                            all_rules.push(backend_rules);
+                        }
                     }
                 }
             }

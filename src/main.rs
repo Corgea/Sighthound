@@ -28,19 +28,26 @@ fn main() -> Result<()> {
     let findings = if cli.taint_analysis {
         run_taint_analysis(&cli, show_progress)?
     } else {
+        // Resolve the actual embedded rules setting (use_file_rules overrides use_embedded_rules)
+        let should_use_embedded = cli.use_embedded_rules && !cli.use_file_rules;
+        
         // Validate CLI parameters using CommonUtils
-        CommonUtils::validate_cli_params(&cli.language, &cli.rules_path)
-            .map_err(|_| anyhow::anyhow!(
-                "❌ Invalid combination. Please provide both language and rules path:\n  \
-                cargo run -- {} <language> <rules_path>\n  \
-                Or use auto-detection (no language/rules args):\n  \
-                cargo run -- {}", 
-                cli.root_dir, cli.root_dir
+        CommonUtils::validate_cli_params(&cli.language, &cli.rules_path, cli.use_embedded_rules, cli.use_file_rules)
+            .map_err(|e| anyhow::anyhow!(
+                "❌ Invalid parameter combination: {}\n\n\
+                Valid usage:\n  \
+                • Explicit mode with embedded rules (default): cargo run -- {} <language>\n  \
+                • Explicit mode with file rules: cargo run -- {} <language> <rules_path> --use-file-rules\n  \
+                • Auto-detection mode with embedded rules (default): cargo run -- {}\n  \
+                • Auto-detection mode with file rules: cargo run -- {} --use-file-rules\n  \
+                • Custom rules directory: cargo run -- {} --rules-dir <custom_rules_dir> --use-file-rules", 
+                e, cli.root_dir, cli.root_dir, cli.root_dir, cli.root_dir, cli.root_dir
             ))?;
 
-        match (&cli.language, &cli.rules_path) {
-            (Some(_), Some(_)) => run_explicit_scan(&cli, show_progress)?,
-            (None, None) => run_auto_detection_scan(&cli, show_progress)?,
+        match (&cli.language, &cli.rules_path, should_use_embedded) {
+            (Some(_), Some(_), false) => run_explicit_scan(&cli, show_progress)?,
+            (Some(_), None, true) => run_explicit_scan(&cli, show_progress)?,
+            (None, None, _) => run_auto_detection_scan(&cli, show_progress)?,
             _ => unreachable!(), // Validation above ensures this won't happen
         }
     };

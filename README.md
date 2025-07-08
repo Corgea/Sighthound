@@ -43,12 +43,19 @@ A high-performance vulnerability scanner for source code using tree-sitter parsi
 
 ### Build from Source
 ```bash
-git clone https://github.com/corgea/greppy_prototype.git
-cd greppy_prototype
+git clone https://github.com/corgea/Sighthound.git
+cd Sighthound
 cargo build --release
 ```
 
 The binary will be available at `target/release/find_vulns`.
+
+In order to build linux container compatible binary,
+```bash
+docker build --target export -t find-vulns-export:latest .
+docker run --rm -v $(pwd):/output find-vulns-export sh -c "cp /find_vulns /output/
+```
+Then binary `find_vulns` would be exported at the current folder.
 
 ### Development Setup
 ```bash

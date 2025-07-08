@@ -711,11 +711,26 @@ impl CommonUtils {
     }
 
     /// Validate required CLI parameter combination
-    pub fn validate_cli_params(language: &Option<String>, rules_path: &Option<String>) -> Result<()> {
-        match (language, rules_path) {
-            (Some(_), Some(_)) | (None, None) => Ok(()),
-            _ => Err(anyhow::anyhow!(
-                "Invalid combination. Provide both language and rules path, or use auto-detection"
+    pub fn validate_cli_params(language: &Option<String>, rules_path: &Option<String>, use_embedded_rules: bool, use_file_rules: bool) -> Result<()> {
+        // Resolve the actual embedded rules setting (use_file_rules overrides use_embedded_rules)
+        let should_use_embedded = use_embedded_rules && !use_file_rules;
+        
+        match (language, rules_path, should_use_embedded) {
+            // Explicit mode with embedded rules
+            (Some(_), None, true) => Ok(()),
+            // Explicit mode with file rules
+            (Some(_), Some(_), false) => Ok(()),
+            // Auto-detection mode (embedded or file rules)
+            (None, None, _) => Ok(()),
+            // Invalid combinations
+            (Some(_), Some(_), true) => Err(anyhow::anyhow!(
+                "Cannot specify both --rules-path and embedded rules. Use --use-file-rules to disable embedded rules"
+            )),
+            (Some(_), None, false) => Err(anyhow::anyhow!(
+                "Must specify --rules-path when using explicit mode with --use-file-rules"
+            )),
+            (None, Some(_), _) => Err(anyhow::anyhow!(
+                "Cannot specify --rules-path without language in auto-detection mode"
             )),
         }
     }

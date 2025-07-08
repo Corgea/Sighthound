@@ -10,10 +10,6 @@ repository = "https://github.com/corgea/greppy_prototype"
 name = "find_vulns"
 path = "src/main.rs"
 
-[lib]
-name = "find_vulns"
-path = "src/lib.rs"
-
 [features]
 default = ["python", "java", "javascript", "tsx", "html", "django"]
 python = ["tree-sitter-python"]

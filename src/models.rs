@@ -302,6 +302,18 @@ pub struct Cli {
     #[arg(help = "Path to rules file (.ron) or directory containing multiple .ron rule files")]
     pub rules_path: Option<String>,
     
+    /// Custom rules directory (overrides default 'rules' directory)
+    #[arg(long, help = "Custom rules directory to use instead of default 'rules' directory")]
+    pub rules_dir: Option<String>,
+    
+    /// Use embedded rules instead of loading from files (default: true)
+    #[arg(long, default_value = "true", help = "Use rules embedded in the binary instead of loading from files (default: true)")]
+    pub use_embedded_rules: bool,
+    
+    /// Disable embedded rules and use file-based rules instead
+    #[arg(long, help = "Disable embedded rules and load rules from files (overrides --use-embedded-rules)")]
+    pub use_file_rules: bool,
+    
     /// Output format (text, json, csv)
     #[arg(short, long, default_value = "text", help = "Output format: text, json, or csv")]
     pub output_format: String,
