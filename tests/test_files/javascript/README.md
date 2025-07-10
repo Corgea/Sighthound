@@ -124,13 +124,13 @@ Based on testing with our taint analysis rules:
 
 ```bash
 # Test simple patterns
-./find_vulns_macos_arm64 --taint-analysis tests/test_files/javascript/xss_simple_test.js javascript rules/javascript/frontend_taint_security.ron
+./sighthound_macos_arm64 --taint-analysis tests/test_files/javascript/xss_simple_test.js javascript rules/javascript/frontend_taint_security.ron
 
 # Test comprehensive patterns
-./find_vulns_macos_arm64 --taint-analysis tests/test_files/javascript/xss_comprehensive_test.js javascript rules/javascript/frontend_taint_security.ron
+./sighthound_macos_arm64 --taint-analysis tests/test_files/javascript/xss_comprehensive_test.js javascript rules/javascript/frontend_taint_security.ron
 
 # Test TypeScript patterns
-./find_vulns_macos_arm64 --taint-analysis tests/test_files/javascript/xss_false_negative_tests.tsx javascript rules/javascript/frontend_taint_security.ron
+./sighthound_macos_arm64 --taint-analysis tests/test_files/javascript/xss_false_negative_tests.tsx javascript rules/javascript/frontend_taint_security.ron
 ```
 
 ## Expected Outcomes

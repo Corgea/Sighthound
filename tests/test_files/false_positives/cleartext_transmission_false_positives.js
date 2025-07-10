@@ -25,7 +25,7 @@
  * RULE ID: js-cleartext-network-taint-001
  * 
  * TEST COMMAND:
- * ./target/debug/find_vulns tests/test_files/false_positives/cleartext_transmission_false_positives.js --code-type frontend --taint-analysis
+ * ./target/debug/sighthound tests/test_files/false_positives/cleartext_transmission_false_positives.js --code-type frontend --taint-analysis
  * 
  * EXPECTED RESULTS:
  * - 3 Clear-text Transmission vulnerabilities (lines 43, 52, 61)
@@ -210,7 +210,7 @@ function documentedFunction() {
  * REGRESSION TEST VALIDATION:
  * 
  * To validate this test file:
- * 1. Run: ./target/debug/find_vulns tests/test_files/false_positives/cleartext_transmission_false_positives.js --code-type frontend --taint-analysis
+ * 1. Run: ./target/debug/sighthound tests/test_files/false_positives/cleartext_transmission_false_positives.js --code-type frontend --taint-analysis
  * 2. Expected: Exactly 3 Clear-text Transmission vulnerabilities
  * 3. Expected: 0 false positives from library code sections
  * 4. If more than 3 vulnerabilities are found, the rule has regressed

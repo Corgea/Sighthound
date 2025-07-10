@@ -48,16 +48,16 @@ cd Sighthound
 cargo build --release
 ```
 
-The binary will be available at `target/release/find_vulns`.
+The binary will be available at `target/release/sighthound`.
 
 In order to build linux container compatible binary,
 ```bash
 DOCKER_BUILDKIT=1 docker build \
   --target export \
-  --output type=local,dest=./find_vulns_release \
+  --output type=local,dest=./sighthound_release \
   .
 ```
-Then binary `find_vulns` would be exported at the current folder.
+Then binary `sighthound` would be exported at the current folder.
 
 ### Development Setup
 ```bash
@@ -121,7 +121,7 @@ High: SQL Injection
 ### Command Line Options
 ```bash
 USAGE:
-    find_vulns [OPTIONS] <ROOT_DIR> [LANGUAGE] [RULES_PATH]
+    sighthound [OPTIONS] <ROOT_DIR> [LANGUAGE] [RULES_PATH]
 
 ARGS:
     <ROOT_DIR>     Root directory to scan for vulnerabilities

@@ -1,5 +1,5 @@
-use find_vulns::rules::Rules;
-use find_vulns::VulnerabilityScanner;
+use sighthound::rules::Rules;
+use sighthound::VulnerabilityScanner;
 use std::path::Path;
 
 // Helper function to create temporary test files

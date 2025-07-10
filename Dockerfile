@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for building find_vulns binary
+# Multi-stage Dockerfile for building sighthound binary
 # Stage 1: Build the binary
 FROM rust:1.80-slim AS builder
 
@@ -26,7 +26,14 @@ ENV BUILD_DATE=${BUILD_DATE}
 # Build the release binary
 RUN cargo build --release
 
-# Export stage - minimal image with just the binary and required files
+# Runtime stage - minimal image for running the container
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/sighthound /usr/local/bin/sighthound
+COPY --from=builder /app/rules /rules
+ENTRYPOINT ["/usr/local/bin/sighthound"]
+
+# Export stage - minimal stage with just the binary and required files
 FROM scratch AS export
-COPY --from=builder /app/target/release/find_vulns /find_vulns
+COPY --from=builder /app/target/release/sighthound /sighthound
 COPY --from=builder /app/rules /rules

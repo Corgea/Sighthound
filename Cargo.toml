@@ -1,5 +1,5 @@
 [package]
-name = "find_vulns"
+name = "sighthound"
 version = "0.1.1"
 edition = "2021"
 authors = ["Corgea Team"]
@@ -7,7 +7,7 @@ description = "A blazing fast vulnerability scanner for source code using tree-s
 repository = "https://github.com/corgea/greppy_prototype"
 
 [[bin]]
-name = "find_vulns"
+name = "sighthound"
 path = "src/main.rs"
 
 [features]

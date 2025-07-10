@@ -2,15 +2,15 @@ use anyhow::Result;
 use env_logger;
 use log::LevelFilter;
 use clap::Parser;
-use find_vulns::{Cli, CommonUtils, run_explicit_scan, run_auto_detection_scan, run_taint_analysis, run_taint_analysis_with_verbosity};
-use find_vulns::scanner::core::{print_findings_json, print_findings_csv, print_findings_text, print_summary};
+use sighthound::{Cli, CommonUtils, run_explicit_scan, run_auto_detection_scan, run_taint_analysis, run_taint_analysis_with_verbosity};
+use sighthound::scanner::core::{print_findings_json, print_findings_csv, print_findings_text, print_summary};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Handle version flag
     if cli.version {
-        println!("find_vulns {}", env!("CARGO_PKG_VERSION"));
+        println!("sighthound {}", env!("CARGO_PKG_VERSION"));
         println!("Built from commit: {}", option_env!("GIT_HASH").unwrap_or("unknown"));
         println!("Build date: {}", option_env!("BUILD_DATE").unwrap_or("unknown"));
         return Ok(());

@@ -60,20 +60,20 @@ help:
 # Development shortcuts
 dev-django:
 	@echo "🐍 Testing Django rules..."
-	./target/release/find_vulns test_data/python/django python rules/python/django/ --threads 1
+	./target/release/sighthound test_data/python/django python rules/python/django/ --threads 1
 
 dev-general:
 	@echo "🐍 Testing general Python rules..."
-	./target/release/find_vulns test_data/python/general python rules/python/python/general.ron --threads 1
+	./target/release/sighthound test_data/python/general python rules/python/python/general.ron --threads 1
 
 dev-malicious:
 	@echo "🕵️ Testing malicious pattern detection..."
-	./target/release/find_vulns test_data/python/malicious python rules/python/malicious/ --threads 1
+	./target/release/sighthound test_data/python/malicious python rules/python/malicious/ --threads 1
 
 # Performance testing
 perf-test: build
 	@echo "⚡ Running performance tests..."
 	@echo "Testing parser pooling with 8 threads..."
-	time ./target/release/find_vulns test_data/python python rules/python/python/general.ron --threads 8
+	time ./target/release/sighthound test_data/python python rules/python/python/general.ron --threads 8
 	@echo "Testing single-threaded performance..."
-	time ./target/release/find_vulns test_data/python python rules/python/python/general.ron --threads 1 
+	time ./target/release/sighthound test_data/python python rules/python/python/general.ron --threads 1 

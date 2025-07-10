@@ -31,7 +31,7 @@ These tests ensure that once a false positive issue is fixed, it doesn't reappea
 
 **Test Command**:
 ```bash
-./target/debug/find_vulns tests/test_files/false_positives/cleartext_transmission_false_positives.js --code-type frontend --taint-analysis
+./target/debug/sighthound tests/test_files/false_positives/cleartext_transmission_false_positives.js --code-type frontend --taint-analysis
 ```
 
 **Fixed Rule**: `js-cleartext-network-taint-001`
@@ -42,10 +42,10 @@ To run all false positive tests:
 
 ```bash
 # Run individual test
-./target/debug/find_vulns tests/test_files/false_positives/cleartext_transmission_false_positives.js --code-type frontend --taint-analysis
+./target/debug/sighthound tests/test_files/false_positives/cleartext_transmission_false_positives.js --code-type frontend --taint-analysis
 
 # Count results to validate
-./target/debug/find_vulns tests/test_files/false_positives/cleartext_transmission_false_positives.js --code-type frontend --taint-analysis --output-format json | grep -c "Clear-text Transmission"
+./target/debug/sighthound tests/test_files/false_positives/cleartext_transmission_false_positives.js --code-type frontend --taint-analysis --output-format json | grep -c "Clear-text Transmission"
 ```
 
 ## Adding New Tests
