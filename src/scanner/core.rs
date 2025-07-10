@@ -2623,7 +2623,7 @@ impl MultiFileTaintAnalyzer {
                     let module_file_path = if module_name.ends_with(".py") {
                         module_name
                     } else {
-                        // Convert module_a -> test_files/accuracy_tests/cross_file/module_a.py
+                        // Convert module_a -> tests/test_files/accuracy_tests/cross_file/module_a.py
                         let base_dir = std::path::Path::new(filepath).parent().unwrap_or(std::path::Path::new(""));
                         let module_file = format!("{}.py", module_name);
                         base_dir.join(module_file).to_string_lossy().to_string()

@@ -117,7 +117,7 @@ class AccuracyTestRunner:
             "--taint-analysis",
             "--output-format",
             "json",
-            f"test_files/accuracy_tests/{test_dir}",
+            f"tests/test_files/accuracy_tests/{test_dir}",
             "python",
             "rules/python/general_security.ron",
         ]

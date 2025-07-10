@@ -39,7 +39,7 @@ The test suite implements the testing strategy defined in `../../TAINT_TESTING_S
 
 ### **Quick Test Run**
 ```bash
-cd test_files/multi_file_taint_tests
+cd tests/test_files/multi_file_taint_tests
 python3 run_comprehensive_tests.py
 ```
 
@@ -77,7 +77,7 @@ cargo run -- --taint-analysis category4_config/test4_1_config_manager.py categor
 ## 🧪 **Test File Structure**
 
 ```
-test_files/multi_file_taint_tests/
+tests/test_files/multi_file_taint_tests/
 ├── category1_valid/           # Valid flows (should detect)
 │   ├── test1_1_source_module.py
 │   └── test1_1_sink_module.py

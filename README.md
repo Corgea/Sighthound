@@ -72,7 +72,7 @@ cargo build
 cargo test
 
 # Run with sample files
-cargo run -- test_files/python
+cargo run -- tests/test_files/python
 ```
 
 ## 🎯 Quick Start
@@ -299,7 +299,7 @@ cargo test --test integration_tests
 cargo test --test end_to_end_tests
 
 # Test with specific files
-cargo run -- test_files/python/comprehensive_taint_test.py
+cargo run -- tests/test_files/python/comprehensive_taint_test.py
 ```
 
 ### Test Coverage
@@ -310,7 +310,7 @@ cargo run -- test_files/python/comprehensive_taint_test.py
 - **Performance Tests**: Large file handling and scaling
 
 ### Sample Test Files
-The `test_files/` directory contains comprehensive test cases:
+The `tests/test_files/` directory contains comprehensive test cases:
 - **True Positives**: Confirmed vulnerabilities that should be detected
 - **True Negatives**: Safe code that should not trigger alerts
 - **Edge Cases**: Complex scenarios and boundary conditions
