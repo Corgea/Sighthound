@@ -15,9 +15,15 @@
                 "document.documentURI",
                 "document.baseURI",
                 
-                // URL parameter parsing - actual user input
+                // Enhanced URL parameter parsing
                 "URLSearchParams(*window.location*",
                 "new URLSearchParams(*window.location*",
+                "urlParams.get(",
+                "searchParams.get(",
+                "params.get(",
+                "*.searchParams.get(",
+                "currentUrl.searchParams.get(",
+                "url.searchParams.get(",
                 "decodeURIComponent(*location.*",
                 "decodeURI(*location.*",
                 
@@ -27,6 +33,24 @@
                 "document.getElementById(*).value",
                 "input.value",
                 "textarea.value",
+                "FormData",
+                
+                // DOM element content (could be user-controlled)
+                "*.textContent",
+                "*.innerText",
+                "*.innerHTML",
+                "*.outerHTML",
+                "*.text",
+                "option.text",
+                "*.selectedOptions",
+                "*.value",
+                "element.textContent",
+                "element.innerText",
+                "element.innerHTML",
+                "firstMember.querySelector(*).textContent",
+                "document.querySelector(*).textContent",
+                "document.querySelector(*).innerText",
+                "document.querySelector(*).innerHTML",
                 
                 // User interaction
                 "prompt(",
@@ -42,6 +66,11 @@
                 "*.response",
                 "fetch(*).then",
                 "XMLHttpRequest.responseText",
+                "axios.get",
+                "axios.post",
+                "$.get",
+                "$.post",
+                "$.ajax",
                 
                 // External storage (could be manipulated)
                 "localStorage.getItem",
@@ -60,6 +89,16 @@
                 // Script injection points - be more specific
                 "script.src",
                 "iframe.src",
+                "*.srcdoc",  // iframe srcdoc
+                
+                // Attribute manipulation
+                "*.title",
+                "*.alt",
+                "*.onclick",
+                "*.onload",
+                "*.onerror",
+                "*.setAttribute",
+                "*.dataset.*",
                 
                 // Code execution
                 "eval(",
@@ -91,7 +130,14 @@
                 "sanitize(",
                 "validate(",
                 "clean(",
-                "escape("
+                "escape(",
+                "isValidURL",
+                "validateURL",
+                "whitelist.includes",
+                "allowedDomains.includes",
+                "startsWith(\"https://trusted\")",
+                "encodeURIComponent",
+                "encodeURI"
             ]),
             
             finding_type: Some("DOM-based XSS"),
@@ -151,7 +197,13 @@
                 (
                     field: "pattern",
                     operator: "not_contains",
-                    value: "window.location.href",
+                    value: "= window.location.href",
+                    condition_type: Some("exclude_safe_location_reads")
+                ),
+                (
+                    field: "pattern",
+                    operator: "not_contains",
+                    value: "= window.location.pathname",
                     condition_type: Some("exclude_safe_location_reads")
                 ),
                 (
@@ -171,6 +223,25 @@
                     operator: "not_contains",
                     value: "DOMPurify.sanitize",
                     condition_type: Some("exclude_safe_operations")
+                ),
+                // Exclude safe validation patterns
+                (
+                    field: "pattern",
+                    operator: "not_contains",
+                    value: "isValidURL",
+                    condition_type: Some("exclude_validated_operations")
+                ),
+                (
+                    field: "pattern",
+                    operator: "not_contains",
+                    value: "validateURL",
+                    condition_type: Some("exclude_validated_operations")
+                ),
+                (
+                    field: "pattern",
+                    operator: "not_contains",
+                    value: "startsWith(\"https://trusted",
+                    condition_type: Some("exclude_validated_operations")
                 )
             ]),
             
@@ -587,7 +658,13 @@
                 
                 // External storage (could be manipulated)
                 "localStorage.getItem",    // Only if from external sources
-                "sessionStorage.getItem"   // Only if from external sources
+                "sessionStorage.getItem",  // Only if from external sources
+                "{ ...localStorage }",     // Spread operator for localStorage
+                "...localStorage",         // Spread operator variations
+                "Object.entries({ ...localStorage })",  // Object.entries with localStorage
+                "Object.entries(localStorage)",         // Object.entries with localStorage
+                "Object.keys(localStorage)",            // Object.keys with localStorage
+                "Object.values(localStorage)",          // Object.values with localStorage
             ]),
             
             sinks: Some([
@@ -605,6 +682,28 @@
                 "*.src",                   // Resource sources
                 "*.action",                // Form actions
                 "*.formAction",            // Form actions
+                
+                // React/Component state that could be used for redirection
+                "*.setState",              // React setState
+                "this.setState",           // React setState
+                "useState",                // React hooks
+                "useReducer",              // React hooks
+                "*.dispatch",              // Redux/state management
+                
+                // Component props that could be used for redirection
+                "*.props.*",               // Component props
+                "props.*",                 // Component props
+                "*.onRedirect",            // Callback props
+                "*.onNavigate",            // Callback props
+                
+                // State management libraries
+                "store.dispatch",          // Redux
+                "*.commit",                // Vuex
+                "*.mutate",                // State mutations
+                
+                // DOM data attributes that could be used for redirection
+                "*.dataset.*",             // Dataset attributes
+                "*.setAttribute",          // Setting attributes
                 
                 // Meta refresh (high risk)
                 "*.setAttribute(\"http-equiv\", \"refresh\")"
@@ -858,9 +957,13 @@
                 "*.responseJSON.refreshToken",
                 "*.responseJSON.apiKey",
                 "*.responseJSON.sessionId",
+                "*.responseJSON.session_key",
+                "*.responseJSON.secret",
                 "*.response.data.token",
                 "*.response.data.accessToken",
                 "*.response.data.key",
+                "*.response.data.session_key",
+                "*.response.data.secret",
                 
                 // Authentication form fields (actual values)
                 "*[type=\"password\"].value",
@@ -892,6 +995,54 @@
                 "config.secret",
                 "config.privateKey",
                 
+                // Configuration objects with sensitive properties
+                "*.token",
+                "*.session_key",
+                "*.sessionKey", 
+                "*.api_key",
+                "*.apiKey",
+                "*.secret",
+                "*.privateKey",
+                "*.accessToken",
+                "*.refreshToken",
+                "*.authToken",
+                "*.password",
+                "*.credentials",
+                "*.refresh_token",
+                "*.api_root",
+                "*.apiRoot",
+                
+                // Specific patterns for configuration objects
+                "lastfmConfig.token",
+                "lastfmConfig.session_key",
+                "lastfmConfig.api_key",
+                "lastfmConfig.secret",
+                "authConfig.token",
+                "authConfig.session_key",
+                "authConfig.api_key",
+                "authConfig.secret",
+                "authConfig.refresh_token",
+                
+                // Configuration store access patterns
+                "store.get(*token*)",
+                "store.get(*session*)",
+                "store.get(*key*)",
+                "store.get(*secret*)",
+                "store.get(*password*)",
+                "config.get(*token*)",
+                "config.get(*session*)",
+                "config.get(*key*)",
+                "config.get(*secret*)",
+                "config.get(*password*)",
+                
+                // Object property access with sensitive names
+                "*.get('token')",
+                "*.get('session_key')",
+                "*.get('api_key')",
+                "*.get('secret')",
+                "*.get('password')",
+                "*.get('credentials')",
+                
                 // User input that's clearly sensitive
                 "prompt(*password*)",
                 "prompt(*token*)",
@@ -905,7 +1056,7 @@
             ]),
             
             sinks: Some([
-                // Insecure storage with sensitive data patterns
+                // Browser storage with sensitive data patterns
                 "localStorage.setItem(*password*",
                 "localStorage.setItem(*token*",
                 "localStorage.setItem(*key*",
@@ -923,6 +1074,37 @@
                 "document.cookie =",
                 "*.cookie =",
                 
+                // Configuration store methods
+                "store.set",
+                "store.setItem",
+                "store.put",
+                "config.set",
+                "config.setItem",
+                "config.put",
+                "*.set(",
+                "*.setItem(",
+                "*.put(",
+                
+                // Specific store.set patterns with sensitive data
+                "store.set(*scrobbler*",
+                "store.set(*auth*",
+                "store.set(*token*",
+                "store.set(*session*",
+                "store.set(*key*",
+                "store.set(*secret*",
+                
+                // File system storage (Node.js context)
+                "fs.writeFileSync",
+                "fs.writeFile",
+                "writeFileSync",
+                "writeFile",
+                
+                // Database storage
+                "*.save(",
+                "*.insert(",
+                "*.create(",
+                "*.update(",
+                
                 // IndexedDB storage of sensitive data
                 "indexedDB.*.put",
                 "indexedDB.*.add",
@@ -930,7 +1112,14 @@
                 "*.objectStore.add",
                 
                 // WebSQL (deprecated but still risky)
-                "*.executeSql"
+                "*.executeSql",
+                
+                // Memory/cache storage
+                "cache.set",
+                "*.cache.set",
+                "memoryCache.set",
+                "redis.set",
+                "*.redis.set"
             ]),
             
             sanitizers: Some([
@@ -1002,6 +1191,181 @@
             ]),
             
             tags: Some(["storage", "cwe-922", "sensitive-data", "authentication"])
+        ),
+
+        // ==================== CWE-922: Insecure Storage (Search Mode) ====================
+        (
+            id: Some("js-insecure-storage-search-001"),
+            name: Some("Insecure Storage of Sensitive Data (Direct Pattern)"),
+            category: Some("storage"),
+            mode: "search",
+            
+            patterns: Some([
+                // Direct property access in store.set calls
+                "store.set(*token*",
+                "store.set(*session*",
+                "store.set(*key*",
+                "store.set(*secret*",
+                "store.set(*password*",
+                "store.set(*credential*",
+                "store.set(*auth*",
+                
+                // Configuration store patterns with sensitive property access
+                "store.set(*\\.token*",
+                "store.set(*\\.session_key*",
+                "store.set(*\\.sessionKey*",
+                "store.set(*\\.api_key*",
+                "store.set(*\\.apiKey*",
+                "store.set(*\\.secret*",
+                "store.set(*\\.password*",
+                "store.set(*\\.credentials*",
+                "store.set(*\\.accessToken*",
+                "store.set(*\\.refreshToken*",
+                "store.set(*\\.authToken*",
+                "store.set(*\\.privateKey*",
+                
+                // Specific configuration object patterns
+                "store.set(*lastfmConfig\\.token*",
+                "store.set(*lastfmConfig\\.session_key*",
+                "store.set(*lastfmConfig\\.api_key*",
+                "store.set(*lastfmConfig\\.secret*",
+                "store.set(*authConfig\\.token*",
+                "store.set(*authConfig\\.session_key*",
+                "store.set(*authConfig\\.api_key*",
+                "store.set(*authConfig\\.secret*",
+                "store.set(*config\\.token*",
+                "store.set(*config\\.session_key*",
+                "store.set(*config\\.api_key*",
+                "store.set(*config\\.secret*",
+                
+                // Generic config.set patterns
+                "config.set(*token*",
+                "config.set(*session*",
+                "config.set(*key*",
+                "config.set(*secret*",
+                "config.set(*password*",
+                "config.set(*credential*",
+                "config.set(*auth*",
+                
+                // Other store methods
+                "*.setItem(*token*",
+                "*.setItem(*session*",
+                "*.setItem(*key*",
+                "*.setItem(*secret*",
+                "*.setItem(*password*",
+                "*.setItem(*credential*",
+                "*.setItem(*auth*",
+                
+                // File system storage patterns
+                "fs.writeFileSync(*token*",
+                "fs.writeFileSync(*session*",
+                "fs.writeFileSync(*key*",
+                "fs.writeFileSync(*secret*",
+                "fs.writeFileSync(*password*",
+                "fs.writeFileSync(*credential*",
+                "fs.writeFile(*token*",
+                "fs.writeFile(*session*",
+                "fs.writeFile(*key*",
+                "fs.writeFile(*secret*",
+                "fs.writeFile(*password*",
+                "fs.writeFile(*credential*",
+                
+                // localStorage patterns
+                "localStorage.setItem(*token*",
+                "localStorage.setItem(*session*",
+                "localStorage.setItem(*key*",
+                "localStorage.setItem(*secret*",
+                "localStorage.setItem(*password*",
+                "localStorage.setItem(*credential*",
+                "localStorage.setItem(*auth*",
+                
+                // sessionStorage patterns
+                "sessionStorage.setItem(*token*",
+                "sessionStorage.setItem(*session*",
+                "sessionStorage.setItem(*key*",
+                "sessionStorage.setItem(*secret*",
+                "sessionStorage.setItem(*password*",
+                "sessionStorage.setItem(*credential*",
+                "sessionStorage.setItem(*auth*"
+            ]),
+            
+            finding_type: Some("Insecure Storage"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-922"),
+            description: Some("Sensitive authentication or cryptographic data is stored without proper encryption"),
+            
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            
+            tags: Some(["storage", "cwe-922", "sensitive-data", "search-mode"])
+        ),
+
+        // ==================== CWE-79: Enhanced XSS Search Mode ====================
+        (
+            id: Some("js-xss-enhanced-search-001"),
+            name: Some("Enhanced XSS via URL Parameters and DOM Content"),
+            category: Some("xss"),
+            mode: "search",
+            
+            patterns: Some([
+                // URL parameter patterns to innerHTML
+                "*.searchParams.get(*innerHTML*",
+                "*.searchParams.get(*innerText*",
+                "*.searchParams.get(*outerHTML*",
+                "currentUrl.searchParams.get(*innerHTML*",
+                "url.searchParams.get(*innerHTML*",
+                "URLSearchParams(*innerHTML*",
+                "new URLSearchParams(*innerHTML*",
+                
+                // DOM element content patterns to innerHTML
+                "*.textContent*innerHTML*",
+                "*.innerText*innerHTML*",
+                "*.text*innerHTML*",
+                "option.text*innerHTML*",
+                "element.textContent*innerHTML*",
+                "firstMember.querySelector(*).textContent*innerHTML*",
+                "document.querySelector(*).textContent*innerHTML*",
+                "select.previousElementSibling.textContent*innerHTML*",
+                
+                // Template literal patterns with innerHTML
+                "`*${*searchParams.get(*}*`*innerHTML*",
+                "`*${*textContent*}*`*innerHTML*",
+                "`*${*innerText*}*`*innerHTML*",
+                "`*${*option.text*}*`*innerHTML*",
+                "`*${*memberName*}*`*innerHTML*",
+                "`*${*filterName*}*`*innerHTML*",
+                "`*${*search*}*`*innerHTML*",
+                "`*${*query*}*`*innerHTML*",
+                "`*${*filter*}*`*innerHTML*",
+                
+                // Specific vulnerable patterns from user cases
+                "filterTagsHtml*innerHTML*",
+                "tag.innerHTML*`*${*",
+                "membersButton.innerHTML*`*${*",
+                "document.getElementById(*).innerHTML*`*${*searchParams*",
+                "document.getElementById(*).innerHTML*`*${*textContent*",
+                "document.getElementById(*).innerHTML*`*${*innerText*",
+                "document.getElementById(*).innerHTML*`*${*option.text*",
+                
+                // General dangerous template literal patterns
+                "innerHTML*=*`*${*",
+                "outerHTML*=*`*${*",
+                "insertAdjacentHTML*`*${*",
+                "document.write*`*${*",
+                "document.writeln*`*${*"
+            ]),
+            
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("User-controlled data from URL parameters or DOM elements flows to HTML output without proper encoding"),
+            
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            
+            tags: Some(["xss", "cwe-79", "search-mode", "enhanced"])
         ),
 
         // ==================== CWE-95: Eval of User-Controlled Code ====================

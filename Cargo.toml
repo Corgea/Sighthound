@@ -1,6 +1,6 @@
 [package]
 name = "find_vulns"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Corgea Team"]
 description = "A blazing fast vulnerability scanner for source code using tree-sitter"

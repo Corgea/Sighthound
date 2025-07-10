@@ -52,8 +52,10 @@ The binary will be available at `target/release/find_vulns`.
 
 In order to build linux container compatible binary,
 ```bash
-docker build --target export -t find-vulns-export:latest .
-docker run --rm -v $(pwd):/output find-vulns-export sh -c "cp /find_vulns /output/
+DOCKER_BUILDKIT=1 docker build \
+  --target export \
+  --output type=local,dest=./find_vulns_release \
+  .
 ```
 Then binary `find_vulns` would be exported at the current folder.
 

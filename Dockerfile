@@ -17,6 +17,12 @@ COPY . .
 # Remove Cargo.lock to avoid version conflicts in container
 RUN rm -f Cargo.lock
 
+# Set build-time environment variables
+ARG GIT_HASH
+ARG BUILD_DATE
+ENV GIT_HASH=${GIT_HASH}
+ENV BUILD_DATE=${BUILD_DATE}
+
 # Build the release binary
 RUN cargo build --release
 

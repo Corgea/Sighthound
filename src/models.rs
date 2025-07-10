@@ -287,12 +287,12 @@ pub struct Condition {
 #[command(
     name = "find_vulns",
     about = "A fast vulnerability scanner for source code",
-    long_about = "Corgea Greppy - A high-performance vulnerability scanner that uses tree-sitter for AST-based analysis with parallel processing support.\n\nSupports both explicit mode (specify language and rules) and auto-detection mode (automatically detect file types and load appropriate rules). Rules must be in RON format."
+    long_about = "Corgea Greppy - A high-performance vulnerability scanner that uses tree-sitter for AST-based analysis with parallel processing support.\n\nBy default, runs both simple pattern-based analysis and taint analysis for comprehensive vulnerability detection. Use --simple-analysis or --taint-analysis to run only one mode.\n\nSupports both explicit mode (specify language and rules) and auto-detection mode (automatically detect file types and load appropriate rules). Rules must be in RON format."
 )]
 pub struct Cli {
     /// Root directory to scan
     #[arg(help = "Root directory to scan for vulnerabilities")]
-    pub root_dir: String,
+    pub root_dir: Option<String>,
     
     /// Language to scan (optional - triggers explicit mode when used with rules_path)
     #[arg(help = "Programming language to scan (python, java, javascript, tsx, html, django)")]
@@ -334,9 +334,13 @@ pub struct Cli {
     #[arg(long, help = "Number of threads for parallel processing (default: auto-detect CPU cores)")]
     pub threads: Option<usize>,
 
-    /// Enable taint analysis mode
-    #[arg(long, help = "Enable taint analysis to track data flows from sources to sinks")]
+    /// Enable taint analysis mode only (default: both search and taint)
+    #[arg(long, help = "Run only taint analysis (data flow tracking from sources to sinks)")]
     pub taint_analysis: bool,
+
+    /// Enable simple analysis mode only (default: both search and taint)
+    #[arg(long, help = "Run only simple analysis (pattern-based search mode)")]
+    pub simple_analysis: bool,
 
     /// Skip minified JavaScript files (default: true)
     #[arg(long, help = "Skip minified JavaScript files during scanning")]
@@ -349,6 +353,10 @@ pub struct Cli {
     /// Filter by programming language
     #[arg(long, help = "Filter by programming language: javascript, typescript, python, java, etc.")]
     pub language_filter: Option<String>,
+
+    /// Print version information
+    #[arg(long, help = "Print version information")]
+    pub version: bool,
 }
 
 // Helper function for default search mode

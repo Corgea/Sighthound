@@ -13,6 +13,7 @@ pub use scanner::{
     VulnerabilityScanner, ScanningLogic, PreFilter, FilterStats, 
     run_explicit_scan, run_auto_detection_scan, run_taint_analysis
 };
+pub use scanner::modes::run_taint_analysis_with_verbosity;
 
 // Re-export types needed by tests and library users
 pub use common::CommonUtils;
