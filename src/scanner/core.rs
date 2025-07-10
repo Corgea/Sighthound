@@ -172,8 +172,8 @@ impl ScanningLogic {
             }
         }
 
-        let mut finding = Self::create_finding(
-            filepath, node, func_name, &rule.get_finding_type(), source, &rule.get_severity()
+        let mut finding = Self::create_finding_with_rule(
+            filepath, node, func_name, &rule.get_finding_type(), source, &rule.get_severity(), rule
         );
 
         Self::add_finding_metadata(&mut finding, rule, node);
@@ -580,9 +580,12 @@ impl ScanningLogic {
         source: &[u8],
         severity: &str,
     ) -> crate::models::Finding {
+        // Try to find the most specific vulnerable line within the node
+        let vulnerable_line = Self::find_vulnerable_line_in_node(node, source, finding_type, None);
+        
         crate::models::Finding {
             file: file.to_string(),
-            line: node.start_position().row + 1,
+            line: vulnerable_line,
             column: node.start_position().column + 1,
             end_line: node.end_position().row + 1,
             end_column: node.end_position().column + 1,
@@ -598,6 +601,114 @@ impl ScanningLogic {
             traces: None,
             tags: None,
         }
+    }
+
+    pub fn create_finding_with_rule(
+        file: &str,
+        node: &tree_sitter::Node,
+        function: &str,
+        finding_type: &str,
+        source: &[u8],
+        severity: &str,
+        rule: &crate::rules::UnifiedRule,
+    ) -> crate::models::Finding {
+        // Try to find the most specific vulnerable line within the node using rule sink patterns
+        let vulnerable_line = Self::find_vulnerable_line_in_node(node, source, finding_type, Some(rule));
+        
+        crate::models::Finding {
+            file: file.to_string(),
+            line: vulnerable_line,
+            column: node.start_position().column + 1,
+            end_line: node.end_position().row + 1,
+            end_column: node.end_position().column + 1,
+            function: function.to_string(),
+            finding_type: finding_type.to_string(),
+            severity: severity.to_string(),
+            confidence: "Medium".to_string(),
+            snippet: crate::parser::get_node_text(node, source),
+            description: None,
+            cwe_id: None,
+            source_info: None,
+            sink_info: None,
+            traces: None,
+            tags: None,
+        }
+    }
+
+    /// Find the most specific line where the vulnerability actually occurs within a node
+    fn find_vulnerable_line_in_node(
+        node: &tree_sitter::Node,
+        source: &[u8],
+        finding_type: &str,
+        rule: Option<&crate::rules::UnifiedRule>,
+    ) -> usize {
+        let node_text = crate::parser::get_node_text(node, source);
+        let lines: Vec<&str> = node_text.lines().collect();
+        let start_line = node.start_position().row + 1;
+        
+        // Get sink patterns from the rule if available
+        let sink_patterns = if let Some(rule) = rule {
+            if let Some(ref sinks) = rule.sinks {
+                sinks.clone()
+            } else {
+                // Fallback to pattern/patterns if no sinks defined
+                if let Some(ref pattern) = rule.pattern {
+                    vec![pattern.clone()]
+                } else if let Some(ref patterns) = rule.patterns {
+                    patterns.clone()
+                } else {
+                    vec![]
+                }
+            }
+        } else {
+            // Fallback to hardcoded patterns if no rule provided such as for simple search rule cases.
+            match finding_type.to_lowercase().as_str() {
+                s if s.contains("xss") || s.contains("cross-site") => vec![
+                    ".innerHTML".to_string(), ".outerHTML".to_string(), 
+                    "document.write".to_string(), ".insertAdjacentHTML".to_string()
+                ],
+                s if s.contains("redirect") || s.contains("open redirect") => vec![
+                    "window.location.href =".to_string(), "location.href =".to_string(), 
+                    "location.assign(".to_string(), "location.replace(".to_string(), 
+                    ".href =".to_string(), "window.open(".to_string(), ".setState(".to_string()
+                ],
+                s if s.contains("injection") || s.contains("command") => vec![
+                    "eval(".to_string(), "system(".to_string(), "exec(".to_string(), 
+                    "popen(".to_string(), "subprocess".to_string()
+                ],
+                s if s.contains("sql") => vec![
+                    "execute(".to_string(), "query(".to_string(), 
+                    "cursor.execute".to_string(), "db.query".to_string()
+                ],
+                _ => vec![]
+            }
+        };
+        // Search for the actual vulnerable line within the node
+        for (line_offset, line) in lines.iter().enumerate() {
+            for pattern in &sink_patterns {
+                // Clean pattern for matching (remove wildcards and make more flexible)
+                let clean_pattern = pattern
+                    .replace("*.", "")
+                    .replace("*", "")
+                    .trim()
+                    .to_string();
+                if !clean_pattern.is_empty() && line.contains(&clean_pattern) {
+                    return start_line + line_offset;
+                }
+            }
+        }
+        // If no specific sink pattern found, look for assignment operations (common vulnerability pattern)
+        for (line_offset, line) in lines.iter().enumerate() {
+            if line.contains('=') && !line.trim().starts_with("//") && !line.trim().starts_with("/*") {
+                // Skip function declarations and variable declarations without assignment
+                if !line.contains("function") && !line.contains("def ") && 
+                   !line.contains("const ") && !line.contains("let ") && !line.contains("var ") {
+                    return start_line + line_offset;
+                }
+            }
+        }
+        // Fallback to the original node start line
+        start_line
     }
 
     /// Scan file with taint analysis rules (fixed implementation with proper flow tracking)
@@ -1738,10 +1849,11 @@ impl ScanningLogic {
             }
         }
 
-        // Create enhanced finding with taint context
+        // Create enhanced finding with taint context - always point to the sink line
+        let vulnerable_line = Self::find_vulnerable_line_in_node(node, source, &rule.get_finding_type(), Some(rule));
         let mut finding = crate::models::Finding {
             file: filepath.to_string(),
-            line,
+            line: vulnerable_line,
             column: node.start_position().column,
             end_line: node.end_position().row + 1,
             end_column: node.end_position().column,
