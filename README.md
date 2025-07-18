@@ -51,6 +51,9 @@ cargo build --release
 The binary will be available at `target/release/sighthound`.
 
 In order to build linux container compatible binary,
+Use `build_all_platforms.sh`
+
+Docker command to build
 ```bash
 DOCKER_BUILDKIT=1 docker build \
   --target export \
