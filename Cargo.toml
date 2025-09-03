@@ -51,7 +51,7 @@ tempfile = "3.8"
 
 [profile.release]
 opt-level = 3
-lto = true
+lto = "thin"
 
 [[test]]
 name = "unit_tests"
