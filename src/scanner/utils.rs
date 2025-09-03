@@ -1,6 +1,6 @@
 use crate::rules::FileTypes;
 use std::path::{Path, PathBuf};
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use anyhow::Result;
 use walkdir::WalkDir;
 use rayon::prelude::*;
@@ -179,11 +179,11 @@ pub fn detect_language_from_path(file_path: &Path) -> Option<&'static str> {
 }
 
 /// Discover files by language with configurable parallelism
-pub fn discover_files_by_language(root_dir: &str, parallel: bool) -> Result<HashMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language(root_dir: &str, parallel: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     discover_files_by_language_with_progress(root_dir, parallel, true)
 }
 
-pub fn discover_files_by_language_with_progress(root_dir: &str, parallel: bool, show_progress: bool) -> Result<HashMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language_with_progress(root_dir: &str, parallel: bool, show_progress: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     let estimated_languages = crate::config::ScanDefaults::ESTIMATED_LANGUAGES;
 
     if parallel {
@@ -194,7 +194,7 @@ pub fn discover_files_by_language_with_progress(root_dir: &str, parallel: bool, 
 }
 
 /// Internal parallel file discovery implementation
-fn discover_files_parallel(root_dir: &str, estimated_languages: usize, show_progress: bool) -> Result<HashMap<String, Vec<PathBuf>>> {
+fn discover_files_parallel(root_dir: &str, estimated_languages: usize, show_progress: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     let all_paths: Vec<PathBuf> = WalkDir::new(root_dir)
         .follow_links(false)
         .into_iter()
@@ -233,7 +233,7 @@ fn discover_files_parallel(root_dir: &str, estimated_languages: usize, show_prog
     }
 
     let files_by_language = Arc::new(Mutex::new(
-        HashMap::<String, Vec<PathBuf>>::with_capacity(estimated_languages)
+        BTreeMap::<String, Vec<PathBuf>>::new()
     ));
 
     all_paths.par_iter().for_each(|path| {
@@ -252,8 +252,8 @@ fn discover_files_parallel(root_dir: &str, estimated_languages: usize, show_prog
 }
 
 /// Internal sequential file discovery implementation
-fn discover_files_sequential(root_dir: &str, estimated_languages: usize, _show_progress: bool) -> Result<HashMap<String, Vec<PathBuf>>> {
-    let mut files_by_language = HashMap::with_capacity(estimated_languages);
+fn discover_files_sequential(root_dir: &str, estimated_languages: usize, _show_progress: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
+    let mut files_by_language = BTreeMap::new();
 
     for entry in WalkDir::new(root_dir)
         .follow_links(false)
@@ -285,22 +285,22 @@ fn discover_files_sequential(root_dir: &str, estimated_languages: usize, _show_p
 }
 
 /// Parallel file discovery (replaces legacy wrapper)
-pub fn discover_files_by_language_parallel(root_dir: &str) -> Result<HashMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language_parallel(root_dir: &str) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     discover_files_by_language(root_dir, true)
 }
 
 /// Sequential file discovery (replaces legacy wrapper)
-pub fn discover_files_by_language_sequential(root_dir: &str) -> Result<HashMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language_sequential(root_dir: &str) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     discover_files_by_language(root_dir, false)
 }
 
 /// Parallel file discovery with progress control
-pub fn discover_files_by_language_parallel_with_progress(root_dir: &str, show_progress: bool) -> Result<HashMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language_parallel_with_progress(root_dir: &str, show_progress: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     discover_files_by_language_with_progress(root_dir, true, show_progress)
 }
 
 /// Sequential file discovery with progress control
-pub fn discover_files_by_language_sequential_with_progress(root_dir: &str, show_progress: bool) -> Result<HashMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language_sequential_with_progress(root_dir: &str, show_progress: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     discover_files_by_language_with_progress(root_dir, false, show_progress)
 }
 

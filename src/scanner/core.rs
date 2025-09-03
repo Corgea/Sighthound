@@ -10,7 +10,7 @@ use indicatif::{ProgressBar, ProgressStyle, ProgressDrawTarget};
 use memmap2::Mmap;
 use rayon::prelude::*;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -36,20 +36,20 @@ use crate::rules::Rules;
 #[derive(Debug, Clone)]
 struct TaintRuleDeduplicator {
     /// Mapping from (source_pattern, sink_pattern) to the rule that should handle it
-    rule_mapping: std::collections::HashMap<(String, String), crate::rules::UnifiedRule>,
+    rule_mapping: std::collections::BTreeMap<(String, String), crate::rules::UnifiedRule>,
     /// Consolidated source patterns across all rules
-    source_patterns: std::collections::HashSet<String>,
+    source_patterns: std::collections::BTreeSet<String>,
     /// Consolidated sink patterns across all rules
-    sink_patterns: std::collections::HashSet<String>,
+    sink_patterns: std::collections::BTreeSet<String>,
 }
 
 impl TaintRuleDeduplicator {
     /// Create a new deduplicator from a list of taint rules
     fn new(taint_rules: &[&crate::rules::UnifiedRule]) -> Self {
         let mut deduplicator = Self {
-            rule_mapping: std::collections::HashMap::new(),
-            source_patterns: std::collections::HashSet::new(),
-            sink_patterns: std::collections::HashSet::new(),
+            rule_mapping: std::collections::BTreeMap::new(),
+            source_patterns: std::collections::BTreeSet::new(),
+            sink_patterns: std::collections::BTreeSet::new(),
         };
 
         // Process each rule and create specific source-sink mappings
@@ -1448,7 +1448,7 @@ impl VulnerabilityScanner {
             crate::scanner::utils::discover_files_by_language_with_progress(root_dir, true, show_progress)?
         } else {
             let files = self.discover_files(root_dir)?;
-            let mut result = std::collections::HashMap::new();
+            let mut result = std::collections::BTreeMap::new();
             if !files.is_empty() {
                 result.insert(self.language.clone(), files);
             }
@@ -1920,10 +1920,10 @@ impl ScanningLogic {
 pub fn print_summary(findings: &[Finding], duration: std::time::Duration) {
     println!("\n\x1b[1;36m=== Vulnerability Summary ===\x1b[0m");
 
-    // Group findings by severity
-    let mut severity_counts: HashMap<String, usize> = HashMap::new();
-    let mut finding_types: HashMap<String, usize> = HashMap::new();
-    let mut file_counts: HashMap<String, usize> = HashMap::new();
+    // Group findings by severity - use BTreeMap for deterministic iteration
+    let mut severity_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut finding_types: BTreeMap<String, usize> = BTreeMap::new();
+    let mut file_counts: BTreeMap<String, usize> = BTreeMap::new();
 
     for finding in findings {
         *severity_counts.entry(finding.severity.clone()).or_insert(0) += 1;
@@ -2191,13 +2191,13 @@ pub fn print_findings_text(findings: &[Finding], _verbose: bool, summary_only: b
 #[derive(Debug)]
 struct VariableFlowTracker {
     /// Maps variable names to their taint source information
-    tainted_variables: std::collections::HashMap<String, TaintVariableInfo>,
+    tainted_variables: std::collections::BTreeMap<String, TaintVariableInfo>,
     /// Function scopes to handle variable visibility
-    function_scopes: std::collections::HashMap<String, std::collections::HashSet<String>>,
+    function_scopes: std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
     /// Taint propagation through operations
-    taint_propagations: std::collections::HashMap<String, Vec<String>>, // var -> [dependent_vars]
+    taint_propagations: std::collections::BTreeMap<String, Vec<String>>, // var -> [dependent_vars]
     /// Deduplication set for flows to prevent duplicates
-    processed_flows: std::collections::HashSet<(usize, String, String)>, // (line, source_pattern, sink_pattern)
+    processed_flows: std::collections::BTreeSet<(usize, String, String)>, // (line, source_pattern, sink_pattern)
 }
 
 #[derive(Debug, Clone)]
@@ -2211,10 +2211,10 @@ struct TaintVariableInfo {
 impl VariableFlowTracker {
     fn new() -> Self {
         Self {
-            tainted_variables: std::collections::HashMap::new(),
-            function_scopes: std::collections::HashMap::new(),
-            taint_propagations: std::collections::HashMap::new(),
-            processed_flows: std::collections::HashSet::new(),
+            tainted_variables: std::collections::BTreeMap::new(),
+            function_scopes: std::collections::BTreeMap::new(),
+            taint_propagations: std::collections::BTreeMap::new(),
+            processed_flows: std::collections::BTreeSet::new(),
         }
     }
 
@@ -2228,7 +2228,7 @@ impl VariableFlowTracker {
         // Add to function scope
         self.function_scopes
             .entry(source_info.source_function.clone())
-            .or_insert_with(std::collections::HashSet::new)
+            .or_insert_with(std::collections::BTreeSet::new)
             .insert(var_name);
     }
 
@@ -2402,21 +2402,21 @@ enum AnalysisResult {
 #[derive(Debug)]
 struct MultiFileTaintAnalyzer {
     /// Maps file paths to their exported functions/variables
-    file_exports: std::collections::HashMap<String, FileExports>,
+    file_exports: std::collections::BTreeMap<String, FileExports>,
     /// Maps file paths to their imported functions/variables
-    file_imports: std::collections::HashMap<String, FileImports>,
+    file_imports: std::collections::BTreeMap<String, FileImports>,
     /// Cross-file taint flows that span multiple files
     cross_file_flows: Vec<CrossFileTaintFlow>,
     /// Deduplication set for cross-file flows
-    processed_cross_file_flows: std::collections::HashSet<(String, String, String, String)>, // (source_file, source_func, sink_file, sink_func)
+    processed_cross_file_flows: std::collections::BTreeSet<(String, String, String, String)>, // (source_file, source_func, sink_file, sink_func)
 }
 
 #[derive(Debug, Clone)]
 struct FileExports {
     /// Functions exported from this file
-    functions: std::collections::HashSet<String>,
+    functions: std::collections::BTreeSet<String>,
     /// Variables exported from this file
-    variables: std::collections::HashSet<String>,
+    variables: std::collections::BTreeSet<String>,
     /// Taint sources in this file
     taint_sources: Vec<TaintSourceInfo>,
 }
@@ -2424,9 +2424,9 @@ struct FileExports {
 #[derive(Debug, Clone)]
 struct FileImports {
     /// Functions imported into this file
-    functions: std::collections::HashMap<String, String>, // local_name -> source_file
+    functions: std::collections::BTreeMap<String, String>, // local_name -> source_file
     /// Variables imported into this file
-    variables: std::collections::HashMap<String, String>, // local_name -> source_file
+    variables: std::collections::BTreeMap<String, String>, // local_name -> source_file
     /// Taint sinks in this file
     taint_sinks: Vec<TaintSinkInfo>,
 }
@@ -2463,17 +2463,17 @@ struct CrossFileTaintFlow {
 impl MultiFileTaintAnalyzer {
     fn new() -> Self {
         Self {
-            file_exports: std::collections::HashMap::new(),
-            file_imports: std::collections::HashMap::new(),
+            file_exports: std::collections::BTreeMap::new(),
+            file_imports: std::collections::BTreeMap::new(),
             cross_file_flows: Vec::new(),
-            processed_cross_file_flows: std::collections::HashSet::new(),
+            processed_cross_file_flows: std::collections::BTreeSet::new(),
         }
     }
 
     /// NEW: Analyze cross-file taint flows using the enhanced DataFlowTracer
     fn analyze_cross_file_flows(
         &mut self,
-        files_by_language: &std::collections::HashMap<String, Vec<std::path::PathBuf>>,
+        files_by_language: &std::collections::BTreeMap<String, Vec<std::path::PathBuf>>,
         taint_rules: &[&crate::rules::UnifiedRule],
         language_filter: Option<&str>,
     ) -> Result<Vec<crate::models::Finding>> {
@@ -2628,7 +2628,7 @@ impl MultiFileTaintAnalyzer {
     /// Build import/export maps for all files
     fn build_import_export_maps(
         &mut self,
-        files_by_language: &std::collections::HashMap<String, Vec<std::path::PathBuf>>,
+        files_by_language: &std::collections::BTreeMap<String, Vec<std::path::PathBuf>>,
         taint_rules: &[&crate::rules::UnifiedRule],
         language_filter: Option<&str>,
     ) -> Result<()> {
@@ -2698,14 +2698,14 @@ impl MultiFileTaintAnalyzer {
         _language_support: &dyn crate::language::LanguageSupport,
     ) {
         let mut exports = FileExports {
-            functions: std::collections::HashSet::new(),
-            variables: std::collections::HashSet::new(),
+            functions: std::collections::BTreeSet::new(),
+            variables: std::collections::BTreeSet::new(),
             taint_sources: Vec::new(),
         };
 
         let mut imports = FileImports {
-            functions: std::collections::HashMap::new(),
-            variables: std::collections::HashMap::new(),
+            functions: std::collections::BTreeMap::new(),
+            variables: std::collections::BTreeMap::new(),
             taint_sinks: Vec::new(),
         };
 
