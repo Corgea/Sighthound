@@ -1,0 +1,277 @@
+(
+    rules: [
+        // ==================== Weak Hash Algorithms ====================
+        (
+            id: Some("java-crypto-001"),
+            name: Some("Weak Hash Algorithm MD5"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "MessageDigest\\.getInstance\\(\"MD5\"\\)",
+                "MessageDigest\\.getInstance\\(\"md5\"\\)",
+                "DigestUtils\\.md5",
+                "DigestUtils\\.md5Hex",
+                "MD5\\.getInstance",
+                "new MD5\\(\\)"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("MD5 is cryptographically broken and should not be used for security purposes"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "hash", "md5", "weak"])
+        ),
+        (
+            id: Some("java-crypto-002"),
+            name: Some("Weak Hash Algorithm SHA1"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "MessageDigest\\.getInstance\\(\"SHA-1\"\\)",
+                "MessageDigest\\.getInstance\\(\"SHA1\"\\)",
+                "MessageDigest\\.getInstance\\(\"sha-1\"\\)",
+                "MessageDigest\\.getInstance\\(\"sha1\"\\)",
+                "DigestUtils\\.sha1",
+                "DigestUtils\\.sha1Hex",
+                "SHA1\\.getInstance",
+                "new SHA1\\(\\)"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("SHA1 is cryptographically weak and should be replaced with SHA-256 or higher"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "hash", "sha1", "weak"])
+        ),
+        
+        // ==================== Weak Encryption Algorithms ====================
+        (
+            id: Some("java-crypto-003"),
+            name: Some("Weak Encryption Algorithm DES"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "Cipher\\.getInstance\\(\"DES\"\\)",
+                "Cipher\\.getInstance\\(\"des\"\\)",
+                "DES\\.getInstance",
+                "new DES\\(\\)",
+                "DESCipher",
+                "DESKeySpec"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("DES encryption is obsolete and easily broken"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "encryption", "des", "weak"])
+        ),
+        (
+            id: Some("java-crypto-004"),
+            name: Some("Weak Encryption Algorithm RC4"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "Cipher\\.getInstance\\(\"RC4\"\\)",
+                "Cipher\\.getInstance\\(\"rc4\"\\)",
+                "Cipher\\.getInstance\\(\"ARC4\"\\)",
+                "Cipher\\.getInstance\\(\"arc4\"\\)",
+                "RC4\\.getInstance",
+                "ARC4\\.getInstance",
+                "new RC4\\(\\)",
+                "new ARC4\\(\\)"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("RC4 stream cipher has known vulnerabilities and should not be used"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "encryption", "rc4", "weak"])
+        ),
+        (
+            id: Some("java-crypto-005"),
+            name: Some("Weak Encryption Algorithm 3DES"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "Cipher\\.getInstance\\(\"DESede\"\\)",
+                "Cipher\\.getInstance\\(\"3DES\"\\)",
+                "Cipher\\.getInstance\\(\"TripleDES\"\\)",
+                "DESede\\.getInstance",
+                "TripleDES\\.getInstance"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("3DES is deprecated and should be replaced with AES"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "encryption", "3des", "weak"])
+        ),
+        
+        // ==================== Weak Encryption Modes ====================
+        (
+            id: Some("java-crypto-006"),
+            name: Some("ECB Mode Encryption"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "Cipher\\.getInstance\\(\".*ECB\"\\)",
+                "Cipher\\.getInstance\\(\".*ecb\"\\)",
+                "AES/ECB",
+                "DES/ECB",
+                "3DES/ECB",
+                "DESede/ECB"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("ECB mode encryption is insecure and reveals patterns in plaintext"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "encryption", "ecb", "mode"])
+        ),
+        
+        // ==================== Weak Random Number Generation ====================
+        (
+            id: Some("java-crypto-007"),
+            name: Some("Weak Random Number Generation"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "new Random\\(\\)",
+                "Random\\.nextInt",
+                "Random\\.nextLong",
+                "Random\\.nextDouble",
+                "Math\\.random\\(\\)",
+                "System\\.currentTimeMillis\\(\\)"
+            ]),
+            finding_type: Some("Weak Random Number Generation"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-338"),
+            description: Some("Standard Random class is not cryptographically secure, use SecureRandom instead"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "random", "weak", "prng"])
+        ),
+        
+        // ==================== Hardcoded Cryptographic Material ====================
+        (
+            id: Some("java-crypto-008"),
+            name: Some("Hardcoded Cryptographic Key"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "key\\s*=\\s*[\"'].*[\"']",
+                "password\\s*=\\s*[\"'].*[\"']",
+                "secret\\s*=\\s*[\"'].*[\"']",
+                "token\\s*=\\s*[\"'].*[\"']",
+                "privateKey\\s*=\\s*[\"'].*[\"']",
+                "publicKey\\s*=\\s*[\"'].*[\"']"
+            ]),
+            finding_type: Some("Hardcoded Cryptographic Material"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-798"),
+            description: Some("Hardcoded cryptographic keys or secrets detected"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "hardcoded", "key", "secret"])
+        ),
+        
+        // ==================== Weak Key Sizes ====================
+        (
+            id: Some("java-crypto-009"),
+            name: Some("Weak Key Size for RSA"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "KeyPairGenerator\\.getInstance\\(\"RSA\"\\)\\.initialize\\(1024\\)",
+                "RSAKeyPairGenerator\\.initialize\\(1024\\)",
+                "new RSAKeyGenParameterSpec\\(1024",
+                "RSA.*1024"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("RSA keys smaller than 2048 bits are cryptographically weak"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "rsa", "key-size", "weak"])
+        ),
+        (
+            id: Some("java-crypto-010"),
+            name: Some("Weak Key Size for DSA"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "KeyPairGenerator\\.getInstance\\(\"DSA\"\\)\\.initialize\\(1024\\)",
+                "DSAKeyPairGenerator\\.initialize\\(1024\\)",
+                "new DSAParameterSpec\\(1024",
+                "DSA.*1024"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("DSA keys smaller than 2048 bits are cryptographically weak"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "dsa", "key-size", "weak"])
+        ),
+        
+        // ==================== Taint Mode for Cryptographic Material Flows ====================
+        (
+            id: Some("java-crypto-taint-001"),
+            name: Some("Hardcoded Key Taint Flow"),
+            category: Some("cryptography"),
+            mode: "taint",
+            sources: Some([
+                "\".*\"",
+                "'.*'",
+                "new String\\(\".*\"\\)",
+                "new String\\('.*'\\)"
+            ]),
+            sinks: Some([
+                "Cipher\\.getInstance",
+                "MessageDigest\\.getInstance",
+                "KeyGenerator\\.getInstance",
+                "SecretKeySpec",
+                "new SecretKeySpec",
+                "key\\s*=",
+                "password\\s*=",
+                "secret\\s*="
+            ]),
+            finding_type: Some("Hardcoded Cryptographic Material in Data Flow"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-798"),
+            description: Some("Hardcoded string flows to cryptographic operations"),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["crypto", "taint", "hardcoded", "key"])
+        )
+    ]
+)

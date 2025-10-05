@@ -1,0 +1,313 @@
+(
+    rules: [
+        // ==================== Weak Hash Algorithms ====================
+        (
+            id: Some("js-crypto-001"),
+            name: Some("Weak Hash Algorithm MD5"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "crypto\\.createHash\\(\"md5\"\\)",
+                "crypto\\.createHash\\(\"MD5\"\\)",
+                "require\\(\"crypto-js\"\\)\\.MD5",
+                "import.*MD5.*from.*crypto-js",
+                "CryptoJS\\.MD5",
+                "md5\\(",
+                "MD5\\(",
+                "hashlib\\.md5",
+                "crypto-js.*MD5"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("MD5 is cryptographically broken and should not be used for security purposes"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "hash", "md5", "weak"])
+        ),
+        (
+            id: Some("js-crypto-002"),
+            name: Some("Weak Hash Algorithm SHA1"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "crypto\\.createHash\\(\"sha1\"\\)",
+                "crypto\\.createHash\\(\"SHA1\"\\)",
+                "crypto\\.createHash\\(\"sha-1\"\\)",
+                "require\\(\"crypto-js\"\\)\\.SHA1",
+                "import.*SHA1.*from.*crypto-js",
+                "CryptoJS\\.SHA1",
+                "sha1\\(",
+                "SHA1\\(",
+                "hashlib\\.sha1",
+                "crypto-js.*SHA1"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("SHA1 is cryptographically weak and should be replaced with SHA-256 or higher"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "hash", "sha1", "weak"])
+        ),
+        
+        // ==================== Weak Encryption Algorithms ====================
+        (
+            id: Some("js-crypto-003"),
+            name: Some("Weak Encryption Algorithm DES"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "crypto\\.createCipher\\(\"des\"\\)",
+                "crypto\\.createCipher\\(\"DES\"\\)",
+                "crypto\\.createDecipher\\(\"des\"\\)",
+                "crypto\\.createDecipher\\(\"DES\"\\)",
+                "require\\(\"crypto-js\"\\)\\.DES",
+                "import.*DES.*from.*crypto-js",
+                "CryptoJS\\.DES",
+                "DES\\.encrypt",
+                "DES\\.decrypt",
+                "crypto-js.*DES"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("DES encryption is obsolete and easily broken"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "encryption", "des", "weak"])
+        ),
+        (
+            id: Some("js-crypto-004"),
+            name: Some("Weak Encryption Algorithm RC4"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "crypto\\.createCipher\\(\"rc4\"\\)",
+                "crypto\\.createCipher\\(\"RC4\"\\)",
+                "crypto\\.createCipher\\(\"arc4\"\\)",
+                "crypto\\.createCipher\\(\"ARC4\"\\)",
+                "crypto\\.createDecipher\\(\"rc4\"\\)",
+                "crypto\\.createDecipher\\(\"RC4\"\\)",
+                "require\\(\"crypto-js\"\\)\\.RC4",
+                "import.*RC4.*from.*crypto-js",
+                "CryptoJS\\.RC4",
+                "RC4\\.encrypt",
+                "RC4\\.decrypt",
+                "crypto-js.*RC4"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("RC4 stream cipher has known vulnerabilities and should not be used"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "encryption", "rc4", "weak"])
+        ),
+        (
+            id: Some("js-crypto-005"),
+            name: Some("Weak Encryption Algorithm 3DES"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "crypto\\.createCipher\\(\"des3\"\\)",
+                "crypto\\.createCipher\\(\"3des\"\\)",
+                "crypto\\.createCipher\\(\"tripledes\"\\)",
+                "require\\(\"crypto-js\"\\)\\.TripleDES",
+                "import.*TripleDES.*from.*crypto-js",
+                "CryptoJS\\.TripleDES",
+                "TripleDES\\.encrypt",
+                "TripleDES\\.decrypt",
+                "crypto-js.*TripleDES"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("3DES is deprecated and should be replaced with AES"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "encryption", "3des", "weak"])
+        ),
+        
+        // ==================== Weak Encryption Modes ====================
+        (
+            id: Some("js-crypto-006"),
+            name: Some("ECB Mode Encryption"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "crypto\\.createCipher\\(\".*ecb\"\\)",
+                "crypto\\.createCipher\\(\".*ECB\"\\)",
+                "AES/ECB",
+                "DES/ECB",
+                "3DES/ECB",
+                "TripleDES/ECB",
+                "mode.*ECB",
+                "ECB.*mode",
+                "require\\(\"crypto-js\"\\)\\.mode\\.ECB",
+                "CryptoJS\\.mode\\.ECB"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("ECB mode encryption is insecure and reveals patterns in plaintext"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "encryption", "ecb", "mode"])
+        ),
+        
+        // ==================== Weak Random Number Generation ====================
+        (
+            id: Some("js-crypto-007"),
+            name: Some("Weak Random Number Generation"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "Math\\.random\\(\\)",
+                "Math\\.floor\\(Math\\.random\\(\\)",
+                "Math\\.ceil\\(Math\\.random\\(\\)",
+                "Math\\.round\\(Math\\.random\\(\\)",
+                "Date\\.now\\(\\)",
+                "new Date\\(\\)\\.getTime\\(\\)",
+                "performance\\.now\\(\\)",
+                "crypto\\.getRandomValues\\(.*Math\\.random"
+            ]),
+            finding_type: Some("Weak Random Number Generation"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-338"),
+            description: Some("Math.random() is not cryptographically secure, use crypto.getRandomValues() instead"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "random", "weak", "prng"])
+        ),
+        
+        // ==================== Hardcoded Cryptographic Material ====================
+        (
+            id: Some("js-crypto-008"),
+            name: Some("Hardcoded Cryptographic Key"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "key\\s*=\\s*[\"'].*[\"']",
+                "password\\s*=\\s*[\"'].*[\"']",
+                "secret\\s*=\\s*[\"'].*[\"']",
+                "token\\s*=\\s*[\"'].*[\"']",
+                "apiKey\\s*=\\s*[\"'].*[\"']",
+                "privateKey\\s*=\\s*[\"'].*[\"']",
+                "publicKey\\s*=\\s*[\"'].*[\"']",
+                "const\\s+key\\s*=\\s*[\"'].*[\"']",
+                "let\\s+key\\s*=\\s*[\"'].*[\"']",
+                "var\\s+key\\s*=\\s*[\"'].*[\"']"
+            ]),
+            finding_type: Some("Hardcoded Cryptographic Material"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-798"),
+            description: Some("Hardcoded cryptographic keys or secrets detected"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "hardcoded", "key", "secret"])
+        ),
+        
+        // ==================== Weak Key Derivation ====================
+        (
+            id: Some("js-crypto-009"),
+            name: Some("Weak Key Derivation Function"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "crypto\\.createHash\\(\"md5\"\\)\\.update\\(password\\)",
+                "crypto\\.createHash\\(\"sha1\"\\)\\.update\\(password\\)",
+                "MD5\\(password\\)",
+                "SHA1\\(password\\)",
+                "hash\\(password\\)",
+                "simpleHash\\(password\\)"
+            ]),
+            finding_type: Some("Weak Key Derivation"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("Simple hash functions are not suitable for password hashing, use PBKDF2, scrypt, or bcrypt"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "password", "hash", "weak"])
+        ),
+        
+        // ==================== Insecure JWT Usage ====================
+        (
+            id: Some("js-crypto-010"),
+            name: Some("Insecure JWT Algorithm"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "jwt\\.sign\\(.*,\\s*[\"'].*[\"']\\s*,\\s*\\{\\s*algorithm:\\s*[\"']none[\"']",
+                "jwt\\.sign\\(.*,\\s*[\"'].*[\"']\\s*,\\s*\\{\\s*algorithm:\\s*[\"']HS256[\"']",
+                "jwt\\.sign\\(.*,\\s*[\"'].*[\"']\\s*,\\s*\\{\\s*algorithm:\\s*[\"']HS384[\"']",
+                "jwt\\.sign\\(.*,\\s*[\"'].*[\"']\\s*,\\s*\\{\\s*algorithm:\\s*[\"']HS512[\"']",
+                "jsonwebtoken\\.sign\\(.*,\\s*[\"'].*[\"']\\s*,\\s*\\{\\s*algorithm:\\s*[\"']none[\"']",
+                "jsonwebtoken\\.sign\\(.*,\\s*[\"'].*[\"']\\s*,\\s*\\{\\s*algorithm:\\s*[\"']HS256[\"']"
+            ]),
+            finding_type: Some("Insecure JWT Configuration"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("JWT with 'none' algorithm or weak HMAC algorithms are insecure"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "jwt", "authentication", "weak"])
+        ),
+        
+        // ==================== Taint Mode for Cryptographic Material Flows ====================
+        (
+            id: Some("js-crypto-taint-001"),
+            name: Some("Hardcoded Key Taint Flow"),
+            category: Some("cryptography"),
+            mode: "taint",
+            sources: Some([
+                "\".*\"",
+                "'.*'",
+                "`.*`",
+                "new String\\(\".*\"\\)",
+                "new String\\('.*'\\)"
+            ]),
+            sinks: Some([
+                "crypto\\.createHash",
+                "crypto\\.createCipher",
+                "crypto\\.createDecipher",
+                "crypto\\.createHmac",
+                "jwt\\.sign",
+                "jsonwebtoken\\.sign",
+                "key\\s*=",
+                "password\\s*=",
+                "secret\\s*=",
+                "token\\s*="
+            ]),
+            finding_type: Some("Hardcoded Cryptographic Material in Data Flow"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-798"),
+            description: Some("Hardcoded string flows to cryptographic operations"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"])
+            )),
+            tags: Some(["crypto", "taint", "hardcoded", "key"])
+        )
+    ]
+)

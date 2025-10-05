@@ -20,6 +20,8 @@ const EMBEDDED_PYTHON_WORKING_RULES: &str = include_str!("../rules/python/workin
 const EMBEDDED_JAVASCRIPT_FRONTEND_RULES: &str = include_str!("../rules/javascript/frontend_security.ron");
 const EMBEDDED_JAVASCRIPT_BACKEND_RULES: &str = include_str!("../rules/backend_javascript/backend_security.ron");
 const EMBEDDED_JAVASCRIPT_TAINT_RULES: &str = include_str!("../rules/javascript/frontend_taint_security.ron");
+const EMBEDDED_JAVASCRIPT_CRYPTOGRAPHY_RULES: &str = include_str!("../rules/javascript/cryptography.ron");
+const EMBEDDED_JAVA_CRYPTOGRAPHY_RULES: &str = include_str!("../rules/java/cryptography.ron");
 
 // Add more embedded rules as needed
 // const EMBEDDED_JAVA_RULES: &str = include_str!("../rules/java/security.ron");
@@ -142,6 +144,11 @@ impl Rules {
                     .context("Failed to parse embedded JavaScript taint rules")?;
                 all_rules.push(taint_rules);
                 
+                // Load cryptography rules
+                let crypto_rules: Rules = ron::from_str(EMBEDDED_JAVASCRIPT_CRYPTOGRAPHY_RULES)
+                    .context("Failed to parse embedded JavaScript cryptography rules")?;
+                all_rules.push(crypto_rules);
+                
                 // Load backend rules if requested
                 if let Some(code_type) = code_type {
                     if code_type != "frontend" {
@@ -150,6 +157,12 @@ impl Rules {
                         all_rules.push(backend_rules);
                     }
                 }
+            }
+            "java" => {
+                // Load Java cryptography rules
+                let crypto_rules: Rules = ron::from_str(EMBEDDED_JAVA_CRYPTOGRAPHY_RULES)
+                    .context("Failed to parse embedded Java cryptography rules")?;
+                all_rules.push(crypto_rules);
             }
             // Add more languages as needed
             _ => {
