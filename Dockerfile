@@ -2,12 +2,10 @@
 # Stage 1: Build the binary
 FROM rust:1.89-slim AS builder
 
-# Install build dependencies including cross-compilation tools
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
-    gcc-x86-64-linux-gnu \
-    gcc-aarch64-linux-gnu \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -22,11 +20,16 @@ RUN rm -f Cargo.lock
 # Set build-time environment variables
 ARG GIT_HASH
 ARG BUILD_DATE
+ARG TARGETPLATFORM
 ENV GIT_HASH=${GIT_HASH}
 ENV BUILD_DATE=${BUILD_DATE}
 
-# Build the release binary
+# Configure Rust for the target platform
+# Use native compilation (no cross-compilation) - Docker buildx handles platform selection
 ENV CARGO_TARGET_DIR=/app/target
+
+# Build the release binary
+# Note: .cargo/config.toml configures target-cpu=generic to avoid SIGILL in emulated builds
 RUN cargo build --release
 
 # Runtime stage - minimal image for running the container
