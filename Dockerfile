@@ -29,7 +29,9 @@ ENV BUILD_DATE=${BUILD_DATE}
 ENV CARGO_TARGET_DIR=/app/target
 
 # Build the release binary
-# Note: .cargo/config.toml configures target-cpu=generic to avoid SIGILL in emulated builds
+# Use CARGO_BUILD_RUSTFLAGS to apply target-cpu=generic only to final artifacts, not build scripts
+# This prevents SIGILL errors in Docker buildx emulated environments
+ENV CARGO_BUILD_RUSTFLAGS="-C target-cpu=generic"
 RUN cargo build --release
 
 # Runtime stage - minimal image for running the container
