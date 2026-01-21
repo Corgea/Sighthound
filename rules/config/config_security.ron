@@ -1,110 +1,6 @@
 (
     rules: [
         (
-            id: Some("config-secret-001"),
-            name: Some("Hardcoded Password in Config"),
-            category: Some("secrets"),
-            mode: "search",
-            patterns: Some([
-                "\"password\":",
-                "'password':",
-                "password:",
-                "\"passwd\":",
-                "'passwd':",
-            ]),
-            unless: Some([
-                "\"$",
-                "'$",
-                "ENV",
-                "SECRET",
-                "vault",
-            ]),
-            finding_type: Some("Hardcoded Secret"),
-            severity: Some("High"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-798"),
-            description: Some("Password found in configuration file - use environment variables or secret management"),
-            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".xml", ".config", ".conf"]))),
-            tags: Some(["secrets", "password", "cwe-798"])
-        ),
-        (
-            id: Some("config-secret-002"),
-            name: Some("API Key in Config"),
-            category: Some("secrets"),
-            mode: "search",
-            patterns: Some([
-                "\"api_key\":",
-                "'api_key':",
-                "\"apiKey\":",
-                "'apiKey':",
-                "api_key:",
-                "apiKey:",
-            ]),
-            unless: Some([
-                "\"$",
-                "'$",
-                "ENV",
-                "SECRET",
-            ]),
-            finding_type: Some("Hardcoded Secret"),
-            severity: Some("Critical"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-798"),
-            description: Some("API key found in configuration - use environment variables or secret management"),
-            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".xml", ".config", ".conf"]))),
-            tags: Some(["secrets", "api-key", "cwe-798"])
-        ),
-        (
-            id: Some("config-secret-003"),
-            name: Some("Secret Token in Config"),
-            category: Some("secrets"),
-            mode: "search",
-            patterns: Some([
-                "\"secret\":",
-                "'secret':",
-                "\"token\":",
-                "'token':",
-                "\"access_token\":",
-                "'access_token':",
-            ]),
-            unless: Some([
-                "\"$",
-                "'$",
-                "ENV",
-                "SECRET",
-                "vault",
-            ]),
-            finding_type: Some("Hardcoded Secret"),
-            severity: Some("Critical"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-798"),
-            description: Some("Secret or token found in configuration - use environment variables or secret management"),
-            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".xml", ".config", ".conf"]))),
-            tags: Some(["secrets", "token", "cwe-798"])
-        ),
-        (
-            id: Some("config-db-001"),
-            name: Some("Database Credentials in Config"),
-            category: Some("secrets"),
-            mode: "search",
-            patterns: Some([
-                "\"connection_string\":",
-                "'connection_string':",
-                "\"connectionString\":",
-                "'connectionString':",
-                "jdbc:",
-                "mongodb:",
-                "postgresql:",
-            ]),
-            finding_type: Some("Database Credentials"),
-            severity: Some("High"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-798"),
-            description: Some("Database connection information in configuration - ensure credentials are secure"),
-            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".xml", ".config", ".conf"]))),
-            tags: Some(["secrets", "database", "cwe-798"])
-        ),
-        (
             id: Some("config-crypto-001"),
             name: Some("SSL/TLS Verification Disabled"),
             category: Some("cryptography"),
@@ -187,25 +83,6 @@
             tags: Some(["authentication", "authorization", "cwe-306"])
         ),
         (
-            id: Some("config-aws-001"),
-            name: Some("AWS Credentials in Config"),
-            category: Some("secrets"),
-            mode: "search",
-            patterns: Some([
-                "AWS_ACCESS_KEY_ID",
-                "AWS_SECRET_ACCESS_KEY",
-                "aws_access_key_id",
-                "aws_secret_access_key",
-            ]),
-            finding_type: Some("Hardcoded Secret"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-798"),
-            description: Some("AWS credentials in configuration - use IAM roles or AWS Secrets Manager"),
-            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".xml", ".config", ".conf"]))),
-            tags: Some(["secrets", "aws", "credentials", "cwe-798"])
-        ),
-        (
             id: Some("config-http-001"),
             name: Some("HTTP URL in Config"),
             category: Some("cryptography"),
@@ -230,4 +107,3 @@
         ),
     ]
 )
-

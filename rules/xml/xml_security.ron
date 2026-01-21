@@ -38,76 +38,6 @@
             tags: Some(["xxe", "xml", "file-access", "cwe-611"])
         ),
         (
-            id: Some("xml-secret-001"),
-            name: Some("Hardcoded Password in XML"),
-            category: Some("hardcoded-secrets"),
-            mode: "search",
-            patterns: Some([
-                "<password>",
-                "<Password>",
-                "password=\"",
-                "Password=\"",
-            ]),
-            unless: Some([
-                "password=\"\"",
-                "<password></password>",
-                "password=\"${",
-                "password=\"%",
-            ]),
-            finding_type: Some("Hardcoded Secret"),
-            severity: Some("High"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-798"),
-            description: Some("XML file contains hardcoded password that should be externalized"),
-            file_types: Some((extensions: Some([".xml", ".config", ".pom", ".wsdl"]))),
-            tags: Some(["secrets", "password", "hardcoded", "cwe-798"])
-        ),
-        (
-            id: Some("xml-secret-002"),
-            name: Some("API Key in XML"),
-            category: Some("hardcoded-secrets"),
-            mode: "search",
-            patterns: Some([
-                "<apiKey>",
-                "<api_key>",
-                "<ApiKey>",
-                "apiKey=\"",
-                "api_key=\"",
-            ]),
-            unless: Some([
-                "apiKey=\"\"",
-                "<apiKey></apiKey>",
-                "apiKey=\"${",
-            ]),
-            finding_type: Some("Hardcoded Secret"),
-            severity: Some("High"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-798"),
-            description: Some("XML file contains hardcoded API key that should be externalized"),
-            file_types: Some((extensions: Some([".xml", ".config"]))),
-            tags: Some(["secrets", "api-key", "hardcoded", "cwe-798"])
-        ),
-        (
-            id: Some("xml-secret-003"),
-            name: Some("AWS Credentials in XML"),
-            category: Some("hardcoded-secrets"),
-            mode: "search",
-            patterns: Some([
-                "<accessKeyId>AKIA",
-                "<aws_access_key_id>AKIA",
-                "accessKeyId=\"AKIA",
-                "<secretAccessKey>",
-                "<aws_secret_access_key>",
-            ]),
-            finding_type: Some("Hardcoded Secret"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-798"),
-            description: Some("XML file contains hardcoded AWS credentials - these should be externalized"),
-            file_types: Some((extensions: Some([".xml", ".config"]))),
-            tags: Some(["secrets", "aws", "credentials", "cwe-798"])
-        ),
-        (
             id: Some("xml-insecure-001"),
             name: Some("Insecure HTTP URL in XML"),
             category: Some("insecure-communication"),
@@ -252,4 +182,3 @@
         ),
     ]
 )
-
