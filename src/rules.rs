@@ -27,6 +27,9 @@ static RULES_RUBY: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/ruby");
 static RULES_HTML: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/html");
 static RULES_PHP: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/php");
 static RULES_OBJECTSCRIPT: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/objectscript");
+static RULES_SQL: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/sql");
+static RULES_PROPERTIES: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/properties");
+static RULES_CONFIG: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/config");
 
 // Structure for centralized exclusion patterns
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -156,6 +159,14 @@ impl Rules {
             "php" => all_rules.extend(Self::parse_embedded_dir(&RULES_PHP, "PHP")?),
             "objectscript" => {
                 all_rules.extend(Self::parse_embedded_dir(&RULES_OBJECTSCRIPT, "ObjectScript")?)
+            }
+            "sql" => all_rules.extend(Self::parse_embedded_dir(&RULES_SQL, "SQL")?),
+            "properties" => {
+                all_rules.extend(Self::parse_embedded_dir(&RULES_PROPERTIES, "properties")?)
+            }
+            "config" => {
+                all_rules.extend(Self::parse_embedded_dir(&RULES_PROPERTIES, "properties")?);
+                all_rules.extend(Self::parse_embedded_dir(&RULES_CONFIG, "config")?);
             }
             _ => {
                 return Err(anyhow::anyhow!(

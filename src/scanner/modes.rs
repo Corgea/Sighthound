@@ -542,9 +542,10 @@ pub fn run_taint_analysis_with_verbosity(
     let taint_rules_count = rules.rules.iter().filter(|r| r.is_taint_rule()).count();
 
     if taint_rules_count == 0 {
-        return Err(anyhow::anyhow!(
-            "No taint flow rules found. Please ensure your rules contain rules with mode='taint'."
-        ));
+        if show_progress && verbose_mode {
+            println!("ℹ️  No taint flow rules found for this language - skipping taint analysis");
+        }
+        return Ok(Vec::new());
     }
     if show_progress && verbose_mode {
         print_taint_analysis_intro(root_dir, taint_rules_count, context.total_files);

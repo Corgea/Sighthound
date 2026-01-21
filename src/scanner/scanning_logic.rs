@@ -103,6 +103,19 @@ impl ScanningLogic {
             "key",
             "http://",
             "=",
+            "javascript:",
+            "href=",
+            "src=",
+            "onclick",
+            "onload",
+            "onerror",
+            "onmouseover",
+            "eval(",
+            "document.write",
+            "srcdoc",
+            "data:",
+            "expression(",
+            "http-equiv",
         ];
 
         let check_pattern = |pattern: &str| {

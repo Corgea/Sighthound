@@ -38,6 +38,12 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
         "php" => Ok(Box::new(PHPLanguage)),
         #[cfg(feature = "objectscript")]
         "objectscript" => Ok(Box::new(ObjectScriptLanguage::udl())),
+        #[cfg(feature = "sql")]
+        "sql" => Ok(Box::new(SQLLanguage)),
+        #[cfg(feature = "properties")]
+        "properties" => Ok(Box::new(PropertiesLanguage)),
+        #[cfg(feature = "config")]
+        "config" => Ok(Box::new(ConfigLanguage)),
         _ => {
             let mut supported = Vec::new();
             #[cfg(feature = "python")]
@@ -64,6 +70,12 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
             supported.push("php");
             #[cfg(feature = "objectscript")]
             supported.push("objectscript");
+            #[cfg(feature = "sql")]
+            supported.push("sql");
+            #[cfg(feature = "properties")]
+            supported.push("properties");
+            #[cfg(feature = "config")]
+            supported.push("config");
 
             anyhow::bail!(
                 "Unsupported language: {}. Supported languages: {}",
@@ -658,5 +670,86 @@ impl LanguageSupport for DjangoTemplateLanguage {
             }
             _ => node.child_by_field_name("value"),
         }
+    }
+}
+
+#[cfg(feature = "sql")]
+pub struct SQLLanguage;
+
+#[cfg(feature = "sql")]
+impl LanguageSupport for SQLLanguage {
+    fn name(&self) -> &'static str {
+        "sql"
+    }
+    fn file_extension(&self) -> &'static str {
+        ".sql"
+    }
+    fn tree_sitter_language(&self) -> Language {
+        tree_sitter_javascript::LANGUAGE.into()
+    }
+    fn call_node_types(&self) -> &[&'static str] {
+        &["program"]
+    }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        Some(get_node_text_slice(node, source))
+    }
+
+    fn get_arguments_node<'a>(&self, _node: &'a Node) -> Option<Node<'a>> {
+        None
+    }
+}
+
+#[cfg(feature = "properties")]
+pub struct PropertiesLanguage;
+
+#[cfg(feature = "properties")]
+impl LanguageSupport for PropertiesLanguage {
+    fn name(&self) -> &'static str {
+        "properties"
+    }
+    fn file_extension(&self) -> &'static str {
+        ".properties"
+    }
+    fn tree_sitter_language(&self) -> Language {
+        tree_sitter_javascript::LANGUAGE.into()
+    }
+    fn call_node_types(&self) -> &[&'static str] {
+        &["program"]
+    }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        Some(get_node_text_slice(node, source))
+    }
+
+    fn get_arguments_node<'a>(&self, _node: &'a Node) -> Option<Node<'a>> {
+        None
+    }
+}
+
+#[cfg(feature = "config")]
+pub struct ConfigLanguage;
+
+#[cfg(feature = "config")]
+impl LanguageSupport for ConfigLanguage {
+    fn name(&self) -> &'static str {
+        "config"
+    }
+    fn file_extension(&self) -> &'static str {
+        ".config"
+    }
+    fn tree_sitter_language(&self) -> Language {
+        tree_sitter_javascript::LANGUAGE.into()
+    }
+    fn call_node_types(&self) -> &[&'static str] {
+        &["program"]
+    }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        Some(get_node_text_slice(node, source))
+    }
+
+    fn get_arguments_node<'a>(&self, _node: &'a Node) -> Option<Node<'a>> {
+        None
     }
 }
