@@ -28,6 +28,7 @@ static RULES_HTML: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/html");
 static RULES_PHP: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/php");
 static RULES_OBJECTSCRIPT: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/objectscript");
 static RULES_SQL: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/sql");
+static RULES_XML: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/xml");
 static RULES_PROPERTIES: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/properties");
 static RULES_CONFIG: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/config");
 
@@ -161,6 +162,7 @@ impl Rules {
                 all_rules.extend(Self::parse_embedded_dir(&RULES_OBJECTSCRIPT, "ObjectScript")?)
             }
             "sql" => all_rules.extend(Self::parse_embedded_dir(&RULES_SQL, "SQL")?),
+            "xml" => all_rules.extend(Self::parse_embedded_dir(&RULES_XML, "XML")?),
             "properties" => {
                 all_rules.extend(Self::parse_embedded_dir(&RULES_PROPERTIES, "properties")?)
             }

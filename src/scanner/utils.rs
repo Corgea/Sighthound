@@ -277,10 +277,12 @@ pub fn detect_language_from_path(file_path: &Path) -> Option<&'static str> {
 
         "sql" | "ddl" | "dml" => Some("sql"),
 
+        "xml" | "xsd" | "xsl" | "xslt" | "wsdl" | "svg" | "pom" => Some("xml"),
+
         "properties" | "props" => Some("properties"),
 
         "conf" | "cfg" | "ini" | "env" | "config" | "json" | "yaml" | "yml" | "toml"
-        | "xml" => Some("config"),
+        => Some("config"),
 
         // Vue.js single file components (contain HTML, JS, and CSS)
         "vue" => Some("javascript"),

@@ -40,6 +40,8 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
         "objectscript" => Ok(Box::new(ObjectScriptLanguage::udl())),
         #[cfg(feature = "sql")]
         "sql" => Ok(Box::new(SQLLanguage)),
+        #[cfg(feature = "xml")]
+        "xml" => Ok(Box::new(XMLLanguage)),
         #[cfg(feature = "properties")]
         "properties" => Ok(Box::new(PropertiesLanguage)),
         #[cfg(feature = "config")]
@@ -72,6 +74,8 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
             supported.push("objectscript");
             #[cfg(feature = "sql")]
             supported.push("sql");
+            #[cfg(feature = "xml")]
+            supported.push("xml");
             #[cfg(feature = "properties")]
             supported.push("properties");
             #[cfg(feature = "config")]
@@ -683,6 +687,33 @@ impl LanguageSupport for SQLLanguage {
     }
     fn file_extension(&self) -> &'static str {
         ".sql"
+    }
+    fn tree_sitter_language(&self) -> Language {
+        tree_sitter_javascript::LANGUAGE.into()
+    }
+    fn call_node_types(&self) -> &[&'static str] {
+        &["program"]
+    }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        Some(get_node_text_slice(node, source))
+    }
+
+    fn get_arguments_node<'a>(&self, _node: &'a Node) -> Option<Node<'a>> {
+        None
+    }
+}
+
+#[cfg(feature = "xml")]
+pub struct XMLLanguage;
+
+#[cfg(feature = "xml")]
+impl LanguageSupport for XMLLanguage {
+    fn name(&self) -> &'static str {
+        "xml"
+    }
+    fn file_extension(&self) -> &'static str {
+        ".xml"
     }
     fn tree_sitter_language(&self) -> Language {
         tree_sitter_javascript::LANGUAGE.into()

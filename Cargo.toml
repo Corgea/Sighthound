@@ -19,7 +19,7 @@ path = "harness.rs"
 edition = "2024"
 
 [features]
-default = ["python", "java", "javascript", "tsx", "typescript", "go", "ruby", "csharp", "html", "django", "php", "objectscript", "sql", "properties", "config"]
+default = ["python", "java", "javascript", "tsx", "typescript", "go", "ruby", "csharp", "html", "django", "php", "objectscript", "sql", "xml", "properties", "config"]
 python = ["tree-sitter-python"]
 java = ["tree-sitter-java"]
 javascript = ["tree-sitter-javascript"]
@@ -33,6 +33,7 @@ django = ["tree-sitter-html"]  # Reuse HTML parser for Django templates
 php = ["tree-sitter-php"]
 objectscript = ["dep:tree-sitter-objectscript", "dep:tree-sitter-objectscript-routine"]
 sql = ["tree-sitter-javascript"]
+xml = ["tree-sitter-javascript"]
 properties = ["tree-sitter-javascript"]
 config = ["tree-sitter-javascript"]
 
