@@ -63,22 +63,21 @@
             category: Some("sql-injection"),
             mode: "search",
             patterns: Some([
-                "--",
-                "/*",
-                "#",
-            ]),
-            unless: Some([
-                "-- Comment:",
-                "-- TODO",
-                "-- FIXME",
-                "-- Note:",
-                "-- Description:",
+                "' --",
+                "\" --",
+                "; --",
+                "' /*",
+                "\" /*",
+                "; /*",
+                "' #",
+                "\" #",
+                "; #",
             ]),
             finding_type: Some("SQL Injection"),
             severity: Some("Medium"),
-            confidence: Some("Low"),
+            confidence: Some("Medium"),
             cwe_id: Some("cwe-89"),
-            description: Some("SQL comment syntax in queries may indicate injection attempt or comment-based attack"),
+            description: Some("SQL comment syntax after quotes or semicolons may indicate injection attempt or comment-based attack"),
             file_types: Some((extensions: Some([".sql"]))),
             tags: Some(["sql-injection", "comments", "cwe-89"])
         ),
@@ -191,4 +190,3 @@
         ),
     ]
 )
-

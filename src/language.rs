@@ -92,11 +92,11 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
 
 pub fn get_language_support_for_path(
     language_name: &str,
-    path: &Path,
+    _path: &Path,
 ) -> Result<Box<dyn LanguageSupport>> {
     #[cfg(feature = "objectscript")]
     if language_name.eq_ignore_ascii_case("objectscript") {
-        let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or_default();
+        let extension = _path.extension().and_then(|ext| ext.to_str()).unwrap_or_default();
         let grammar =
             if matches!(extension.to_ascii_lowercase().as_str(), "mac" | "inc" | "int" | "rtn") {
                 ObjectScriptGrammar::Routine
@@ -109,6 +109,7 @@ pub fn get_language_support_for_path(
     get_language_support(language_name)
 }
 
+#[cfg(feature = "objectscript")]
 fn direct_named_child_of_kind<'a>(node: &Node<'a>, kind: &str) -> Option<Node<'a>> {
     let mut cursor = node.walk();
     let child = node.named_children(&mut cursor).find(|child| child.kind() == kind);

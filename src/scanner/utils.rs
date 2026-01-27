@@ -281,8 +281,9 @@ pub fn detect_language_from_path(file_path: &Path) -> Option<&'static str> {
 
         "properties" | "props" => Some("properties"),
 
-        "conf" | "cfg" | "ini" | "env" | "config" | "json" | "yaml" | "yml" | "toml"
-        => Some("config"),
+        "conf" | "cfg" | "ini" | "env" | "config" | "json" | "yaml" | "yml" | "toml" => {
+            Some("config")
+        }
 
         // Vue.js single file components (contain HTML, JS, and CSS)
         "vue" => Some("javascript"),

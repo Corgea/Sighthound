@@ -738,6 +738,9 @@ impl ScanningLogic {
         sink_patterns: &[String],
     ) -> Option<usize> {
         for (line_offset, line) in lines.iter().enumerate() {
+            if Self::is_comment_line(line) {
+                continue;
+            }
             for pattern in sink_patterns {
                 // Clean pattern for matching (remove wildcards and make more flexible)
                 let clean_pattern = pattern.replace("*.", "").replace("*", "").trim().to_string();
@@ -749,14 +752,20 @@ impl ScanningLogic {
         None
     }
 
+    fn is_comment_line(line: &str) -> bool {
+        let trimmed = line.trim();
+        trimmed.starts_with("//")
+            || trimmed.starts_with("/*")
+            || trimmed.starts_with("--")
+            || trimmed.starts_with('#')
+            || trimmed.starts_with("\"\"\"")
+    }
+
     /// Fallback search: the first line with an assignment operation (common vulnerability
     /// pattern), skipping comments and declarations without assignment.
     fn find_line_with_assignment(lines: &[&str], start_line: usize) -> Option<usize> {
         for (line_offset, line) in lines.iter().enumerate() {
-            if line.contains('=')
-                && !line.trim().starts_with("//")
-                && !line.trim().starts_with("/*")
-            {
+            if line.contains('=') && !Self::is_comment_line(line) {
                 // Skip function declarations and variable declarations without assignment
                 if !line.contains("function")
                     && !line.contains("def ")
