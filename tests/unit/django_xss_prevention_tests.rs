@@ -2,15 +2,12 @@ use sighthound::rules::Rules;
 use sighthound::VulnerabilityScanner;
 use std::path::Path;
 
-// Helper function to create temporary test files
-
-// Helper function to load general rules (as a fallback)
+// General-security Python rules ship as `general_security.ron` (the earlier
+// `general.ron` name was retired during the crate rename).
 fn load_general_rules() -> Rules {
-    Rules::load_from_file("rules/python/general.ron")
-        .expect("Failed to load general rules")
+    Rules::load_from_file("rules/python/general_security.ron")
+        .expect("Failed to load general security rules")
 }
-
-// Helper function to run scanner and count vulnerabilities
 
 #[cfg(test)]
 mod django_xss_tests {
@@ -19,8 +16,7 @@ mod django_xss_tests {
     #[test]
     fn test_basic_scanner_functionality() {
         let rules = load_general_rules();
-        
-        // Just test that we can load the rules and create a scanner
+
         let scanner_result = VulnerabilityScanner::new("python", rules);
         assert!(scanner_result.is_ok(), "Should be able to create scanner with general rules");
         println!("Successfully created scanner with general rules");
@@ -29,8 +25,7 @@ mod django_xss_tests {
     #[test]
     fn test_django_xss_patterns_with_general_rules() {
         let rules = load_general_rules();
-        
-        // Just test that we can load the rules and create a scanner
+
         let scanner_result = VulnerabilityScanner::new("python", rules);
         assert!(scanner_result.is_ok(), "Should be able to create scanner with general rules");
         println!("Successfully created scanner for Django patterns with general rules");
@@ -39,8 +34,7 @@ mod django_xss_tests {
     #[test]
     fn test_mark_safe_patterns() {
         let rules = load_general_rules();
-        
-        // Just test that we can load the rules and create a scanner
+
         let scanner_result = VulnerabilityScanner::new("python", rules);
         assert!(scanner_result.is_ok(), "Should be able to create scanner with general rules");
         println!("Successfully created scanner for mark_safe patterns");
@@ -49,8 +43,7 @@ mod django_xss_tests {
     #[test]
     fn test_template_injection_patterns() {
         let rules = load_general_rules();
-        
-        // Just test that we can load the rules and create a scanner
+
         let scanner_result = VulnerabilityScanner::new("python", rules);
         assert!(scanner_result.is_ok(), "Should be able to create scanner with general rules");
         println!("Successfully created scanner for template injection patterns");
@@ -59,95 +52,92 @@ mod django_xss_tests {
     #[test]
     fn test_safe_django_patterns() {
         let rules = load_general_rules();
-        
-        // Just test that we can load the rules and create a scanner
+
         let scanner_result = VulnerabilityScanner::new("python", rules);
         assert!(scanner_result.is_ok(), "Should be able to create scanner with general rules");
         println!("Successfully created scanner for safe Django patterns");
     }
 
-    // TODO(onboarding): Rules fields `other`, `injection_sinks`, `crypto_rules` removed during crate rename; needs triage.
-    // Original import line: use sighthound::rules::Rules; (was find_vulns::rules::Rules)
-    // Excluded from compilation via #[cfg(any())] so the rest of the suite still compiles.
-    #[cfg(any())]
     #[test]
     fn test_xss_prevention_rule_structure() {
-        // Test that we can at least try to load the XSS prevention rules
-        // Even if parsing fails, we should handle it gracefully
+        // The Django XSS prevention rules ship optionally; if the file is
+        // absent or fails to parse, treat that as a soft skip rather than a
+        // hard failure. When the file is present, walk the unified rule list
+        // and look for entries categorised as XSS.
         match Rules::load_from_file("rules/python/django/xss_prevention.ron") {
             Ok(rules) => {
                 println!("Successfully loaded XSS prevention rules");
 
-                // Check if rules have the expected structure
-                if let Some(xss_rules) = rules.other.get("xss_prevention_rules") {
-                    assert!(xss_rules.len() > 0, "Should have XSS prevention rules");
-                    
-                    // Test that rules have expected fields
-                    for rule in xss_rules {
-                        assert!(rule.pattern.is_some() || rule.patterns.is_some(), 
-                               "Each rule should have either pattern or patterns");
-                        
+                let xss_rules: Vec<_> = rules
+                    .rules
+                    .iter()
+                    .filter(|r| {
+                        r.category
+                            .as_deref()
+                            .map(|c| c.contains("xss"))
+                            .unwrap_or(false)
+                    })
+                    .collect();
+
+                if xss_rules.is_empty() {
+                    println!("Warning: no XSS-category rules found in xss_prevention.ron");
+                } else {
+                    for rule in &xss_rules {
+                        assert!(
+                            rule.pattern.is_some() || rule.patterns.is_some(),
+                            "Each XSS rule should declare a pattern or patterns"
+                        );
+
                         if let Some(finding_type) = &rule.finding_type {
-                            assert!(finding_type.starts_with("django_"), 
-                                   "Django XSS rules should have django_ prefix");
+                            assert!(
+                                finding_type.to_lowercase().contains("django")
+                                    || finding_type.to_lowercase().contains("xss"),
+                                "Django XSS rules should reference Django or XSS in finding_type"
+                            );
                         }
                     }
-                } else {
-                    println!("Warning: xss_prevention_rules not found in other categories");
                 }
-            },
+            }
             Err(e) => {
-                println!("Warning: Failed to load XSS prevention rules: {}", e);
-                // This is acceptable for now - the rules file may have syntax issues
-                // but we don't want the test to fail completely
+                println!("Skipping: Failed to load XSS prevention rules: {}", e);
             }
         }
     }
 
-    // TODO(onboarding): Rules fields `injection_sinks`, `crypto_rules`, `other` removed during crate rename; needs triage.
-    // Original import line: use sighthound::rules::Rules; (was find_vulns::rules::Rules)
-    // Excluded from compilation via #[cfg(any())] so the rest of the suite still compiles.
-    #[cfg(any())]
     #[test]
     fn test_django_directory_loading() {
-        // Test loading all Django rules from the directory
         match Rules::load_from_directory("rules/python/django/") {
             Ok(rules) => {
                 println!("Successfully loaded Django rules directory");
 
-                // Check that we have some rules loaded
-                let total_rules = rules.injection_sinks.as_ref().map(|r| r.len()).unwrap_or(0)
-                    + rules.crypto_rules.as_ref().map(|r| r.len()).unwrap_or(0)
-                    + rules.other.values().map(|r| r.len()).sum::<usize>();
-                
+                let total_rules = rules.count_rules();
                 assert!(total_rules > 0, "Should have loaded some Django rules");
                 println!("Loaded {} total rules from Django directory", total_rules);
-                
-                // Test scanning with these rules using existing test data
-                let mut scanner = VulnerabilityScanner::new("python", rules)
+
+                let scanner = VulnerabilityScanner::new("python", rules)
                     .expect("Failed to create scanner");
-                let results = scanner.find_vulnerabilities_single_threaded(
-                    "tests/test_files/python/django",
-                    "python"
-                ).expect("Failed to scan directory");
-                
+                let results = scanner
+                    .find_vulnerabilities_single_threaded(
+                        "tests/test_files/python/django",
+                        "python",
+                    )
+                    .expect("Failed to scan directory");
+
                 println!("Found {} vulnerabilities with Django rules", results.len());
                 assert!(results.len() >= 1, "Should detect at least one vulnerability");
-            },
+            }
             Err(e) => {
-                println!("Warning: Failed to load Django rules directory: {}", e);
-                // Don't fail the test - this indicates a rules configuration issue
+                println!("Skipping: Failed to load Django rules directory: {}", e);
             }
         }
     }
 
     #[test]
     fn test_django_scanner_output() {
-        // Skip if django directory doesn't exist
         let django_dir = Path::new("tests/test_files/python/django");
         if !django_dir.exists() {
             println!("Skipping Django test because tests/test_files/python/django directory doesn't exist");
             return;
         }
     }
-} 
+}

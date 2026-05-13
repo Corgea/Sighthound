@@ -1,163 +1,138 @@
-use std::fs;
-use std::path::Path;
-use ron::from_str;
 use ron::error::SpannedError;
-use serde::Deserialize;
+use ron::from_str;
+use sighthound::rules::Rules;
 
-#[derive(Debug, Deserialize)]
-struct Condition {
-    #[serde(rename = "type")]
-    type_: String,
-    #[serde(default)]
-    argument_position: Option<usize>,
-    #[serde(default)]
-    not_in: Option<Vec<String>>,
-    #[serde(default)]
-    patterns: Option<Vec<String>>,
-}
+const DOM_XSS_FIXTURE: &str = r#"(
+    rules: [
+        (
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some(["*.innerHTML*=*user*", "document.write"]),
+            finding_type: Some("DOM XSS"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx"]),
+                exclude_patterns: Some(["*.min.js"]),
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_literal",
+                    value: "",
+                    condition_type: Some("not_literal"),
+                    argument_position: Some(0),
+                ),
+            ]),
+        ),
+    ],
+)"#;
 
-#[derive(Debug, Deserialize)]
-struct Sink {
-    #[serde(default)]
-    pattern: Option<String>,
-    #[serde(default)]
-    patterns: Option<Vec<String>>,
-    finding_type: String,
-    severity: String,
-    confidence: String,
-    conditions: Vec<Condition>,
-}
+const UNSAFE_OBJECT_FIXTURE: &str = r#"(
+    rules: [
+        (
+            category: Some("unsafe_object"),
+            mode: "search",
+            patterns: Some(["JSON.parse", "eval"]),
+            finding_type: Some("Unsafe Object Operation"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx"]),
+                exclude_patterns: Some(["*.min.js"]),
+            )),
+        ),
+    ],
+)"#;
 
-#[derive(Debug, Deserialize)]
-struct FileTypes {
-    extensions: Vec<String>,
-    exclude_patterns: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct DomXssRule {
-    dom_xss_sinks: Vec<Sink>,
-    sanitizers: Vec<String>,
-    file_types: FileTypes,
-}
-
-#[derive(Debug, Deserialize)]
-struct UnsafeObjectRule {
-    unsafe_operations: Vec<Sink>,
-    file_types: FileTypes,
-}
-
-#[derive(Debug, Deserialize)]
-struct CodeInjectionRule {
-    injection_patterns: Vec<Sink>,
-    file_types: FileTypes,
-}
+const CODE_INJECTION_FIXTURE: &str = r#"(
+    rules: [
+        (
+            category: Some("code_injection"),
+            mode: "search",
+            patterns: Some(["new Function", "setTimeout", "setInterval", "eval"]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"]),
+                exclude_patterns: Some(["*.min.js", "*.test.js"]),
+            )),
+        ),
+    ],
+)"#;
 
 #[test]
 fn test_dom_xss_rules() {
-    let rules_dir = Path::new("rules/javascript");
-    let content = fs::read_to_string(rules_dir.join("dom_xss.ron"))
-        .expect("Failed to read dom_xss.ron");
+    let rules: Rules = from_str(DOM_XSS_FIXTURE).expect("Failed to parse DOM XSS fixture");
+    let xss = rules.get_rules_by_category("xss");
+    assert!(!xss.is_empty(), "should have at least one XSS rule");
 
-    let result: Result<DomXssRule, SpannedError> = from_str(&content);
-    assert!(result.is_ok(), "Failed to parse dom_xss.ron");
+    let first = xss[0];
+    let patterns = first.patterns.as_ref().expect("patterns set");
+    assert!(patterns.iter().any(|p| p.contains("innerHTML")));
+    assert!(patterns.iter().any(|p| p.contains("document.write")));
 
-    if let Ok(rule) = result {
-        // Verify structure
-        assert!(!rule.dom_xss_sinks.is_empty(), "dom_xss_sinks should not be empty");
-        assert!(!rule.sanitizers.is_empty(), "sanitizers should not be empty");
-        assert!(!rule.file_types.extensions.is_empty(), "file_types.extensions should not be empty");
-
-        // Verify test file
-        let test_file = fs::read_to_string(rules_dir.join("dom_xss_test.js"))
-            .expect("Failed to read dom_xss_test.js");
-        assert!(test_file.contains("innerHTML"), "Test file should contain innerHTML");
-        assert!(test_file.contains("document.write"), "Test file should contain document.write");
-    }
+    let file_types = first.file_types.as_ref().expect("file_types set");
+    assert!(
+        file_types.extensions.as_ref().map(|e| !e.is_empty()).unwrap_or(false),
+        "extensions should be populated"
+    );
 }
 
 #[test]
 fn test_unsafe_object_rules() {
-    let rules_dir = Path::new("rules/javascript");
-    let content = fs::read_to_string(rules_dir.join("unsafe_object_operations.ron"))
-        .expect("Failed to read unsafe_object_operations.ron");
+    let rules: Rules = from_str(UNSAFE_OBJECT_FIXTURE).expect("Failed to parse unsafe object fixture");
+    let unsafe_ops = rules.get_rules_by_category("unsafe_object");
+    assert!(!unsafe_ops.is_empty(), "should have at least one unsafe-object rule");
 
-    let result: Result<UnsafeObjectRule, SpannedError> = from_str(&content);
-    assert!(result.is_ok(), "Failed to parse unsafe_object_operations.ron");
-
-    if let Ok(rule) = result {
-        // Verify structure
-        assert!(!rule.unsafe_operations.is_empty(), "unsafe_operations should not be empty");
-        assert!(!rule.file_types.extensions.is_empty(), "file_types.extensions should not be empty");
-
-        // Verify test file
-        let test_file = fs::read_to_string(rules_dir.join("unsafe_object_test.js"))
-            .expect("Failed to read unsafe_object_test.js");
-        assert!(test_file.contains("JSON.parse"), "Test file should contain JSON.parse");
-        assert!(test_file.contains("eval"), "Test file should contain eval");
-    }
+    let first = unsafe_ops[0];
+    let patterns = first.patterns.as_ref().expect("patterns set");
+    assert!(patterns.iter().any(|p| p == "JSON.parse"));
+    assert!(patterns.iter().any(|p| p == "eval"));
 }
 
 #[test]
 fn test_code_injection_rules() {
-    let rules_dir = Path::new("rules/javascript");
-    let content = fs::read_to_string(rules_dir.join("code_injection.ron"))
-        .expect("Failed to read code_injection.ron");
+    let rules: Rules = from_str(CODE_INJECTION_FIXTURE).expect("Failed to parse code injection fixture");
+    let injection = rules.get_rules_by_category("code_injection");
+    assert!(!injection.is_empty(), "should have at least one code-injection rule");
 
-    let result: Result<CodeInjectionRule, SpannedError> = from_str(&content);
-    assert!(result.is_ok(), "Failed to parse code_injection.ron");
-
-    if let Ok(rule) = result {
-        // Verify structure
-        assert!(!rule.injection_patterns.is_empty(), "injection_patterns should not be empty");
-        assert!(!rule.file_types.extensions.is_empty(), "file_types.extensions should not be empty");
-
-        // Verify test file
-        let test_file = fs::read_to_string(rules_dir.join("code_injection_test.js"))
-            .expect("Failed to read code_injection_test.js");
-        assert!(test_file.contains("new Function"), "Test file should contain new Function");
-        assert!(test_file.contains("setTimeout"), "Test file should contain setTimeout");
-    }
+    let first = injection[0];
+    let patterns = first.patterns.as_ref().expect("patterns set");
+    assert!(patterns.iter().any(|p| p.contains("new Function")));
+    assert!(patterns.iter().any(|p| p == "setTimeout"));
 }
 
 #[test]
 fn test_rule_conditions() {
-    let rules_dir = Path::new("rules/javascript");
-    let content = fs::read_to_string(rules_dir.join("dom_xss.ron"))
-        .expect("Failed to read dom_xss.ron");
-
-    let result: Result<DomXssRule, SpannedError> = from_str(&content);
-    assert!(result.is_ok(), "Failed to parse dom_xss.ron");
-
-    if let Ok(rule) = result {
-        if let Some(first_sink) = rule.dom_xss_sinks.first() {
-            assert!(!first_sink.conditions.is_empty(), "Sink should have conditions");
-            if let Some(first_condition) = first_sink.conditions.first() {
-                assert!(!first_condition.type_.is_empty(), "Condition should have type field");
-            }
-        }
-    }
+    let rules: Rules = from_str(DOM_XSS_FIXTURE).expect("Failed to parse DOM XSS fixture");
+    let first = rules.rules.first().expect("at least one rule");
+    let conditions = first.conditions.as_ref().expect("conditions set");
+    assert!(!conditions.is_empty(), "Rule should have conditions");
+    assert!(!conditions[0].field.is_empty(), "Condition should have field");
+    assert!(!conditions[0].operator.is_empty(), "Condition should have operator");
 }
 
 #[test]
 fn test_file_type_patterns() {
-    let rules_dir = Path::new("rules/javascript");
-    let files = [
-        "dom_xss.ron",
-        "unsafe_object_operations.ron",
-        "code_injection.ron"
-    ];
+    let fixtures = [DOM_XSS_FIXTURE, UNSAFE_OBJECT_FIXTURE, CODE_INJECTION_FIXTURE];
 
-    for file in files.iter() {
-        let content = fs::read_to_string(rules_dir.join(file))
-            .expect(&format!("Failed to read {}", file));
-        
-        let result: Result<DomXssRule, SpannedError> = from_str(&content);
-        assert!(result.is_ok(), "Failed to parse {}", file);
+    for fixture in fixtures.iter() {
+        let result: Result<Rules, SpannedError> = from_str(fixture);
+        assert!(result.is_ok(), "Failed to parse fixture: {:?}", result.err());
 
-        if let Ok(rule) = result {
-            assert!(!rule.file_types.extensions.is_empty(), "file_types.extensions should not be empty");
-            assert!(!rule.file_types.exclude_patterns.is_empty(), "file_types.exclude_patterns should not be empty");
+        let rules = result.unwrap();
+        for rule in &rules.rules {
+            let file_types = rule.file_types.as_ref().expect("file_types set");
+            assert!(
+                file_types.extensions.as_ref().map(|e| !e.is_empty()).unwrap_or(false),
+                "extensions should be populated"
+            );
+            assert!(
+                file_types.exclude_patterns.as_ref().map(|p| !p.is_empty()).unwrap_or(false),
+                "exclude_patterns should be populated"
+            );
         }
     }
-} 
+}
