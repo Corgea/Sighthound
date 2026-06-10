@@ -21,6 +21,14 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
         "javascript" | "js" | "jsx" => Ok(Box::new(JavaScriptLanguage)),
         #[cfg(feature = "tsx")]
         "tsx" | "typescript-jsx" => Ok(Box::new(TSXLanguage)),
+        #[cfg(feature = "typescript")]
+        "typescript" => Ok(Box::new(TypeScriptLanguage)),
+        #[cfg(feature = "go")]
+        "go" => Ok(Box::new(GoLanguage)),
+        #[cfg(feature = "ruby")]
+        "ruby" => Ok(Box::new(RubyLanguage)),
+        #[cfg(feature = "csharp")]
+        "csharp" => Ok(Box::new(CSharpLanguage)),
         #[cfg(feature = "html")]
         "html" => Ok(Box::new(HTMLLanguage)),
         #[cfg(feature = "django")]
@@ -35,6 +43,14 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
             supported.push("javascript");
             #[cfg(feature = "tsx")]
             supported.push("tsx");
+            #[cfg(feature = "typescript")]
+            supported.push("typescript");
+            #[cfg(feature = "go")]
+            supported.push("go");
+            #[cfg(feature = "ruby")]
+            supported.push("ruby");
+            #[cfg(feature = "csharp")]
+            supported.push("csharp");
             #[cfg(feature = "html")]
             supported.push("html");
             #[cfg(feature = "django")]
@@ -168,6 +184,125 @@ impl LanguageSupport for TSXLanguage {
     fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>> {
         node.child_by_field_name("arguments")
             .or_else(|| node.child_by_field_name("value"))
+    }
+}
+
+// TypeScript Implementation
+#[cfg(feature = "typescript")]
+pub struct TypeScriptLanguage;
+
+#[cfg(feature = "typescript")]
+impl LanguageSupport for TypeScriptLanguage {
+    fn name(&self) -> &'static str { "typescript" }
+    fn file_extension(&self) -> &'static str { ".ts" }
+    fn tree_sitter_language(&self) -> Language { tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into() }
+    fn call_node_types(&self) -> &[&'static str] {
+        &["call_expression", "new_expression"]
+    }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        match node.kind() {
+            "call_expression" => {
+                node.child_by_field_name("function")
+                    .map(|child| get_node_text_slice(&child, source))
+            }
+            "new_expression" => {
+                node.child_by_field_name("constructor")
+                    .map(|child| get_node_text_slice(&child, source))
+            }
+            _ => None
+        }
+    }
+
+    fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>> {
+        node.child_by_field_name("arguments")
+    }
+}
+
+// Go Implementation
+#[cfg(feature = "go")]
+pub struct GoLanguage;
+
+#[cfg(feature = "go")]
+impl LanguageSupport for GoLanguage {
+    fn name(&self) -> &'static str { "go" }
+    fn file_extension(&self) -> &'static str { ".go" }
+    fn tree_sitter_language(&self) -> Language { tree_sitter_go::LANGUAGE.into() }
+    fn call_node_types(&self) -> &[&'static str] { &["call_expression"] }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        node.child_by_field_name("function").map(|function| {
+            if function.kind() == "selector_expression" {
+                function
+                    .child_by_field_name("field")
+                    .map(|field| get_node_text_slice(&field, source))
+                    .unwrap_or_else(|| get_node_text_slice(&function, source))
+            } else {
+                get_node_text_slice(&function, source)
+            }
+        })
+    }
+
+    fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>> {
+        node.child_by_field_name("arguments")
+    }
+}
+
+// Ruby Implementation
+#[cfg(feature = "ruby")]
+pub struct RubyLanguage;
+
+#[cfg(feature = "ruby")]
+impl LanguageSupport for RubyLanguage {
+    fn name(&self) -> &'static str { "ruby" }
+    fn file_extension(&self) -> &'static str { ".rb" }
+    fn tree_sitter_language(&self) -> Language { tree_sitter_ruby::LANGUAGE.into() }
+    fn call_node_types(&self) -> &[&'static str] { &["method_call", "call"] }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        match node.kind() {
+            "method_call" | "call" => {
+                node.child_by_field_name("method")
+                    .map(|child| get_node_text_slice(&child, source))
+            }
+            _ => None
+        }
+    }
+
+    fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>> {
+        node.child_by_field_name("arguments")
+    }
+}
+
+// C# Implementation
+#[cfg(feature = "csharp")]
+pub struct CSharpLanguage;
+
+#[cfg(feature = "csharp")]
+impl LanguageSupport for CSharpLanguage {
+    fn name(&self) -> &'static str { "csharp" }
+    fn file_extension(&self) -> &'static str { ".cs" }
+    fn tree_sitter_language(&self) -> Language { tree_sitter_c_sharp::LANGUAGE.into() }
+    fn call_node_types(&self) -> &[&'static str] {
+        &["invocation_expression", "object_creation_expression"]
+    }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        match node.kind() {
+            "invocation_expression" => {
+                node.child_by_field_name("name")
+                    .map(|child| get_node_text_slice(&child, source))
+            }
+            "object_creation_expression" => {
+                node.child_by_field_name("type")
+                    .map(|child| get_node_text_slice(&child, source))
+            }
+            _ => None
+        }
+    }
+
+    fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>> {
+        node.child_by_field_name("argument_list")
     }
 }
 
