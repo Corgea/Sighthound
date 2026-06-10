@@ -16,6 +16,10 @@ python = ["tree-sitter-python"]
 java = ["tree-sitter-java"]
 javascript = ["tree-sitter-javascript"]
 tsx = ["tree-sitter-typescript"]
+typescript = ["tree-sitter-typescript"]
+go = ["tree-sitter-go"]
+ruby = ["tree-sitter-ruby"]
+csharp = ["tree-sitter-c-sharp"]
 html = ["tree-sitter-html"]
 django = ["tree-sitter-html"]  # Reuse HTML parser for Django templates
 
@@ -25,6 +29,9 @@ tree-sitter-python = { version = "0.23", optional = true }
 tree-sitter-java = { version = "0.23", optional = true }
 tree-sitter-javascript = { version = "0.23", optional = true }
 tree-sitter-typescript = { version = "0.23", optional = true }
+tree-sitter-go = { version = "0.23", optional = true }
+tree-sitter-ruby = { version = "0.23", optional = true }
+tree-sitter-c-sharp = { version = "0.23", optional = true }
 tree-sitter-html = { version = "0.23", optional = true }
 regex = "1.0"
 serde = { version = "1.0", features = ["derive"] }
