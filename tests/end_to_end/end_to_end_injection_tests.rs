@@ -1,5 +1,5 @@
-use find_vulns::VulnerabilityScanner;
-use find_vulns::rules::Rules;
+use sighthound::VulnerabilityScanner;
+use sighthound::rules::Rules;
 use tempfile::{TempDir, NamedTempFile};
 use std::fs;
 use std::io::Write;
@@ -23,52 +23,47 @@ mod end_to_end_injection_tests {
     }
 
     fn create_test_rules() -> NamedTempFile {
-        let rules_content = r#"{
-            injection_sinks: Some([
+        let rules_content = r#"(
+            rules: [
                 // SQL injection patterns
                 (
-                    pattern: "*.execute",
+                    mode: "search",
+                    pattern: Some("*.execute"),
                     finding_type: Some("sql_injection"),
                     severity: Some("high"),
                     confidence: Some("high"),
-                    conditions: None,
-                    file_types: None,
                 ),
                 (
-                    pattern: "cursor.execute",
+                    mode: "search",
+                    pattern: Some("cursor.execute"),
                     finding_type: Some("sql_injection"),
                     severity: Some("high"),
                     confidence: Some("high"),
-                    conditions: None,
-                    file_types: None,
                 ),
                 // Command injection patterns
                 (
-                    pattern: "Runtime.exec",
+                    mode: "search",
+                    pattern: Some("Runtime.exec"),
                     finding_type: Some("command_injection"),
                     severity: Some("high"),
                     confidence: Some("high"),
-                    conditions: None,
-                    file_types: None,
                 ),
                 (
-                    pattern: "os.system",
+                    mode: "search",
+                    pattern: Some("os.system"),
                     finding_type: Some("command_injection"),
                     severity: Some("high"),
                     confidence: Some("high"),
-                    conditions: None,
-                    file_types: None,
                 ),
                 (
-                    pattern: "subprocess.*",
+                    mode: "search",
+                    pattern: Some("subprocess.*"),
                     finding_type: Some("command_injection"),
                     severity: Some("high"),
                     confidence: Some("high"),
-                    conditions: None,
-                    file_types: None,
                 ),
-            ]),
-        }"#;
+            ],
+        )"#;
         
         let mut temp_file = NamedTempFile::with_suffix(".ron").expect("Failed to create temp file");
         write!(temp_file, "{}", rules_content).expect("Failed to write rules");
@@ -132,12 +127,12 @@ def count_users():
         ];
 
         let temp_dir = create_temp_dir_with_files(python_files);
-        let rules_file = create_test_rules();
-        
-        // Load rules and create scanner
-        let rules = Rules::load_from_file(rules_file.path().to_str().unwrap())
-            .expect("Failed to load rules");
-        let mut scanner = VulnerabilityScanner::new("python", rules)
+
+        // Use the production Python rule set, which is injection-aware (it flags
+        // dynamic query construction but leaves literal queries alone).
+        let rules = Rules::load_from_directory("rules/python/")
+            .expect("Failed to load python rules");
+        let scanner = VulnerabilityScanner::new("python", rules)
             .expect("Failed to create scanner");
 
         // Scan the directory
@@ -152,22 +147,18 @@ def count_users():
                 finding.finding_type, finding.file, finding.line, finding.snippet);
         }
 
-        // Should find 3 vulnerabilities in vulnerable.py, none in safe.py
-        assert!(findings.len() >= 3, "Should find at least 3 SQL injection vulnerabilities");
-        
-        // Verify all findings are SQL injection
+        // The 3 dynamically-built queries in vulnerable.py should be detected as SQL injection.
         let sql_injection_count = findings.iter()
-            .filter(|f| f.finding_type == "sql_injection")
+            .filter(|f| f.finding_type.to_lowercase().contains("sql"))
             .count();
         assert!(sql_injection_count >= 3, "Should find at least 3 SQL injection vulnerabilities");
 
-        // Verify findings are in the vulnerable file
         let vulnerable_findings = findings.iter()
             .filter(|f| f.file.contains("vulnerable.py"))
             .count();
         assert!(vulnerable_findings >= 3, "Should find vulnerabilities in vulnerable.py");
 
-        // Verify no findings in safe file
+        // safe.py contains only literal queries and must not be flagged.
         let safe_findings = findings.iter()
             .filter(|f| f.file.contains("safe.py"))
             .count();
@@ -271,10 +262,10 @@ public class VulnerableService {
         // 2. Directly validate the injection pattern detection logic
         #[cfg(feature = "java")]
         {
-            use find_vulns::parser::LanguageParser;
-            use find_vulns::language::LanguageSupport;
-            use find_vulns::rules::check_for_injection_pattern;
-            use find_vulns::models::Finding;
+            use sighthound::parser::LanguageParser;
+            use sighthound::language::LanguageSupport;
+            use sighthound::rules::check_for_injection_pattern;
+            use sighthound::models::Finding;
             
             // Create findings vector to store our results
             let mut findings = Vec::new();
@@ -473,34 +464,31 @@ function safeQuery() {
         let _rules_file = create_test_rules();
         
         // Add JavaScript-specific rules
-        let js_rules_content = r#"{
-            injection_sinks: Some([
+        let js_rules_content = r#"(
+            rules: [
                 (
-                    pattern: "db.execute",
+                    mode: "search",
+                    pattern: Some("db.execute"),
                     finding_type: Some("sql_injection"),
                     severity: Some("high"),
                     confidence: Some("high"),
-                    conditions: None,
-                    file_types: None,
                 ),
                 (
-                    pattern: "eval",
+                    mode: "search",
+                    pattern: Some("eval"),
                     finding_type: Some("code_injection"),
                     severity: Some("critical"),
                     confidence: Some("high"),
-                    conditions: None,
-                    file_types: None,
                 ),
                 (
-                    pattern: "*.innerHTML",
+                    mode: "search",
+                    pattern: Some("*.innerHTML"),
                     finding_type: Some("xss"),
                     severity: Some("high"),
                     confidence: Some("medium"),
-                    conditions: None,
-                    file_types: None,
                 ),
-            ]),
-        }"#;
+            ],
+        )"#;
         
         let mut js_rules_file = NamedTempFile::with_suffix(".ron").expect("Failed to create temp file");
         write!(js_rules_file, "{}", js_rules_content).expect("Failed to write rules");
@@ -559,14 +547,13 @@ def safe_print():
         ];
 
         let temp_dir = create_temp_dir_with_files(safe_files);
-        let rules_file = create_test_rules();
-        
-        let rules = Rules::load_from_file(rules_file.path().to_str().unwrap())
-            .expect("Failed to load rules");
-        
+
+        let rules = Rules::load_from_directory("rules/python/")
+            .expect("Failed to load python rules");
+
         #[cfg(feature = "python")]
         {
-            let mut scanner = VulnerabilityScanner::new("python", rules)
+            let scanner = VulnerabilityScanner::new("python", rules)
                 .expect("Failed to create scanner");
 
             let findings = scanner.find_vulnerabilities_single_threaded(

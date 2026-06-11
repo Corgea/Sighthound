@@ -1,0 +1,30 @@
+(
+    rules: [
+        // SSRF: IntegrationService builds an outbound URL from request-controlled host
+        // and path segments and fetches it server-side via HttpClient. The interpolated
+        // URL string is assigned to a local that is then passed to the HTTP client.
+        (
+            id: Some("csharp-ssrf-url-build"),
+            name: Some("Server-side request forgery via user-controlled URL"),
+            category: Some("ssrf"),
+            mode: "taint",
+            sources: Some([
+                "$\"http://",
+                "$\"https://",
+            ]),
+            sinks: Some([
+                "$\"http://",
+                "$\"https://",
+            ]),
+            finding_type: Some("SSRF"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-918"),
+            description: Some("A user-controlled URL is assembled and fetched server-side, enabling SSRF"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["ssrf", "csharp", "cwe-918"])
+        ),
+    ]
+)

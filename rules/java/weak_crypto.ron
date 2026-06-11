@@ -1,0 +1,34 @@
+(
+    rules: [
+        // CWE-327: Use of a broken/risky cryptographic algorithm. Match the
+        // MessageDigest/Cipher factory and require a weak-algorithm literal argument.
+        (
+            id: Some("java-weak-crypto"),
+            name: Some("Weak Cryptographic Algorithm"),
+            category: Some("crypto"),
+            mode: "search",
+            patterns: Some([
+                "getInstance"
+            ]),
+            finding_type: Some("Weak Cryptographic Algorithm"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("Weak hashing/encryption algorithm (MD5, SHA1, DES) used via MessageDigest/Cipher.getInstance."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "matches",
+                    value: "",
+                    condition_type: Some("has_argument"),
+                    argument_position: Some(0),
+                    pattern: Some("regex:(?i)\"(MD5|MD2|MD4|SHA-?1|DES|DESede|RC2|RC4|ECB)")
+                )
+            ]),
+            tags: Some(["crypto", "cwe-327", "java"])
+        ),
+    ]
+)

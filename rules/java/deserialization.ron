@@ -1,0 +1,24 @@
+(
+    rules: [
+        // CWE-502: Deserialization of untrusted data via ObjectInputStream.readObject().
+        (
+            id: Some("java-unsafe-deserialization"),
+            name: Some("Unsafe Deserialization"),
+            category: Some("deserialization"),
+            mode: "search",
+            patterns: Some([
+                "readObject",
+                "readUnshared"
+            ]),
+            finding_type: Some("Unsafe Deserialization"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-502"),
+            description: Some("Untrusted data deserialized via ObjectInputStream.readObject(), enabling remote code execution."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["deserialization", "cwe-502", "java"])
+        ),
+    ]
+)

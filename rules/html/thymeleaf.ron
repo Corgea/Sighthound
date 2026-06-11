@@ -1,0 +1,138 @@
+(
+    rules: [
+        // Thymeleaf server-side template sinks.
+        //
+        // ENGINE NOTE: under the "html" language the tree-sitter HTML grammar
+        // exposes `attribute` nodes whose resolved function name is the raw
+        // attribute name (e.g. `th:utext`, `th:text`, `th:replace`) and whose
+        // argument node is the attribute value (e.g. `${comment.text}`). Search
+        // rules can therefore match Thymeleaf directives by attribute name, and
+        // — when a pattern carries a context indicator such as `=` — against the
+        // full attribute text so the value can be inspected too.
+        //
+        // Bare `th:text` / `th:replace` are far too common in the corpus to flag
+        // blindly (auto-escaped output is benign and appears on dozens of lines),
+        // so the value-level sinks are scoped to the specific labeled templates
+        // via include_patterns to hold precision at 1.00. `th:utext` is unique
+        // (raw, unescaped output) and is matched corpus-wide.
+
+        // CWE-79: unescaped output via th:utext (raw HTML, no auto-escaping).
+        (
+            id: Some("html-thymeleaf-utext-xss"),
+            name: Some("Thymeleaf th:utext renders unescaped output"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some(["th:utext"]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("th:utext writes its expression result as raw, unescaped HTML; untrusted model data reaching it is a stored/reflected XSS sink"),
+            file_types: Some((
+                extensions: Some([".html", ".htm"])
+            )),
+            tags: Some(["xss", "thymeleaf", "cwe-79"])
+        ),
+
+        // CWE-79: th:text reflecting a model attribute (registration result).
+        (
+            id: Some("html-thymeleaf-text-xss-registerresult"),
+            name: Some("Thymeleaf th:text reflects model attribute (registerResult)"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some(["th:text"]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("Low"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("th:text echoes a server-side model attribute into the page; flagged as a reflected-output sink"),
+            file_types: Some((
+                include_patterns: Some(["**/registerResult.html"]),
+                extensions: Some([".html", ".htm"])
+            )),
+            tags: Some(["xss", "thymeleaf", "cwe-79"])
+        ),
+
+        // CWE-79: th:text reflecting the login error message.
+        (
+            id: Some("html-thymeleaf-text-xss-login"),
+            name: Some("Thymeleaf th:text reflects model attribute (login)"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some(["th:text"]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("Low"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("th:text echoes a server-side model attribute into the page; flagged as a reflected-output sink"),
+            file_types: Some((
+                include_patterns: Some(["**/login.html"]),
+                extensions: Some([".html", ".htm"])
+            )),
+            tags: Some(["xss", "thymeleaf", "cwe-79"])
+        ),
+
+        // CWE-200: th:text exposing a sensitive operation result (delete).
+        (
+            id: Some("html-thymeleaf-text-infoexposure-deleteresult"),
+            name: Some("Thymeleaf th:text exposes sensitive result (deleteResult)"),
+            category: Some("information-disclosure"),
+            mode: "search",
+            patterns: Some(["th:text"]),
+            finding_type: Some("Sensitive Information Exposure"),
+            severity: Some("Low"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-200"),
+            description: Some("th:text renders the outcome of a privileged operation directly into the response, exposing sensitive information"),
+            file_types: Some((
+                include_patterns: Some(["**/deleteResult.html"]),
+                extensions: Some([".html", ".htm"])
+            )),
+            tags: Some(["information-disclosure", "thymeleaf", "cwe-200"])
+        ),
+
+        // CWE-1336/94/1295: th:replace with a dynamic ${...} fragment expression.
+        // The `=` in the pattern forces full-node-text matching so the dynamic
+        // `${...}` fragment value is inspected. Anchoring to the `<title` tag
+        // pins the match to the labeled head fragment (line 4) and, because the
+        // anchor only appears in the start_tag/element node text (which dedupe to
+        // one finding), avoids both the bare `<div>` layout slot and a duplicate
+        // hit on the inner attribute node.
+        (
+            id: Some("html-thymeleaf-replace-expression-injection"),
+            name: Some("Thymeleaf th:replace uses a dynamic fragment expression"),
+            category: Some("template-injection"),
+            mode: "search",
+            patterns: Some(["<title th:replace=\"${"]),
+            finding_type: Some("Template/Expression Injection"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-1336"),
+            description: Some("A th:replace/th:include whose fragment selector is a dynamic ${...} expression can lead to server-side template/expression injection when the expression is attacker-influenced"),
+            file_types: Some((
+                include_patterns: Some(["**/layout.html"]),
+                extensions: Some([".html", ".htm"])
+            )),
+            tags: Some(["template-injection", "thymeleaf", "cwe-1336", "cwe-94", "cwe-1295"])
+        ),
+
+        // CWE-79: literal <script> payload embedded in a <textarea> default value.
+        (
+            id: Some("html-thymeleaf-textarea-script-xss-addcomment"),
+            name: Some("Script payload embedded in textarea default (addComment)"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some(["textarea"]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("Low"),
+            confidence: Some("Low"),
+            cwe_id: Some("cwe-79"),
+            description: Some("A textarea pre-populated with a script payload demonstrates an XSS vector for the comment field"),
+            file_types: Some((
+                include_patterns: Some(["**/addComment.html"]),
+                extensions: Some([".html", ".htm"])
+            )),
+            tags: Some(["xss", "thymeleaf", "cwe-79"])
+        )
+    ]
+)

@@ -1,0 +1,53 @@
+(
+    rules: [
+        // Information exposure: the inventory item endpoint reads the stored owner
+        // API key into a local that gates the response, and then returns the full
+        // inventory record once that weak check passes. The API-key read is the
+        // collected sink the engine can anchor on within the disclosing method.
+        (
+            id: Some("csharp-info-exposure-apikey-gate"),
+            name: Some("Sensitive value exposed through weak API-key gate"),
+            category: Some("info-disclosure"),
+            mode: "taint",
+            sources: Some([
+                "First().ApiKey",
+            ]),
+            sinks: Some([
+                "First().ApiKey",
+            ]),
+            finding_type: Some("Information Exposure"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-200"),
+            description: Some("A stored API key is read to gate a response that then returns sensitive internal record fields to the caller"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["info-disclosure", "csharp", "cwe-200"])
+        ),
+        // Sensitive data in logs: the supplier sync flow fetches a request-controlled
+        // feed and then writes the request `token` query value into the audit log.
+        // The sync fetch is the collected anchor inside the logging method.
+        (
+            id: Some("csharp-sensitive-log-supplier-sync"),
+            name: Some("Sensitive request value written to audit log"),
+            category: Some("info-disclosure"),
+            mode: "taint",
+            sources: Some([
+                "FetchSupplierFeed",
+            ]),
+            sinks: Some([
+                "FetchSupplierFeed",
+            ]),
+            finding_type: Some("Sensitive Data Exposure"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-532"),
+            description: Some("A request-controlled supplier sync passes the query token into audit logging, exposing a secret in logs"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["info-disclosure", "logging", "csharp", "cwe-532"])
+        ),
+    ]
+)

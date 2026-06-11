@@ -1,0 +1,47 @@
+// Go insecure TLS configuration rules (CWE-295 / CWE-322)
+// See sql_injection.ron header for engine/full-context conventions.
+//
+// LIMITATION: `InsecureSkipVerify: true` is a struct field in a composite
+// literal, not a call, so the scanner can only see it when the *tls.Config is
+// constructed inline as an argument to a TLS call (tls.Dial/Client/Server,
+// DialWithDialer). Standalone assignments to a Transport/Config variable are
+// not observable by this engine.
+(
+    rules: [
+        (
+            id: Some("go-insecure-tls-skip-verify"),
+            name: Some("TLS certificate verification disabled"),
+            category: Some("tls"),
+            mode: "search",
+            patterns: Some([
+                "regex:(Dial|DialWithDialer|Client|Server)\\([^)]*InsecureSkipVerify\\s*:\\s*true",
+                "=__force_full_context__"
+            ]),
+            finding_type: Some("Insecure TLS Configuration"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-295"),
+            description: Some("Setting InsecureSkipVerify: true disables TLS certificate validation, enabling man-in-the-middle attacks. Verify certificates against a trusted CA pool."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["tls", "insecure-transport", "cwe-295", "cwe-322", "go"])
+        ),
+
+        // Cleartext HTTP endpoints constructed in code.
+        (
+            id: Some("go-cleartext-http-url"),
+            name: Some("Cleartext HTTP request"),
+            category: Some("tls"),
+            mode: "search",
+            patterns: Some([
+                "regex:http\\.(Get|Post|Head|PostForm)\\(\\s*\"http://"
+            ]),
+            finding_type: Some("Cleartext Transmission"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-319"),
+            description: Some("Data is sent over cleartext HTTP. Use HTTPS so traffic is encrypted in transit."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["tls", "cleartext", "cwe-319", "go"])
+        )
+    ]
+)

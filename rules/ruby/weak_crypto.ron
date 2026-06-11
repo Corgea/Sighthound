@@ -1,0 +1,57 @@
+(
+    rules: [
+        // === SEARCH: weak hash functions (MD5 / SHA1) ===
+        (
+            id: Some("ruby-weak-hash"),
+            name: Some("Weak Hashing Algorithm (MD5/SHA1)"),
+            category: Some("crypto"),
+            mode: "search",
+            patterns: Some([
+                "*Digest::MD5.hexdigest*", "*Digest::MD5.digest*", "*Digest::MD5.base64digest*",
+                "*Digest::MD5.new*", "*Digest::MD5.file*",
+                "*Digest::SHA1.hexdigest*", "*Digest::SHA1.digest*", "*Digest::SHA1.base64digest*",
+                "*Digest::SHA1.new*", "*Digest::SHA1.file*",
+                "*MD5.hexdigest*", "*MD5.digest*", "*MD5.base64digest*",
+                "*SHA1.hexdigest*", "*SHA1.digest*", "*SHA1.base64digest*",
+                "*OpenSSL::Digest::MD5.new*", "*OpenSSL::Digest::SHA1.new*",
+                "*OpenSSL::Digest.new('MD5'*", "*OpenSSL::Digest.new(\"MD5\"*",
+                "*OpenSSL::Digest.new('SHA1'*", "*OpenSSL::Digest.new(\"SHA1\"*",
+                "*Digest.new('MD5'*", "*Digest.new('SHA1'*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("MD5 and SHA1 are cryptographically broken. Use SHA-256+ for integrity and bcrypt/scrypt/argon2 for password hashing."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["weak-crypto", "cwe-327", "cwe-328", "ruby"])
+        ),
+
+        // === SEARCH: weak / insecure ciphers (DES, RC4, Blowfish, ECB) ===
+        (
+            id: Some("ruby-weak-cipher"),
+            name: Some("Weak Encryption Cipher"),
+            category: Some("crypto"),
+            mode: "search",
+            patterns: Some([
+                "*OpenSSL::Cipher.new('DES'*", "*OpenSSL::Cipher.new(\"DES\"*",
+                "*OpenSSL::Cipher.new('des*", "*OpenSSL::Cipher.new(\"des*",
+                "*OpenSSL::Cipher.new('RC4'*", "*OpenSSL::Cipher.new(\"RC4\"*",
+                "*OpenSSL::Cipher.new('rc4*", "*OpenSSL::Cipher.new(\"rc4*",
+                "*OpenSSL::Cipher.new('BF*", "*OpenSSL::Cipher.new('bf*",
+                "*OpenSSL::Cipher.new(*ECB*", "*OpenSSL::Cipher.new(*ecb*",
+                "*Cipher::DES.new*", "*Cipher::RC4.new*",
+                "*Cipher.new('DES*", "*Cipher.new(\"DES*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("DES/RC4/Blowfish and ECB mode are insecure. Use AES-256-GCM (or another authenticated cipher) instead."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["weak-crypto", "cwe-327", "cwe-326", "ruby"])
+        )
+    ]
+)

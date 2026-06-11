@@ -1,0 +1,53 @@
+(
+    rules: [
+        // === SEARCH: unsafe deserialization primitives ===
+        (
+            id: Some("ruby-deserialization-unsafe"),
+            name: Some("Unsafe Deserialization"),
+            category: Some("deserialization"),
+            mode: "search",
+            patterns: Some([
+                "*Marshal.load(*", "*Marshal.restore(*",
+                "*YAML.load(*", "*YAML.load_file(*",
+                "*YAML.load_stream(*",
+                "*Psych.load(*", "*Psych.load_file(*",
+                "*Oj.load(*", "*Oj.object_load(*",
+                "*Ox.parse_obj(*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Unsafe Deserialization"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-502"),
+            description: Some("Marshal.load / YAML.load / Oj.load (default modes) instantiate arbitrary Ruby objects and can lead to remote code execution on untrusted input. Use YAML.safe_load, JSON.parse, or Oj.load(str, mode: :strict)."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["deserialization", "cwe-502", "ruby"])
+        ),
+
+        // === TAINT: user input -> deserialization sink ===
+        (
+            id: Some("ruby-deserialization-taint"),
+            name: Some("Unsafe Deserialization via Data Flow"),
+            category: Some("deserialization"),
+            mode: "taint",
+            sources: Some([
+                "params", "request.parameters", "cookies", "request.env",
+                "request.headers", "request.body"
+            ]),
+            sinks: Some([
+                "Marshal.load", "Marshal.restore", "YAML.load", "Psych.load",
+                "Oj.load", "Oj.object_load"
+            ]),
+            sanitizers: Some([
+                "safe_load", "JSON.parse"
+            ]),
+            finding_type: Some("Unsafe Deserialization"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-502"),
+            description: Some("Request data flows into an unsafe deserialization sink."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["deserialization", "cwe-502", "ruby", "taint"])
+        )
+    ]
+)

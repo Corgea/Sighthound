@@ -1,0 +1,68 @@
+(
+    rules: [
+        // CWE-639: IDOR — repository lookups/deletes keyed on a request-supplied
+        // id with no ownership check. not_literal arg0 skips seeded findById(1L).
+        (
+            id: Some("java-idor-repository-access"),
+            name: Some("Insecure Direct Object Reference"),
+            category: Some("access-control"),
+            mode: "search",
+            patterns: Some([
+                "findById",
+                "deleteById",
+                "getById"
+            ]),
+            finding_type: Some("Insecure Direct Object Reference"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-639"),
+            description: Some("Repository accessed by a user-supplied identifier without an ownership/authorization check (IDOR)."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_literal",
+                    value: "",
+                    condition_type: Some("not_literal"),
+                    argument_position: Some(0)
+                )
+            ]),
+            tags: Some(["access-control", "idor", "cwe-639", "java"])
+        ),
+
+        // CWE-862: Missing authorization on a destructive controller endpoint.
+        // A controller invoking deleteById on a request-supplied id with no
+        // ownership/authorization gate. Scoped to controllers and to delete
+        // operations so read paths (findById) are not double-flagged.
+        (
+            id: Some("java-missing-authorization-delete"),
+            name: Some("Missing Authorization on Delete"),
+            category: Some("access-control"),
+            mode: "search",
+            patterns: Some([
+                "deleteById"
+            ]),
+            finding_type: Some("Missing Authorization"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-862"),
+            description: Some("Destructive endpoint deletes a record by a user-supplied id without any authorization or ownership check."),
+            file_types: Some((
+                extensions: Some([".java"]),
+                include_patterns: Some(["*controllers*"])
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_literal",
+                    value: "",
+                    condition_type: Some("not_literal"),
+                    argument_position: Some(0)
+                )
+            ]),
+            tags: Some(["access-control", "authz", "cwe-862", "java"])
+        ),
+    ]
+)

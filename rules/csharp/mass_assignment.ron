@@ -1,0 +1,30 @@
+(
+    rules: [
+        // Mass assignment: a request body is deserialized into a patch object whose
+        // privileged IsAdmin field is then copied onto the persisted settings. The
+        // deserialized value is the taint source; copying it into the IsAdmin field is
+        // the sink. The typed System.Text.Json call itself is not flagged (that is the
+        // documented safe-by-design negative); only the privileged copy is.
+        (
+            id: Some("csharp-mass-assignment-isadmin"),
+            name: Some("Mass assignment of privileged field from request input"),
+            category: Some("mass-assignment"),
+            mode: "taint",
+            sources: Some([
+                "Deserialize",
+            ]),
+            sinks: Some([
+                "IsAdmin =",
+            ]),
+            finding_type: Some("Mass Assignment"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-915"),
+            description: Some("A privileged field is overwritten directly from a deserialized request-controlled object"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["mass-assignment", "csharp", "cwe-915"])
+        ),
+    ]
+)

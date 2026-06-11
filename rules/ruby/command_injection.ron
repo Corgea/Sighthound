@@ -1,0 +1,125 @@
+(
+    rules: [
+        // === SEARCH: Shell execution with interpolation / concatenation ===
+        // Restricted to single-string commands built via interpolation (#{...}) or
+        // concatenation (+). The array form system("cmd", arg) is intentionally NOT
+        // matched because its arguments are not shell-interpreted.
+        (
+            id: Some("ruby-cmd-injection-system"),
+            name: Some("Command Injection via system/exec/spawn"),
+            category: Some("command-injection"),
+            mode: "search",
+            patterns: Some([
+                "*system(\"*#{*", "*system('*#{*", "*system(*+*",
+                "*system \"*#{*", "*system '*#{*",
+                "*exec(\"*#{*", "*exec('*#{*", "*exec(*+*",
+                "*exec \"*#{*",
+                "*spawn(\"*#{*", "*spawn(*+*",
+                "*syscall(\"*#{*",
+                "=__sh_fullctx__"
+            ]),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_sanitized",
+                    value: "",
+                    condition_type: Some("argument_not_sanitized"),
+                    patterns: Some(["Shellwords.escape", "shellescape", "Shellwords.split"])
+                )
+            ]),
+            finding_type: Some("Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
+            description: Some("OS command built with interpolation or concatenation can lead to command injection. Use the array form (system(\"cmd\", arg)) or Shellwords.escape."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["command-injection", "cwe-78", "ruby"])
+        ),
+
+        // === SEARCH: Open3 / IO.popen with dynamic single-string command ===
+        (
+            id: Some("ruby-cmd-injection-open3-popen"),
+            name: Some("Command Injection via Open3/IO.popen"),
+            category: Some("command-injection"),
+            mode: "search",
+            patterns: Some([
+                "*Open3.capture2(\"*#{*", "*Open3.capture2(*+*",
+                "*Open3.capture3(\"*#{*", "*Open3.capture3(*+*",
+                "*Open3.capture2e(\"*#{*",
+                "*Open3.popen2(\"*#{*",
+                "*Open3.popen3(\"*#{*",
+                "*Open3.pipeline(\"*#{*",
+                "*IO.popen(\"*#{*", "*IO.popen(*+*",
+                "*IO.popen('*#{*",
+                "=__sh_fullctx__"
+            ]),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_sanitized",
+                    value: "",
+                    condition_type: Some("argument_not_sanitized"),
+                    patterns: Some(["Shellwords.escape", "shellescape"])
+                )
+            ]),
+            finding_type: Some("Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
+            description: Some("Open3/IO.popen invoked with an interpolated single-string command can lead to command injection. Pass the command as an argument array."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["command-injection", "cwe-78", "ruby"])
+        ),
+
+        // === SEARCH: Backticks and %x() subshell with interpolation ===
+        // NOTE: backticks/%x() are not call nodes in tree-sitter-ruby, so these are
+        // best-effort and may not match; the taint rule below is the primary detector.
+        (
+            id: Some("ruby-cmd-injection-backticks"),
+            name: Some("Command Injection via backticks / %x()"),
+            category: Some("command-injection"),
+            mode: "search",
+            patterns: Some([
+                "*`*#{*`*",
+                "*%x(*#{*",
+                "*%x{*#{*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-78"),
+            description: Some("Backtick or %x() subshell with string interpolation executes a shell command built from dynamic data."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["command-injection", "cwe-78", "ruby"])
+        ),
+
+        // === TAINT: user input -> command execution ===
+        (
+            id: Some("ruby-cmd-injection-taint"),
+            name: Some("Command Injection via Data Flow"),
+            category: Some("command-injection"),
+            mode: "taint",
+            sources: Some([
+                "params", "request.parameters", "request.query_parameters",
+                "request.request_parameters", "cookies", "request.env", "request.headers"
+            ]),
+            sinks: Some([
+                "system", "exec", "spawn", "syscall",
+                "Open3.capture2", "Open3.capture3", "Open3.capture2e",
+                "Open3.popen2", "Open3.popen3", "Open3.pipeline",
+                "IO.popen", "popen"
+            ]),
+            sanitizers: Some([
+                "Shellwords.escape", "shellescape", "Shellwords.split", "Integer("
+            ]),
+            finding_type: Some("Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
+            description: Some("Request data flows into an OS command execution sink without shell escaping."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["command-injection", "cwe-78", "ruby", "taint"])
+        )
+    ]
+)

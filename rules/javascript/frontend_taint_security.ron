@@ -93,14 +93,10 @@
                 "*.srcdoc",  // iframe srcdoc
                 
                 // Attribute manipulation
-                "*.title",
-                "*.alt",
                 "*.onclick",
                 "*.onload",
                 "*.onerror",
                 "*.setAttribute",
-                "*.dataset.*",
-                
                 // Code execution
                 "eval(",
                 "Function(",
@@ -454,7 +450,6 @@
                 "$.post",
                 
                 // URL construction
-                "window.location",
                 "location.href",
                 "*.src",
                 "*.href",
@@ -527,14 +522,10 @@
                 // URL contexts without encoding
                 "*.href",
                 "*.src",
-                "window.location",
                 "location.href",
                 
                 // Attribute contexts
                 "*.setAttribute",
-                "*.title",
-                "*.alt",
-                
                 // CSS contexts
                 "*.style",
                 "*.className"
@@ -705,7 +696,6 @@
                 "*.mutate",                // State mutations
                 
                 // DOM data attributes that could be used for redirection
-                "*.dataset.*",             // Dataset attributes
                 "*.setAttribute",          // Setting attributes
                 
                 // Meta refresh (high risk)
@@ -850,7 +840,6 @@
                 "sessionStorage.setItem",
                 
                 // Navigation
-                "window.location",
                 "location.href"
             ]),
             
@@ -906,7 +895,6 @@
                 "*.href",
                 "localStorage.setItem",
                 "sessionStorage.setItem",
-                "window.location",
                 "setTimeout(",
                 "setInterval(",
                 "import("
@@ -1529,27 +1517,12 @@
             ]),
             
             sinks: Some([
-                // Security-sensitive operations
-                "token",
-                "sessionId",
-                "nonce",
-                "csrf",
-                "*.cookie",
-                "localStorage.setItem",
-                "sessionStorage.setItem",
-                
-                // Authentication
-                "authenticate",
-                "login",
-                "password",
-                "key",
-                "secret",
-                
-                // Crypto operations
-                "encrypt(",
-                "decrypt(",
-                "sign(",
-                "verify("
+                // Security-sensitive storage operations (precise to avoid bare-word FPs)
+                "*.cookie =",
+                "localStorage.setItem(",
+                "sessionStorage.setItem(",
+                "crypto.createHmac(",
+                "jwt.sign("
             ]),
             
             sanitizers: Some([
@@ -1918,15 +1891,12 @@
             
             sinks: Some([
                 // Location manipulation
-                "window.location",
                 "window.location.href",
                 "window.location.assign",
                 "window.location.replace",
                 "location.href",
                 "location.assign",
                 "location.replace",
-                "location.hash",
-                
                 // Navigation
                 "history.pushState",
                 "history.replaceState",

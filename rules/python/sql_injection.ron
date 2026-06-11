@@ -1,59 +1,63 @@
 (
     rules: [
-        // === SEARCH MODE RULE (Pattern-based detection for dangerous keywords) ===
+        // Raw-SQL execution helpers and inline string-built queries.
+        // The "%"/"+"/"=" bearing patterns force full-call-text matching, so the
+        // whole list is evaluated against the call text (not just the function name).
         (
-            id: Some("python-sql-dangerous-keywords"),
-            name: Some("Dangerous SQL Keywords"),
+            id: Some("python-sql-raw-001"),
+            name: Some("Raw SQL Execution"),
             category: Some("database"),
             mode: "search",
             patterns: Some([
-                "*DROP TABLE*",
-                "*DELETE FROM*",
-                "*UNION SELECT*",
-                "*; DROP*",
-                "*; DELETE*",
-                "*TRUNCATE*",
-                "*ALTER TABLE*",
-                "*CREATE TABLE*"
+                "execute_raw_query(",
+                "*cursor.execute(*%*",
+                "*cursor.execute(*.format(*",
+                "*cursor.execute(f\"*",
+                "*cursor.execute(f'*",
+                "*cursor.execute(*+*",
+                "*.executescript(*",
             ]),
-            finding_type: Some("Dangerous SQL Keywords"),
-            severity: Some("High"),
-            confidence: Some("High"),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("Medium"),
             cwe_id: Some("cwe-89"),
-            description: Some("Dangerous SQL keywords detected that could indicate SQL injection attempts or malicious queries"),
+            description: Some("Raw SQL query executed from a dynamically-built string (string formatting/concatenation)"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
-            tags: Some(["sql", "dangerous", "injection", "keywords"])
+            tags: Some(["sql", "injection", "database"])
         ),
 
-        // === COMPREHENSIVE TAINT RULE (General SQL injection data flows) ===
+        // Taint: user input flowing into a SQL execute sink (catches variable-built
+        // queries that aren't visible as a literal at the call site).
         (
-            id: Some("python-sql-injection-comprehensive-taint"),
-            name: Some("SQL Injection via Data Flow Analysis"),
+            id: Some("python-sql-taint-001"),
+            name: Some("SQL Injection Taint Flow"),
             category: Some("database"),
             mode: "taint",
             sources: Some([
-                // Web framework request data (comprehensive with wildcards)
-                "request.*",
-                // Direct user input
+                "request.",
                 "input(",
-                "raw_input("
+                "raw_input(",
+                "flask.request",
             ]),
             sinks: Some([
-                // All SQL execution methods (comprehensive pattern)
-                "*execute*"
+                "execute(",
+                "executemany(",
+                "executescript(",
             ]),
-            finding_type: Some("SQL Injection Data Flow"),
+            sanitizers: Some([
+                "parameterized",
+            ]),
+            finding_type: Some("SQL Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
             cwe_id: Some("cwe-89"),
-            description: Some("User input flows to SQL execution without proper sanitization, creating SQL injection vulnerability"),
+            description: Some("User input flows to SQL execution without parameterization"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
-            tags: Some(["sql", "injection", "taint", "database", "critical", "data-flow"])
+            tags: Some(["sql", "injection", "taint", "database"])
         ),
-
     ]
 )

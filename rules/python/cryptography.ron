@@ -1,180 +1,28 @@
 (
     rules: [
-        // Weak cryptographic algorithms
-        (
-            id: Some("python-crypto-001"),
-            name: Some("Weak Hash Algorithm MD5"),
-            category: Some("cryptography"),
-            mode: "search",
-            patterns: Some([
-                "hashlib\\.md5\\(",
-                "Crypto\\.Hash\\.MD5",
-                "md5\\.new\\(",
-                "md5\\.md5\\(",
-            ]),
-            finding_type: Some("Weak Cryptography"),
-            severity: Some("Medium"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-327"),
-            description: Some("MD5 is cryptographically broken and should not be used for security purposes"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["crypto", "hash", "md5", "weak"])
-        ),
-        (
-            id: Some("python-crypto-002"),
-            name: Some("Weak Hash Algorithm SHA1"),
-            category: Some("cryptography"),
-            mode: "search",
-            patterns: Some([
-                "hashlib\\.sha1\\(",
-                "Crypto\\.Hash\\.SHA1",
-                "sha\\.new\\(",
-                "sha1\\.sha1\\(",
-            ]),
-            finding_type: Some("Weak Cryptography"),
-            severity: Some("Medium"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-327"),
-            description: Some("SHA1 is cryptographically weak and should be replaced with SHA-256 or higher"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["crypto", "hash", "sha1", "weak"])
-        ),
+        // Obsolete/broken ciphers and home-grown "encryption" (base64).
         (
             id: Some("python-crypto-003"),
-            name: Some("Weak Encryption Algorithm DES"),
+            name: Some("Weak Encryption Algorithm"),
             category: Some("cryptography"),
             mode: "search",
             patterns: Some([
-                "Crypto\\.Cipher\\.DES",
-                "DES\\.new\\(",
-                "des\\.DES\\(",
+                "DES.new",
+                "ARC4.new",
+                "RC4.new",
+                "Crypto.Cipher.DES",
+                "Crypto.Cipher.ARC4",
+                "base64.b64encode",
             ]),
             finding_type: Some("Weak Cryptography"),
             severity: Some("High"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-327"),
-            description: Some("DES encryption is obsolete and easily broken"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["crypto", "encryption", "des", "weak"])
-        ),
-        (
-            id: Some("python-crypto-004"),
-            name: Some("Weak Encryption Algorithm RC4"),
-            category: Some("cryptography"),
-            mode: "search",
-            patterns: Some([
-                "Crypto\\.Cipher\\.ARC4",
-                "ARC4\\.new\\(",
-                "RC4\\.new\\(",
-            ]),
-            finding_type: Some("Weak Cryptography"),
-            severity: Some("High"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-327"),
-            description: Some("RC4 stream cipher has known vulnerabilities and should not be used"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["crypto", "encryption", "rc4", "weak"])
-        ),
-        (
-            id: Some("python-crypto-005"),
-            name: Some("Hardcoded Cryptographic Key"),
-            category: Some("cryptography"),
-            mode: "search",
-            patterns: Some([
-                "key\\s*=\\s*[\"'].*[\"']",
-                "password\\s*=\\s*[\"'].*[\"']",
-                "secret\\s*=\\s*[\"'].*[\"']",
-                "token\\s*=\\s*[\"'].*[\"']",
-            ]),
-            finding_type: Some("Hardcoded Cryptographic Material"),
-            severity: Some("High"),
             confidence: Some("Medium"),
-            cwe_id: Some("cwe-798"),
-            description: Some("Hardcoded cryptographic keys or secrets detected"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["crypto", "hardcoded", "key", "secret"])
-        ),
-        (
-            id: Some("python-crypto-006"),
-            name: Some("Weak Random Number Generation"),
-            category: Some("cryptography"),
-            mode: "search",
-            patterns: Some([
-                "random\\.random\\(",
-                "random\\.randint\\(",
-                "random\\.choice\\(",
-                "random\\.shuffle\\(",
-            ]),
-            finding_type: Some("Weak Random Number Generation"),
-            severity: Some("Medium"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-338"),
-            description: Some("Standard random module is not cryptographically secure, use secrets module instead"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["crypto", "random", "weak", "prng"])
-        ),
-        (
-            id: Some("python-crypto-007"),
-            name: Some("ECB Mode Encryption"),
-            category: Some("cryptography"),
-            mode: "search",
-            patterns: Some([
-                "MODE_ECB",
-                "\\.ECB",
-                "mode.*ECB",
-            ]),
-            finding_type: Some("Weak Cryptography"),
-            severity: Some("Medium"),
-            confidence: Some("High"),
             cwe_id: Some("cwe-327"),
-            description: Some("ECB mode encryption is insecure and reveals patterns in plaintext"),
+            description: Some("Obsolete/broken cipher (DES/RC4) or base64 used in place of real encryption"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
-            tags: Some(["crypto", "encryption", "ecb", "mode"])
+            tags: Some(["crypto", "encryption", "weak"])
         ),
-        
-        // Taint mode for cryptographic material flows
-        (
-            id: Some("python-crypto-taint-001"),
-            name: Some("Hardcoded Key Taint Flow"),
-            category: Some("cryptography"),
-            mode: "taint",
-            sources: Some([
-                "\".*\"",
-                "'.*'",
-                "b\".*\"",
-                "b'.*'",
-            ]),
-            sinks: Some([
-                "\\.new\\(",
-                "\\.encrypt\\(",
-                "\\.decrypt\\(",
-                "key\\s*=",
-                "password\\s*=",
-                "secret\\s*=",
-            ]),
-            finding_type: Some("Hardcoded Cryptographic Material in Data Flow"),
-            severity: Some("High"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-798"),
-            description: Some("Hardcoded string flows to cryptographic operations"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["crypto", "taint", "hardcoded", "key"])
-        )
     ]
-) 
+)

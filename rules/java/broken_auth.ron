@@ -1,0 +1,45 @@
+(
+    rules: [
+        // CWE-256: Plaintext storage of a password — setPassword called with a
+        // raw value (no hashing/PasswordEncoder).
+        (
+            id: Some("java-plaintext-password-storage"),
+            name: Some("Plaintext Password Storage"),
+            category: Some("auth"),
+            mode: "search",
+            patterns: Some([
+                "setPassword"
+            ]),
+            finding_type: Some("Plaintext Password Storage"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-256"),
+            description: Some("Password stored without hashing via setPassword, exposing credentials if the store is compromised."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["auth", "credentials", "cwe-256", "java"])
+        ),
+
+        // CWE-287: Improper authentication — credential lookup that compares a
+        // plaintext password directly (no hash verification, rate limiting).
+        (
+            id: Some("java-plaintext-auth"),
+            name: Some("Improper Authentication via Plaintext Credentials"),
+            category: Some("auth"),
+            mode: "search",
+            patterns: Some([
+                "findByUsernameAndPassword"
+            ]),
+            finding_type: Some("Improper Authentication"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-287"),
+            description: Some("Authentication performed by matching a plaintext password column, with no hashing or brute-force protection."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["auth", "credentials", "cwe-287", "java"])
+        ),
+    ]
+)

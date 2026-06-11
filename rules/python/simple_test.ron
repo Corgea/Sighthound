@@ -1,29 +1,4 @@
 (
-    rules: [
-        (
-            mode: "search",
-            patterns: Some(["eval\\("]),
-            finding_type: Some("Code Injection"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-95"),
-            file_types: Some((
-                extensions: Some([".py"]),
-                include_patterns: None,
-                exclude_patterns: None,
-            )),
-            id: None,
-            name: None,
-            description: None,
-            category: None,
-            pattern: None,
-            sources: None,
-            sinks: None,
-            propagators: None,
-            sanitizers: None,
-            conditions: None,
-            tags: None,
-            message: None,
-        )
-    ]
-) 
+    // Intentionally empty: eval() coverage lives in general_security.ron.
+    rules: []
+)

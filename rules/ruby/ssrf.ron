@@ -1,0 +1,80 @@
+(
+    rules: [
+        // === SEARCH: HTTP clients fetching a user-controlled URL ===
+        (
+            id: Some("ruby-ssrf-http"),
+            name: Some("SSRF via HTTP client"),
+            category: Some("ssrf"),
+            mode: "search",
+            patterns: Some([
+                "*Net::HTTP.get(*params*", "*Net::HTTP.get(*#{*", "*Net::HTTP.get(*request*",
+                "*Net::HTTP.post(*params*", "*Net::HTTP.post(*#{*",
+                "*Net::HTTP.start(*params*", "*Net::HTTP.start(*#{*",
+                "*HTTParty.get(*params*", "*HTTParty.get(*#{*",
+                "*HTTParty.post(*params*",
+                "*RestClient.get(*params*", "*RestClient.get(*#{*",
+                "*Faraday.get(*params*", "*Faraday.get(*#{*",
+                "*Excon.get(*params*",
+                "*Typhoeus.get(*params*",
+                "*HTTP.get(*params*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Server-Side Request Forgery"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-918"),
+            description: Some("HTTP request issued to a request-controlled URL can be abused for SSRF (internal network/metadata access). Validate the host against an allowlist."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["ssrf", "cwe-918", "ruby"])
+        ),
+
+        // === SEARCH: open()/URI.open fetching a remote user-controlled URL ===
+        (
+            id: Some("ruby-ssrf-open-uri"),
+            name: Some("SSRF via open / URI.open"),
+            category: Some("ssrf"),
+            mode: "search",
+            patterns: Some([
+                "*open(\"http*#{*", "*open('http*#{*",
+                "*open(\"http*+*", "*open('http*+*",
+                "*open(URI*params*", "*open(URI(*#{*",
+                "*URI.open(*params*", "*URI.open(*#{*",
+                "*Kernel.open(*params*", "*Kernel.open(*#{*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Server-Side Request Forgery"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-918"),
+            description: Some("open()/URI.open with request data may fetch attacker-chosen URLs (SSRF) or local files. Validate scheme/host or use a dedicated, restricted HTTP client."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["ssrf", "cwe-918", "cwe-22", "ruby"])
+        ),
+
+        // === TAINT: user input -> outbound request sink ===
+        (
+            id: Some("ruby-ssrf-taint"),
+            name: Some("SSRF via Data Flow"),
+            category: Some("ssrf"),
+            mode: "taint",
+            sources: Some([
+                "params", "request.parameters", "cookies", "request.env", "request.headers"
+            ]),
+            sinks: Some([
+                "Net::HTTP.get", "Net::HTTP.post", "Net::HTTP.start",
+                "HTTParty.get", "HTTParty.post", "RestClient.get", "RestClient.post",
+                "Faraday.get", "Excon.get", "Typhoeus.get", "URI.open"
+            ]),
+            sanitizers: Some([
+                "allowlist", "whitelist", "URI.parse"
+            ]),
+            finding_type: Some("Server-Side Request Forgery"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-918"),
+            description: Some("Request data flows into an outbound HTTP request target without host validation."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["ssrf", "cwe-918", "ruby", "taint"])
+        )
+    ]
+)

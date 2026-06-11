@@ -1,0 +1,87 @@
+(
+    rules: [
+        // === SEARCH: File / IO operations with user-controlled path ===
+        (
+            id: Some("ruby-path-traversal-file"),
+            name: Some("Path Traversal in File/IO operation"),
+            category: Some("path-traversal"),
+            mode: "search",
+            patterns: Some([
+                "*File.read(*params*", "*File.read(*#{*", "*File.read(*cookies*", "*File.read(*request*",
+                "*File.open(*params*", "*File.open(*#{*", "*File.open(*request*",
+                "*File.write(*params*", "*File.write(*#{*",
+                "*File.delete(*params*", "*File.delete(*#{*",
+                "*File.new(*params*", "*File.new(*#{*",
+                "*File.binread(*params*", "*File.binread(*#{*",
+                "*IO.read(*params*", "*IO.read(*#{*",
+                "*IO.binread(*params*",
+                "*FileUtils.rm(*params*", "*FileUtils.rm(*#{*",
+                "*FileUtils.cp(*params*", "*FileUtils.mv(*params*",
+                "=__sh_fullctx__"
+            ]),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_sanitized",
+                    value: "",
+                    condition_type: Some("argument_not_sanitized"),
+                    patterns: Some(["File.basename", "Pathname", "Integer("])
+                )
+            ]),
+            finding_type: Some("Path Traversal"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-22"),
+            description: Some("File path built from request data enables path traversal (../). Constrain to a safe base directory and use File.basename / a whitelist."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["path-traversal", "cwe-22", "ruby"])
+        ),
+
+        // === SEARCH: send_file / send_data with user-controlled path ===
+        (
+            id: Some("ruby-path-traversal-send-file"),
+            name: Some("Path Traversal via send_file"),
+            category: Some("path-traversal"),
+            mode: "search",
+            patterns: Some([
+                "*send_file(*params*", "*send_file(*#{*", "*send_file(*cookies*", "*send_file(*request*",
+                "*send_file *params*", "*send_file *#{*",
+                "*send_data(*params*", "*send_data(*#{*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Path Traversal"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-22"),
+            description: Some("send_file/send_data with request-controlled path can disclose arbitrary files. Resolve against a fixed root and validate."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["path-traversal", "cwe-22", "ruby", "rails"])
+        ),
+
+        // === TAINT: user input -> file path sink ===
+        (
+            id: Some("ruby-path-traversal-taint"),
+            name: Some("Path Traversal via Data Flow"),
+            category: Some("path-traversal"),
+            mode: "taint",
+            sources: Some([
+                "params", "request.parameters", "cookies", "request.env", "request.headers"
+            ]),
+            sinks: Some([
+                "File.read", "File.open", "File.write", "File.delete", "File.new",
+                "File.binread", "IO.read", "IO.binread", "send_file", "send_data",
+                "FileUtils.rm", "FileUtils.cp", "FileUtils.mv"
+            ]),
+            sanitizers: Some([
+                "File.basename", "Pathname", "Integer("
+            ]),
+            finding_type: Some("Path Traversal"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-22"),
+            description: Some("Request data flows into a filesystem path without normalization (File.basename) or whitelisting."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["path-traversal", "cwe-22", "ruby", "taint"])
+        )
+    ]
+)

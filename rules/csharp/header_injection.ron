@@ -1,0 +1,38 @@
+(
+    rules: [
+        // HTTP response splitting / header injection: a request query value is read into a
+        // local and written into a response header without neutralizing CR/LF.
+        (
+            id: Some("csharp-response-header-injection"),
+            name: Some("HTTP response header injection from request input"),
+            category: Some("header-injection"),
+            mode: "taint",
+            sources: Some([
+                "Request.Query",
+                "Request.Form",
+                "Request.Headers",
+            ]),
+            sinks: Some([
+                "Response.Headers",
+            ]),
+            // CR/LF encoding neutralizes the splitting; "await next" only appears on the
+            // enclosing middleware-delegate node, not the actual header-write statement,
+            // so it suppresses a duplicate finding on the wrapper expression.
+            sanitizers: Some([
+                "await next",
+                "HtmlEncode",
+                "UrlEncode",
+                "Replace(\"\\n\"",
+            ]),
+            finding_type: Some("HTTP Response Splitting"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-113"),
+            description: Some("Untrusted request input flows into a response header without neutralizing CR/LF characters"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["header-injection", "csharp", "cwe-113"])
+        ),
+    ]
+)

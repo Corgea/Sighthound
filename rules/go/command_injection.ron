@@ -1,0 +1,54 @@
+// Go OS Command Injection rules (CWE-78)
+// See sql_injection.ron header for engine/full-context conventions.
+(
+    rules: [
+        (
+            id: Some("go-command-injection"),
+            name: Some("OS Command Injection via os/exec"),
+            category: Some("command-injection"),
+            mode: "search",
+            patterns: Some([
+                // Command built with string concatenation.
+                "regex:exec\\.Command(Context)?\\([^)]*\"\\s*\\+",
+                "regex:exec\\.Command(Context)?\\([^)]*\\+\\s*\"",
+                // Shell interpreter invoked with -c (classic injection vector).
+                "regex:exec\\.Command(Context)?\\(\\s*\"(/bin/)?(sh|bash|zsh|cmd|powershell)\"\\s*,\\s*\"-c\"",
+                // Command name comes from a variable instead of a constant.
+                "regex:exec\\.Command\\(\\s*[a-z][A-Za-z0-9_]*\\s*[,)]",
+                // Sprintf used to assemble the command.
+                "regex:exec\\.Command(Context)?\\([^)]*fmt\\.Sprintf\\("
+            ]),
+            finding_type: Some("Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
+            description: Some("A command or its arguments are built from untrusted/dynamic data. Avoid `sh -c`, never concatenate input into commands, and pass arguments as a fixed slice."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["command", "injection", "cwe-78", "go"])
+        ),
+
+        (
+            id: Some("go-command-injection-taint"),
+            name: Some("Command Injection via tainted data flow"),
+            category: Some("command-injection"),
+            mode: "taint",
+            sources: Some([
+                "r.URL.Query", "FormValue", "PostFormValue", "r.PostForm", "r.Form",
+                "mux.Vars", "c.Param", "c.Query", "os.Getenv"
+            ]),
+            sinks: Some([
+                "Command", "CommandContext", "Run", "Start", "Output", "CombinedOutput"
+            ]),
+            sanitizers: Some([
+                "strconv.Atoi", "strconv.ParseInt"
+            ]),
+            finding_type: Some("Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
+            description: Some("Untrusted request data flows into an os/exec command invocation."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["command", "injection", "cwe-78", "taint", "go"])
+        )
+    ]
+)

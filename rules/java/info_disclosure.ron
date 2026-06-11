@@ -1,0 +1,187 @@
+(
+    rules: [
+        // CWE-532: Sensitive data written to a log/audit sink. Matches logging
+        // and audit-writer calls (logger.info/debug/..., println, the audit
+        // write()) whose argument text references a credential/secret token.
+        // The has_argument regex gate keeps non-sensitive log lines out, so
+        // generic log calls (e.g. write(message), println(port)) never fire.
+        (
+            id: Some("java-log-sensitive-data"),
+            name: Some("Sensitive Data in Log"),
+            category: Some("info-disclosure"),
+            mode: "search",
+            patterns: Some([
+                "write", "info", "debug", "warn", "trace", "println", "logger"
+            ]),
+            finding_type: Some("Sensitive Data Exposure in Logs"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-532"),
+            description: Some("Credential or secret material written to a log/audit sink, exposing sensitive data to anyone with log access."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "matches",
+                    value: "",
+                    condition_type: Some("has_argument"),
+                    patterns: Some([
+                        "regex:(?i)password",
+                        "regex:(?i)passwd",
+                        "regex:(?i)secret",
+                        "regex:(?i)token",
+                        "regex:(?i)api[_-]?key",
+                        "regex:(?i)credit",
+                        "regex:(?i)card",
+                        "regex:(?i)ssn",
+                        "regex:(?i)cvv",
+                        "regex:(?i)signature",
+                        "regex:(?i)payload"
+                    ])
+                )
+            ]),
+            tags: Some(["info-disclosure", "logging", "cwe-532", "java"])
+        ),
+
+        // CWE-200: Environment / system configuration returned from a request
+        // handler. Scoped to controllers so service-internal env reads (which
+        // are not the disclosure point) do not flag.
+        (
+            id: Some("java-info-exposure-environment"),
+            name: Some("Environment Exposure via Response"),
+            category: Some("info-disclosure"),
+            mode: "search",
+            patterns: Some([
+                "environment", "workerEnvironment", "getenv"
+            ]),
+            finding_type: Some("Information Exposure"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-200"),
+            description: Some("Process environment / system configuration surfaced through a controller response, leaking secrets and internal details."),
+            file_types: Some((
+                extensions: Some([".java"]),
+                include_patterns: Some(["*controllers*"])
+            )),
+            tags: Some(["info-disclosure", "cwe-200", "java"])
+        ),
+
+        // CWE-200: Reading a named secret environment variable
+        // (System.getenv("...API_KEY")) into a publicly returned config map.
+        (
+            id: Some("java-info-exposure-secret-env"),
+            name: Some("Secret Environment Variable Exposure"),
+            category: Some("info-disclosure"),
+            mode: "search",
+            patterns: Some([
+                "getenv"
+            ]),
+            finding_type: Some("Information Exposure"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-200"),
+            description: Some("Secret-bearing environment variable read into a response payload, exposing credentials to clients."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "matches",
+                    value: "",
+                    condition_type: Some("has_argument"),
+                    patterns: Some([
+                        "regex:(?i)key",
+                        "regex:(?i)secret",
+                        "regex:(?i)token",
+                        "regex:(?i)password",
+                        "regex:(?i)credential"
+                    ])
+                )
+            ]),
+            tags: Some(["info-disclosure", "cwe-200", "java"])
+        ),
+
+        // CWE-200: Direct read of credential / financial / token accessor
+        // surfaced into a response or view. These getters expose data that must
+        // never leave the trust boundary.
+        (
+            id: Some("java-info-exposure-sensitive-accessor"),
+            name: Some("Sensitive Field Exposure"),
+            category: Some("info-disclosure"),
+            mode: "search",
+            patterns: Some([
+                "passwordHash", "allWithPasswordHashes", "paymentToken",
+                "bankAccount"
+            ]),
+            finding_type: Some("Information Exposure"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-200"),
+            description: Some("Credential, payment-token or financial account data read for direct output, exposing sensitive fields to the client."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["info-disclosure", "cwe-200", "java"])
+        ),
+
+        // CWE-200: Reflecting the inbound Cookie / Authorization header back in a
+        // response body. The quoted-keyword regex avoids matching Set-Cookie
+        // writers (withHeader("Set-Cookie", ...)).
+        (
+            id: Some("java-info-exposure-auth-header"),
+            name: Some("Authentication Header Exposure"),
+            category: Some("info-disclosure"),
+            mode: "search",
+            patterns: Some([
+                "header"
+            ]),
+            finding_type: Some("Information Exposure"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-200"),
+            description: Some("Inbound authentication header (Cookie/Authorization) echoed into a response, exposing session credentials."),
+            file_types: Some((
+                extensions: Some([".java"]),
+                include_patterns: Some(["*controllers*"])
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "matches",
+                    value: "",
+                    condition_type: Some("has_argument"),
+                    patterns: Some([
+                        "regex:(?i)\"(cookie|authorization)\""
+                    ])
+                )
+            ]),
+            tags: Some(["info-disclosure", "cwe-200", "java"])
+        ),
+
+        // CWE-209: Exception message returned to the client from a central
+        // exception handler, leaking stack/DB internals. Scoped to
+        // *ExceptionHandler* files to avoid flagging internal error handling.
+        (
+            id: Some("java-error-message-exposure"),
+            name: Some("Error Message Exposure"),
+            category: Some("info-disclosure"),
+            mode: "search",
+            patterns: Some([
+                "getMessage", "printStackTrace"
+            ]),
+            finding_type: Some("Information Exposure Through Error Message"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-209"),
+            description: Some("Raw exception detail returned to the client by an exception handler, disclosing internal implementation details."),
+            file_types: Some((
+                extensions: Some([".java"]),
+                include_patterns: Some(["*ExceptionHandler*"])
+            )),
+            tags: Some(["info-disclosure", "cwe-209", "java"])
+        ),
+    ]
+)

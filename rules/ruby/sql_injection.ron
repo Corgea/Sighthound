@@ -1,0 +1,98 @@
+(
+    rules: [
+        // === SEARCH: ActiveRecord/raw SQL built via interpolation or concatenation ===
+        // Restricted to #{...} interpolation and string concatenation, which are the
+        // injection indicators. Parameterized forms where("x = ?", v) / where(col: v)
+        // are intentionally NOT matched.
+        (
+            id: Some("ruby-sqli-string-build"),
+            name: Some("SQL Injection via string interpolation/concatenation"),
+            category: Some("sqli"),
+            mode: "search",
+            patterns: Some([
+                "*where(\"*#{*", "*where('*#{*", "*where(*+*",
+                "*where \"*#{*", "*where '*#{*",
+                "*having(\"*#{*", "*having(*+*",
+                "*find_by_sql(\"*#{*", "*find_by_sql('*#{*", "*find_by_sql(*+*",
+                "*find_by_sql \"*#{*",
+                "*execute(\"*#{*", "*execute('*#{*", "*execute(*+*",
+                "*execute \"*#{*",
+                "*exec_query(\"*#{*", "*exec_query(*+*",
+                "*select_all(\"*#{*", "*select_all(*+*",
+                "*select_values(\"*#{*", "*select_rows(\"*#{*",
+                "*sanitize_sql(\"*#{*",
+                "=__sh_fullctx__"
+            ]),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_sanitized",
+                    value: "",
+                    condition_type: Some("argument_not_sanitized"),
+                    patterns: Some(["sanitize_sql_array", ".to_i", "Integer(", "quote("])
+                )
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("SQL string built with interpolation or concatenation. Use parameterized queries: where(\"col = ?\", value) or where(col: value)."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["sql-injection", "cwe-89", "ruby", "rails"])
+        ),
+
+        // === SEARCH: order/group/select/joins/pluck with raw user input ===
+        // These methods do not support bind parameters, so passing request data is
+        // directly injectable.
+        (
+            id: Some("ruby-sqli-no-bind-methods"),
+            name: Some("SQL Injection via order/group/select/joins"),
+            category: Some("sqli"),
+            mode: "search",
+            patterns: Some([
+                "*order(*params*", "*order(*#{*", "*order(*+*",
+                "*reorder(*params*", "*reorder(*#{*",
+                "*group(*params*", "*group(*#{*",
+                "*select(*params*", "*select(*#{*",
+                "*joins(*params*", "*joins(*#{*",
+                "*pluck(*params*", "*pluck(*#{*",
+                "*calculate(*params*", "*calculate(*#{*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("order/group/select/joins/pluck cannot use bind parameters; passing request data enables SQL injection. Whitelist column/direction values."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["sql-injection", "cwe-89", "ruby", "rails"])
+        ),
+
+        // === TAINT: user input -> SQL sink ===
+        (
+            id: Some("ruby-sqli-taint"),
+            name: Some("SQL Injection via Data Flow"),
+            category: Some("sqli"),
+            mode: "taint",
+            sources: Some([
+                "params", "request.parameters", "request.query_parameters",
+                "request.request_parameters", "cookies", "request.env", "request.headers"
+            ]),
+            sinks: Some([
+                "where", "having", "find_by_sql", "execute", "exec_query",
+                "order", "reorder", "group", "joins", "select_all", "select_values",
+                "calculate", "pluck"
+            ]),
+            sanitizers: Some([
+                "sanitize_sql_array", "quote", "Integer(", "to_i"
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("Request data flows into a SQL query method without parameterization."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["sql-injection", "cwe-89", "ruby", "rails", "taint"])
+        )
+    ]
+)

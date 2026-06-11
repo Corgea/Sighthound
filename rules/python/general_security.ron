@@ -1,50 +1,61 @@
 (
     rules: [
-        // Code injection vulnerabilities
+        // ---- Code injection (eval/exec) ----
+        // The "*= eval(*" / "*= exec(*" entries contain "=", which forces the
+        // engine to match the whole call text instead of just the function name,
+        // so "eval("/"exec(" are tested against the call text (and therefore do
+        // NOT match cursor.execute(...), since "exec(" != "execute(").
         (
             id: Some("python-code-001"),
-            name: Some("Code Injection via eval()"),
-            category: Some("injection"),
+            name: Some("Code Injection via eval/exec"),
+            category: Some("code_execution"),
             mode: "search",
             patterns: Some([
-                "eval\\(",
+                "eval(",
+                "exec(",
+                "*= eval(*",
+                "*= exec(*",
             ]),
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
             cwe_id: Some("cwe-95"),
-            description: Some("Use of eval() can lead to arbitrary code execution"),
+            description: Some("Use of eval()/exec() can lead to arbitrary code execution"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
             tags: Some(["code", "injection", "eval"])
         ),
+
+        // ---- Server-Side Template Injection (jinja2 from_string) ----
         (
-            id: Some("python-code-002"),
-            name: Some("Code Injection via exec()"),
-            category: Some("injection"),
+            id: Some("python-ssti-001"),
+            name: Some("Server-Side Template Injection"),
+            category: Some("ssti"),
             mode: "search",
             patterns: Some([
-                "exec\\(",
+                "from_string",
             ]),
-            finding_type: Some("Code Injection"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-95"),
-            description: Some("Use of exec() can lead to arbitrary code execution"),
+            finding_type: Some("Template Injection"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-94"),
+            description: Some("Rendering a template built from untrusted input (jinja2 Environment.from_string) enables SSTI/RCE"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
-            tags: Some(["code", "injection", "exec"])
+            tags: Some(["ssti", "template", "injection"])
         ),
+
+        // ---- Dynamic import ----
         (
             id: Some("python-code-003"),
             name: Some("Dynamic Import"),
-            category: Some("injection"),
+            category: Some("dynamic_import"),
             mode: "search",
             patterns: Some([
-                "__import__\\(",
-                "importlib\\.import_module\\(",
+                "__import__",
+                "importlib.import_module",
             ]),
             finding_type: Some("Dynamic Import"),
             severity: Some("Medium"),
@@ -56,207 +67,234 @@
             )),
             tags: Some(["import", "dynamic", "security"])
         ),
-        
-        // Deserialization vulnerabilities
+
+        // ---- Deserialization ----
         (
             id: Some("python-deser-001"),
-            name: Some("Unsafe Pickle Deserialization"),
+            name: Some("Unsafe Deserialization"),
             category: Some("deserialization"),
             mode: "search",
             patterns: Some([
-                "pickle\\.loads\\(",
-                "pickle\\.load\\(",
-                "cPickle\\.loads\\(",
-                "cPickle\\.load\\(",
-                "_pickle\\.loads\\(",
+                "pickle.loads",
+                "pickle.load",
+                "cPickle.loads",
+                "cPickle.load",
+                "yaml.load",
+                "yaml.unsafe_load",
+                "marshal.loads",
+                "dill.loads",
             ]),
             finding_type: Some("Unsafe Deserialization"),
             severity: Some("Critical"),
             confidence: Some("High"),
             cwe_id: Some("cwe-502"),
-            description: Some("Pickle deserialization is unsafe with untrusted data"),
+            description: Some("Unsafe deserialization of untrusted data can lead to RCE"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
-            tags: Some(["pickle", "deserialization", "unsafe"])
+            tags: Some(["deserialization", "pickle", "yaml", "unsafe"])
         ),
+
+        // ---- SSRF ----
         (
-            id: Some("python-deser-002"),
-            name: Some("Unsafe YAML Deserialization"),
-            category: Some("deserialization"),
+            id: Some("python-ssrf-001"),
+            name: Some("Server-Side Request Forgery"),
+            category: Some("ssrf"),
             mode: "search",
             patterns: Some([
-                "yaml\\.load\\(",
-                "yaml\\.unsafe_load\\(",
+                "requests.get",
+                "requests.post",
+                "requests.put",
+                "requests.delete",
+                "requests.patch",
+                "requests.head",
+                "requests.request",
+                "urllib.request.urlopen",
+                "urllib.urlopen",
+                "httpx.get",
+                "httpx.post",
             ]),
-            finding_type: Some("Unsafe Deserialization"),
+            finding_type: Some("SSRF"),
             severity: Some("High"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-502"),
-            description: Some("YAML load() is unsafe, use safe_load() instead"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["yaml", "deserialization", "unsafe"])
-        ),
-        
-        // HTTP security
-        (
-            id: Some("python-http-001"),
-            name: Some("HTTP Request without SSL Verification"),
-            category: Some("http_security"),
-            mode: "search",
-            patterns: Some([
-                "requests\\..*verify=False",
-                "urllib.*verify=False",
-                "ssl\\._create_unverified_context",
-            ]),
-            finding_type: Some("SSL Verification Disabled"),
-            severity: Some("Medium"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-295"),
-            description: Some("SSL certificate verification is disabled"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["ssl", "verification", "http"])
-        ),
-        (
-            id: Some("python-http-002"),
-            name: Some("HTTP URLs in Production"),
-            category: Some("http_security"),
-            mode: "search",
-            patterns: Some([
-                "http://.*",
-                "'http://.*'",
-                "\"http://.*\"",
-            ]),
-            finding_type: Some("Insecure HTTP URL"),
-            severity: Some("Low"),
             confidence: Some("Medium"),
-            cwe_id: Some("cwe-319"),
-            description: Some("HTTP URLs should be HTTPS in production"),
+            cwe_id: Some("cwe-918"),
+            description: Some("Outbound HTTP request sink; if the URL is attacker-controlled this is SSRF"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
-            tags: Some(["http", "insecure", "url"])
+            tags: Some(["ssrf", "request"])
         ),
-        
-        // Information disclosure
+
+        // ---- XXE ----
         (
-            id: Some("python-info-001"),
-            name: Some("Debug Mode Enabled"),
-            category: Some("information_disclosure"),
+            id: Some("python-xxe-001"),
+            name: Some("XML External Entity Injection"),
+            category: Some("xxe"),
             mode: "search",
             patterns: Some([
-                "debug\\s*=\\s*True",
-                "DEBUG\\s*=\\s*True",
-                "app\\.debug\\s*=\\s*True",
+                "etree.fromstring",
+                "etree.parse",
+                "etree.XMLParser",
+                "minidom.parse",
+                "minidom.parseString",
+                "sax.parse",
+                "pulldom.parse",
+            ]),
+            finding_type: Some("XXE"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-611"),
+            description: Some("XML parsing without disabling external entities can lead to XXE"),
+            file_types: Some((
+                extensions: Some([".py"])
+            )),
+            tags: Some(["xxe", "xml"])
+        ),
+
+        // ---- Reflected/stored XSS via server-side template / HTML rendering ----
+        (
+            id: Some("python-xss-001"),
+            name: Some("XSS via Template/HTML Rendering"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "render_template_string",
+                "markdown.markdown",
+                "HTMLResponse",
+                "make_response",
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Untrusted data rendered into HTML without escaping can lead to XSS"),
+            file_types: Some((
+                extensions: Some([".py"])
+            )),
+            tags: Some(["xss", "html", "template"])
+        ),
+
+        // ---- Reflected/stored XSS via f-string-built HTML ----
+        // An assignment whose value is an HTML fragment built with interpolation
+        // (`{...}`). Evaluated by the Python assignment scanner against the whole
+        // statement; the `=` forces full-statement matching and requiring a `{`
+        // after the tag keeps static HTML literals from matching. Untrusted data
+        // glued into markup like this is returned to the client (render_template_string,
+        // jsonify'd *_html fields, etc.) without escaping.
+        (
+            id: Some("python-xss-002"),
+            name: Some("XSS via Interpolated HTML String"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "*=*<div*{*",
+                "*=*<p>*{*",
+                "*=*<p *{*",
+                "*=*<h1*{*",
+                "*=*<h2*{*",
+                "*=*<span*{*",
+                "*=*<html*{*",
+                "*=*<body*{*",
+                "*=*<a href*{*",
+                "*=*<img*{*",
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("HTML markup built from interpolated values; if any value is attacker-controlled this is reflected/stored XSS"),
+            file_types: Some((
+                extensions: Some([".py"])
+            )),
+            tags: Some(["xss", "html", "injection"])
+        ),
+
+        // ---- Open redirect ----
+        (
+            id: Some("python-redirect-001"),
+            name: Some("Open Redirect"),
+            category: Some("redirect"),
+            mode: "search",
+            patterns: Some([
+                "RedirectResponse",
+            ]),
+            finding_type: Some("Open Redirect"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-601"),
+            description: Some("Redirect target may be attacker-controlled (open redirect)"),
+            file_types: Some((
+                extensions: Some([".py"])
+            )),
+            tags: Some(["redirect", "open-redirect"])
+        ),
+
+        // ---- Debug mode / interactive debugger exposed ----
+        (
+            id: Some("python-debug-001"),
+            name: Some("Debug Mode Enabled"),
+            category: Some("misconfiguration"),
+            mode: "search",
+            patterns: Some([
+                "*app.run(*debug=True*",
+                "*.run(*debug=True*",
             ]),
             finding_type: Some("Debug Mode Enabled"),
             severity: Some("Medium"),
             confidence: Some("High"),
             cwe_id: Some("cwe-489"),
-            description: Some("Debug mode should be disabled in production"),
+            description: Some("Flask/served app started with debug=True exposes the interactive debugger"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
-            tags: Some(["debug", "production", "disclosure"])
+            tags: Some(["debug", "misconfiguration"])
         ),
         (
-            id: Some("python-info-002"),
-            name: Some("Exception Information Disclosure"),
-            category: Some("information_disclosure"),
+            id: Some("python-debug-002"),
+            name: Some("Werkzeug Interactive Debugger Exposed"),
+            category: Some("misconfiguration"),
             mode: "search",
             patterns: Some([
-                "traceback\\.print_exc\\(",
-                "traceback\\.format_exc\\(",
-                "raise.*Exception\\(.*\\)",
+                "*run_simple(*use_debugger=True*",
+                "*run_simple(*use_reloader=True*",
             ]),
-            finding_type: Some("Information Disclosure"),
-            severity: Some("Low"),
-            confidence: Some("Low"),
-            cwe_id: Some("cwe-209"),
-            description: Some("Exception handling may disclose sensitive information"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["exception", "disclosure", "traceback"])
-        ),
-        
-        // Taint flows for code injection
-        (
-            id: Some("python-code-taint-001"),
-            name: Some("Code Injection Taint Flow"),
-            category: Some("injection"),
-            mode: "taint",
-            sources: Some([
-                "request.*",
-                "request\\.args\\.",
-                "request\\.form\\.",
-                "request\\.json\\.",
-                "input\\(",
-                "sys\\.argv",
-                "os\\.environ",
-                "flask\\.request",
-                "django\\.request",
-            ]),
-            sinks: Some([
-                "eval\\(",
-                "exec\\(",
-                "compile\\(",
-                "__import__\\(",
-                "importlib\\.import_module",
-            ]),
-            sanitizers: Some([
-                "escape\\(",
-                "quote\\(",
-                "sanitize\\(",
-                "validate\\(",
-            ]),
-            finding_type: Some("Code Injection via Taint Flow"),
+            finding_type: Some("Interactive Debugger Exposed"),
             severity: Some("Critical"),
             confidence: Some("High"),
-            cwe_id: Some("cwe-95"),
-            description: Some("User input flows to code execution functions without proper validation"),
+            cwe_id: Some("cwe-94"),
+            description: Some("Werkzeug run_simple with the interactive debugger enables remote code execution"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
-            tags: Some(["code", "injection", "taint", "eval"])
+            tags: Some(["debug", "rce", "misconfiguration"])
         ),
-        
-        // Taint flows for deserialization
+
+        // ---- Hardcoded credentials ----
+        // Matches an assignment of a string literal to a credential-named target
+        // (case-insensitive). Requires a quote immediately after `=`, so dynamic
+        // values like `password = request.form[...]` and comparisons (`==`) do not
+        // match. Evaluated against the whole statement by the assignment scanner.
         (
-            id: Some("python-deser-taint-001"),
-            name: Some("Unsafe Deserialization Taint Flow"),
-            category: Some("deserialization"),
-            mode: "taint",
-            sources: Some([
-                "request.*",
-                "request\\.data",
-                "request\\.json",
-                "input\\(",
-                "sys\\.argv",
-                "os\\.environ",
-                "flask\\.request",
-                "django\\.request",
+            id: Some("python-secret-001"),
+            name: Some("Hardcoded Credentials"),
+            category: Some("secrets"),
+            mode: "search",
+            // Anchored to the start of the statement so credential text inside SQL
+            // strings (`"... password = '%s'"`) and call keyword-arguments
+            // (`User(password='x')`) is not matched - only real top-level
+            // `cred = "literal"` assignments.
+            patterns: Some([
+                "regex:(?i)^\\s*(password|passwd|secret|secret_key|secretkey|api_key|apikey|access_key|aws_secret|aws_secret_access_key|auth_token|access_token|private_key)\\s*=\\s*[\"']",
             ]),
-            sinks: Some([
-                "pickle\\.loads",
-                "pickle\\.load",
-                "cPickle\\.loads",
-                "yaml\\.load",
-                "yaml\\.unsafe_load",
-            ]),
-            finding_type: Some("Unsafe Deserialization via Taint Flow"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-502"),
-            description: Some("User input flows to unsafe deserialization functions"),
+            finding_type: Some("Hardcoded Credentials"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-798"),
+            description: Some("A credential is assigned a hardcoded string literal; move secrets to configuration/secret storage"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
-            tags: Some(["deserialization", "taint", "pickle", "yaml"])
-        )
+            tags: Some(["secret", "credentials", "hardcoded"])
+        ),
     ]
-) 
+)

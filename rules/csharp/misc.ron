@@ -1,0 +1,24 @@
+(
+    rules: [
+        // Insecure cookie: the session cookie is appended with a CookieOptions object that
+        // disables HttpOnly/Secure, making it script-readable and allowed over plain HTTP.
+        (
+            id: Some("csharp-insecure-cookie"),
+            name: Some("Session cookie missing security flags"),
+            category: Some("cookie"),
+            mode: "search",
+            patterns: Some([
+                "CookieOptions",
+            ]),
+            finding_type: Some("Insecure Cookie"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-614"),
+            description: Some("Session cookie is created without HttpOnly/Secure, allowing script access over cleartext HTTP"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["cookie", "csharp", "cwe-614"])
+        ),
+    ]
+)

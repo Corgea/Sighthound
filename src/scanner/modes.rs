@@ -7,7 +7,6 @@ use crate::cli::Cli;
 use crate::rules::Rules;
 use crate::scanner::{VulnerabilityScanner, Finding};
 use crate::scanner::core::ScanningLogic;
-use crate::scanner::utils::{discover_files_by_language, discover_files_by_language_parallel, discover_files_by_language_sequential};
 use crate::scanner::core::ProgressManager;
 
 /// Unified scan configuration and execution context

@@ -1,0 +1,29 @@
+(
+    rules: [
+        // Open redirect: the admin settings endpoint merges an untrusted JSON patch
+        // into a settings object and then redirects to settings.RedirectAfterSave.
+        // The merge result is the request-controlled redirect target; it is the
+        // collected sink the engine can anchor on within the redirecting method.
+        (
+            id: Some("csharp-open-redirect-merged-settings"),
+            name: Some("Open redirect via request-controlled redirect target"),
+            category: Some("open-redirect"),
+            mode: "taint",
+            sources: Some([
+                "MergeSettings",
+            ]),
+            sinks: Some([
+                "MergeSettings",
+            ]),
+            finding_type: Some("Open Redirect"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-601"),
+            description: Some("An untrusted JSON patch supplies the post-save redirect destination, allowing an open redirect"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["open-redirect", "csharp", "cwe-601"])
+        ),
+    ]
+)

@@ -1,0 +1,70 @@
+(
+    rules: [
+        // Authentication bypass: the session helper trusts an `asUser` query parameter to
+        // select the signed-in account, allowing impersonation.
+        (
+            id: Some("csharp-impersonation-query"),
+            name: Some("User impersonation via request parameter"),
+            category: Some("auth"),
+            mode: "taint",
+            sources: Some([
+                "asUser",
+            ]),
+            sinks: Some([
+                "asUser",
+            ]),
+            finding_type: Some("Authentication Bypass"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-287"),
+            description: Some("A request-controlled parameter selects the authenticated user, enabling impersonation"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["auth", "impersonation", "csharp", "cwe-287"])
+        ),
+        // Authorization on spoofable input: inventory edit authorization is derived from
+        // the caller-controlled X-Role request header.
+        (
+            id: Some("csharp-authz-header-trust"),
+            name: Some("Authorization decision trusts spoofable header"),
+            category: Some("authorization"),
+            mode: "taint",
+            sources: Some([
+                "X-Role",
+            ]),
+            sinks: Some([
+                "X-Role",
+            ]),
+            finding_type: Some("Improper Authorization"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-807"),
+            description: Some("An authorization decision relies on a caller-controlled request header that can be spoofed"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["authorization", "csharp", "cwe-807"])
+        ),
+        // Missing authorization: an unauthenticated request falls back to an Owner-role
+        // account constructed inline (new UserAccount { ... Role = "Owner" }).
+        (
+            id: Some("csharp-missing-authz-guest-owner"),
+            name: Some("Guest fallback to privileged account"),
+            category: Some("authorization"),
+            mode: "search",
+            patterns: Some([
+                "UserAccount",
+            ]),
+            finding_type: Some("Missing Authorization"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-862"),
+            description: Some("A missing session falls back to a privileged Owner account, bypassing authorization"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["authorization", "csharp", "cwe-862"])
+        ),
+    ]
+)

@@ -1,0 +1,51 @@
+(
+    rules: [
+        // === SEARCH: redirect_to with user-controlled destination ===
+        (
+            id: Some("ruby-open-redirect"),
+            name: Some("Open Redirect via redirect_to"),
+            category: Some("open-redirect"),
+            mode: "search",
+            patterns: Some([
+                "*redirect_to(*params*", "*redirect_to(*cookies*", "*redirect_to(*request*",
+                "*redirect_to params*", "*redirect_to cookies*", "*redirect_to request*",
+                "*redirect_to(*#{*", "*redirect_to \"*#{*",
+                "*redirect_to *#{*",
+                "*redirect_back_or_to(*params*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Open Redirect"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-601"),
+            description: Some("redirect_to with a request-controlled URL allows attackers to redirect users to arbitrary sites. Use a whitelist or redirect_to(..., allow_other_host: false)."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["open-redirect", "cwe-601", "ruby", "rails"])
+        ),
+
+        // === TAINT: user input -> redirect sink ===
+        (
+            id: Some("ruby-open-redirect-taint"),
+            name: Some("Open Redirect via Data Flow"),
+            category: Some("open-redirect"),
+            mode: "taint",
+            sources: Some([
+                "params", "request.parameters", "cookies", "request.env",
+                "request.headers", "request.referer"
+            ]),
+            sinks: Some([
+                "redirect_to", "redirect_back_or_to"
+            ]),
+            sanitizers: Some([
+                "only_path", "allow_other_host", "URI.parse", "whitelist"
+            ]),
+            finding_type: Some("Open Redirect"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-601"),
+            description: Some("Request data flows into a redirect target without host validation."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["open-redirect", "cwe-601", "ruby", "rails", "taint"])
+        )
+    ]
+)

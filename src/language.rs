@@ -320,13 +320,20 @@ impl LanguageSupport for HTMLLanguage {
     }
 
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        // The tree-sitter HTML grammar (v0.23) does not label child nodes with
+        // fields, so `child_by_field_name` returns None for attributes/tags. Fall
+        // back to the named child (`attribute_name` / `tag_name`) so directive
+        // names like `th:utext`, `th:replace`, or tag names like `textarea`
+        // resolve as the matchable "function" name for search rules.
         match node.kind() {
             "attribute" => {
                 node.child_by_field_name("name")
+                    .or_else(|| crate::common::CommonUtils::find_child(node, |c| c.kind() == "attribute_name"))
                     .map(|child| get_node_text_slice(&child, source))
             }
             "start_tag" | "element" => {
                 node.child_by_field_name("name")
+                    .or_else(|| crate::common::CommonUtils::find_child(node, |c| c.kind() == "tag_name"))
                     .map(|child| get_node_text_slice(&child, source))
             }
             "script_element" => {

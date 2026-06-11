@@ -1,0 +1,96 @@
+(
+    rules: [
+        // === SEARCH: eval family ===
+        (
+            id: Some("ruby-code-injection-eval"),
+            name: Some("Code Injection via eval"),
+            category: Some("code-injection"),
+            mode: "search",
+            patterns: Some([
+                "*eval(*",
+                "*instance_eval(*",
+                "*class_eval(*",
+                "*module_eval(*",
+                "*class_eval \"*", "*class_eval '*",
+                "*instance_eval \"*", "*instance_eval '*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-94"),
+            description: Some("Dynamic Ruby evaluation (eval/instance_eval/class_eval/module_eval). Never evaluate strings built from untrusted data."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["code-injection", "cwe-94", "ruby"])
+        ),
+
+        // === SEARCH: send / public_send with user input (unsafe reflection) ===
+        (
+            id: Some("ruby-code-injection-send"),
+            name: Some("Unsafe Reflection via send/public_send"),
+            category: Some("code-injection"),
+            mode: "search",
+            patterns: Some([
+                "*send(*params*", "*send(*cookies*", "*send(*request*",
+                "*send *params*",
+                "*public_send(*params*", "*public_send(*cookies*", "*public_send(*request*",
+                "*public_send *params*",
+                "*__send__(*params*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-94"),
+            description: Some("send/public_send invoked with request data lets an attacker call arbitrary methods. Whitelist allowed method names."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["code-injection", "cwe-94", "cwe-913", "ruby"])
+        ),
+
+        // === SEARCH: constantize / safe_constantize on user input (unsafe reflection) ===
+        (
+            id: Some("ruby-code-injection-constantize"),
+            name: Some("Unsafe Reflection via constantize"),
+            category: Some("code-injection"),
+            mode: "search",
+            patterns: Some([
+                "*params*constantize*", "*cookies*constantize*", "*request*constantize*",
+                "*#{*constantize*",
+                "*params*.classify*constantize*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-94"),
+            description: Some("constantize/safe_constantize on request data resolves arbitrary constants/classes. Whitelist allowed class names."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["code-injection", "cwe-94", "cwe-913", "ruby"])
+        ),
+
+        // === TAINT: user input -> dynamic evaluation / reflection ===
+        (
+            id: Some("ruby-code-injection-taint"),
+            name: Some("Code Injection via Data Flow"),
+            category: Some("code-injection"),
+            mode: "taint",
+            sources: Some([
+                "params", "request.parameters", "cookies", "request.env", "request.headers"
+            ]),
+            sinks: Some([
+                "eval", "instance_eval", "class_eval", "module_eval",
+                "send", "public_send", "__send__", "constantize", "safe_constantize"
+            ]),
+            sanitizers: Some([
+                "Integer(", "to_sym", "whitelist", "allowlist"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-94"),
+            description: Some("Request data flows into dynamic code evaluation or method/constant reflection."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["code-injection", "cwe-94", "ruby", "taint"])
+        )
+    ]
+)

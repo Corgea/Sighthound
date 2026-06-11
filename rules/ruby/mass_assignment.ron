@@ -1,0 +1,47 @@
+(
+    rules: [
+        // === SEARCH: permit! (allows all parameters) ===
+        (
+            id: Some("ruby-mass-assignment-permit-bang"),
+            name: Some("Mass Assignment via params.permit!"),
+            category: Some("mass-assignment"),
+            mode: "search",
+            patterns: Some([
+                "*permit!*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Mass Assignment"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-915"),
+            description: Some("params.permit! whitelists every parameter, defeating strong parameters and enabling mass assignment. Permit an explicit attribute list instead."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["mass-assignment", "cwe-915", "ruby", "rails"])
+        ),
+
+        // === SEARCH: update/create directly from params (no strong params) ===
+        (
+            id: Some("ruby-mass-assignment-update-attributes"),
+            name: Some("Mass Assignment from request parameters"),
+            category: Some("mass-assignment"),
+            mode: "search",
+            patterns: Some([
+                "*update_attributes(*params*", "*update_attributes!(*params*",
+                "*update(params*", "*update(params)*",
+                "*update!(params*",
+                "*assign_attributes(params*",
+                "*new(params)*",
+                "*create(params)*", "*create!(params)*",
+                "*attributes = params*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Mass Assignment"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-915"),
+            description: Some("Model attributes assigned directly from the raw params hash without strong parameters allows attackers to set unintended fields. Use params.require(:model).permit(:a, :b)."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["mass-assignment", "cwe-915", "ruby", "rails"])
+        )
+    ]
+)

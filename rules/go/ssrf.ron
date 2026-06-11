@@ -1,0 +1,30 @@
+// Go Server-Side Request Forgery rules (CWE-918)
+// See sql_injection.ron header for engine/full-context conventions.
+(
+    rules: [
+        (
+            id: Some("go-ssrf-http-request"),
+            name: Some("SSRF via outbound HTTP request with dynamic URL"),
+            category: Some("ssrf"),
+            mode: "search",
+            patterns: Some([
+                // http.Get/Post/Head/PostForm with a non-literal (identifier) URL argument.
+                "regex:http\\.(Get|Post|Head|PostForm)\\(\\s*[a-z][A-Za-z0-9_.]*",
+                // URL assembled by concatenation.
+                "regex:http\\.(Get|Post|Head|PostForm)\\([^)]*\\+",
+                // http.NewRequest(method, url, body) / NewRequestWithContext with dynamic url.
+                "regex:http\\.NewRequest(WithContext)?\\([^)]*\\+",
+                "regex:http\\.NewRequest\\(\\s*[^,]+,\\s*[a-z][A-Za-z0-9_.]*\\s*,",
+                // client.Get/Do with concatenated URL.
+                "regex:\\.(Get|Post|Head)\\([^)]*\"https?://\"\\s*\\+"
+            ]),
+            finding_type: Some("Server-Side Request Forgery"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-918"),
+            description: Some("An outbound HTTP request targets a URL derived from untrusted input. Validate the host against an allow-list and block internal/metadata addresses."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["ssrf", "cwe-918", "go"])
+        )
+    ]
+)

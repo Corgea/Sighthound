@@ -1,0 +1,34 @@
+(
+    rules: [
+        // CWE-918: SSRF via new URL(userInput).openStream(). The not_literal
+        // condition on the URL constructor's first argument suppresses hardcoded
+        // (safe) URLs while keeping user-controlled ones.
+        (
+            id: Some("java-ssrf-url"),
+            name: Some("Server-Side Request Forgery via URL"),
+            category: Some("ssrf"),
+            mode: "search",
+            patterns: Some([
+                "URL"
+            ]),
+            finding_type: Some("Server-Side Request Forgery"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-918"),
+            description: Some("User-controlled value passed to new URL(...).openStream(), allowing server-side request forgery."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_literal",
+                    value: "",
+                    condition_type: Some("not_literal"),
+                    argument_position: Some(0)
+                )
+            ]),
+            tags: Some(["ssrf", "cwe-918", "java"])
+        ),
+    ]
+)

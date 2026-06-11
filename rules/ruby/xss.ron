@@ -1,0 +1,91 @@
+(
+    rules: [
+        // === SEARCH: raw() with dynamic content ===
+        (
+            id: Some("ruby-xss-raw"),
+            name: Some("XSS via raw() helper"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "*raw(*params*", "*raw(*#{*", "*raw(*cookies*", "*raw(*request*",
+                "*raw @*", "*raw(@*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("raw() disables HTML escaping. Rendering request data or instance variables through raw() can lead to XSS. Use sanitize() or rely on default escaping."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["xss", "cwe-79", "ruby", "rails"])
+        ),
+
+        // === SEARCH: html_safe on dynamic string ===
+        (
+            id: Some("ruby-xss-html-safe"),
+            name: Some("XSS via html_safe on dynamic string"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "*#{*.html_safe*",
+                "*params*.html_safe*", "*cookies*.html_safe*", "*request*.html_safe*",
+                "*+ *.html_safe*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Calling html_safe on an interpolated or request-derived string marks attacker-controlled markup as trusted, leading to XSS. Escape with ERB::Util.html_escape and sanitize."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["xss", "cwe-79", "ruby", "rails"])
+        ),
+
+        // === SEARCH: render inline / render html with dynamic content ===
+        (
+            id: Some("ruby-xss-render-inline"),
+            name: Some("XSS via render inline/html with dynamic content"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "*render inline:*#{*", "*render inline:*params*",
+                "*render(inline:*#{*", "*render(inline:*params*",
+                "*render :inline*#{*",
+                "*render html:*#{*", "*render html:*params*",
+                "*render(html:*#{*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("render inline:/html: with interpolated request data evaluates attacker markup/ERB. Avoid inline templates built from user input."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["xss", "cwe-79", "ruby", "rails"])
+        ),
+
+        // === TAINT: user input -> unescaped HTML output ===
+        (
+            id: Some("ruby-xss-taint"),
+            name: Some("XSS via Data Flow"),
+            category: Some("xss"),
+            mode: "taint",
+            sources: Some([
+                "params", "request.parameters", "cookies", "request.env", "request.headers"
+            ]),
+            sinks: Some([
+                "raw", "html_safe", "render"
+            ]),
+            sanitizers: Some([
+                "sanitize", "ERB::Util.html_escape", "html_escape", "h(", "CGI.escapeHTML"
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Request data flows into unescaped HTML output (raw/html_safe/render inline)."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["xss", "cwe-79", "ruby", "rails", "taint"])
+        )
+    ]
+)

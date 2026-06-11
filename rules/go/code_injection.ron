@@ -1,0 +1,44 @@
+// Go code / template injection rules (CWE-94)
+// See sql_injection.ron header for engine/full-context conventions.
+(
+    rules: [
+        (
+            id: Some("go-template-injection"),
+            name: Some("Server-Side Template Injection"),
+            category: Some("code-injection"),
+            mode: "search",
+            patterns: Some([
+                // Parsing a template body built from a variable or concatenation.
+                "regex:template\\.New\\([^)]*\\)\\.Parse\\(\\s*[a-z][A-Za-z0-9_.]*\\s*\\)",
+                "regex:template\\.New\\([^)]*\\)\\.Parse\\([^)]*\\+",
+                "regex:template\\.Must\\(\\s*template\\.New\\([^)]*\\)\\.Parse\\([^)]*\\+"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-94"),
+            description: Some("A template is parsed from dynamic input, allowing server-side template injection. Templates must be static; pass untrusted data only as escaped template data."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["code-injection", "ssti", "cwe-94", "go"])
+        ),
+
+        // Loading native plugins from a dynamic path (code execution).
+        (
+            id: Some("go-plugin-open-dynamic"),
+            name: Some("Dynamic plugin load"),
+            category: Some("code-injection"),
+            mode: "search",
+            patterns: Some([
+                "regex:plugin\\.Open\\(\\s*[a-z][A-Za-z0-9_.]*\\s*\\)",
+                "regex:plugin\\.Open\\([^)]*\\+"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-94"),
+            description: Some("Loading a Go plugin from a dynamically-built path executes arbitrary code. Restrict plugins to a fixed, trusted allow-list of paths."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["code-injection", "cwe-94", "go"])
+        )
+    ]
+)

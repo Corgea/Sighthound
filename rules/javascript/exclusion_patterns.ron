@@ -10,7 +10,7 @@
         "*.production.js", "*.prod.js",
         
         // Third-party library directories
-        "*/node_modules/*", "*/assets/*", "*/lib/*", "*/vendor/*",
+        "*/node_modules/*", "*/vendor/*", "*/public/assets/*",
         "*/libraries/*", "*/deps/*", "*/dependencies/*",
         
         // Common JavaScript libraries by name
@@ -39,8 +39,8 @@
         "*.min.js", "*.bundle.js", "*.compiled.js",
         
         // Third-party dependencies
-        "*/node_modules/*", "*/vendor/*", "*/lib/*",
-        
+        "*/node_modules/*", "*/vendor/*", "*/public/assets/*",
+
         // Framework test directories (but not our test files)
         "*/node_modules/*/test/*", "*/node_modules/*/tests/*",
         

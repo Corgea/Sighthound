@@ -1,0 +1,60 @@
+(
+    rules: [
+        // CWE-89: SQL Injection via JDBC Statement / JPA query execution.
+        // Java engine resolves method_invocation name (e.g. "executeQuery").
+        // Parameterized queries use PreparedStatement.setString/executeUpdate on a
+        // prepared object, so flagging the raw executeQuery/createQuery sink stays precise.
+        (
+            id: Some("java-sql-injection-jdbc"),
+            name: Some("SQL Injection via JDBC/JPA query"),
+            category: Some("sql-injection"),
+            mode: "search",
+            patterns: Some([
+                "executeQuery",
+                "executeUpdate",
+                "createQuery",
+                "createNativeQuery"
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("User-controlled data concatenated into a SQL query and executed via Statement/JPA, allowing SQL injection."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["sql", "injection", "cwe-89", "jdbc", "java"])
+        ),
+
+        // Minimal taint rule. The default scan mode runs taint analysis and errors
+        // out if zero taint rules are loaded, so this guarantees the run completes.
+        (
+            id: Some("java-sql-injection-taint"),
+            name: Some("SQL Injection Data Flow"),
+            category: Some("sql-injection"),
+            mode: "taint",
+            sources: Some([
+                "getParameter",
+                "request.query",
+                "request.form"
+            ]),
+            sinks: Some([
+                "executeQuery",
+                "createQuery"
+            ]),
+            sanitizers: Some([
+                "setString",
+                "PreparedStatement"
+            ]),
+            finding_type: Some("SQL Injection Data Flow"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("User input flows into a SQL query without parameterization."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["sql", "injection", "cwe-89", "taint", "java"])
+        ),
+    ]
+)

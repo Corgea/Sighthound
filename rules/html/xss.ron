@@ -1,0 +1,49 @@
+(
+    rules: [
+        // DOM-based XSS in inline <script> blocks of HTML/templates.
+        //
+        // ENGINE NOTE: for `.html` files the tree-sitter HTML grammar (v0.23)
+        // exposes no node fields. The scanner resolves a function name from the
+        // named child instead, so `script_element` ("script"), `attribute`
+        // (the attribute name) and `start_tag`/`element` (the tag name) are all
+        // reachable in search mode — see rules/html/thymeleaf.ron for attribute
+        // sinks. Raw *text* nodes remain unreachable, and templates whose syntax
+        // is not valid HTML (e.g. Jinja `{% %}` / `{{ }}`) degrade the parse so
+        // their tags/attributes are not exposed. This rule targets inline script
+        // sinks; the patterns below still apply to `<script>` bodies.
+        //
+        // The first pattern is a gate token: it contains the substring "script"
+        // so the rule is considered for every <script> node, but it never occurs
+        // in real script text, so it alone never raises a finding. A finding is
+        // only produced when one of the real sink patterns below is present.
+        //
+        // All real sinks require a template literal (backtick) sink target, i.e.
+        // dynamic/interpolated HTML, which avoids flagging assignments of static
+        // string constants.
+        (
+            id: Some("html-inline-dom-xss-001"),
+            name: Some("DOM XSS via dynamic HTML sink in inline script"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "dom-xss-script-sink",
+                "innerHTML = `",
+                "innerHTML=`",
+                "outerHTML = `",
+                "outerHTML=`",
+                "insertAdjacentHTML(`",
+                "document.write(`",
+                "document.writeln(`"
+            ]),
+            finding_type: Some("DOM-based Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Assigning a dynamic template literal to innerHTML/outerHTML or passing it to document.write inside an inline script can lead to DOM-based XSS"),
+            file_types: Some((
+                extensions: Some([".html", ".htm", ".twig", ".hbs", ".mustache", ".njk", ".ejs", ".pug"])
+            )),
+            tags: Some(["xss", "dom", "frontend", "cwe-79", "cwe-80", "cwe-116"])
+        )
+    ]
+)

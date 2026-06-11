@@ -1,0 +1,29 @@
+// Go Path Traversal rules (CWE-22)
+// See sql_injection.ron header for engine/full-context conventions.
+(
+    rules: [
+        (
+            id: Some("go-path-traversal"),
+            name: Some("Path Traversal via filesystem call"),
+            category: Some("path-traversal"),
+            mode: "search",
+            patterns: Some([
+                // File path built via concatenation.
+                "regex:(os\\.Open|os\\.OpenFile|os\\.Create|os\\.ReadFile|ioutil\\.ReadFile|ioutil\\.WriteFile|os\\.WriteFile)\\([^)]*\"\\s*\\+",
+                "regex:(os\\.Open|os\\.OpenFile|os\\.Create|os\\.ReadFile|ioutil\\.ReadFile|ioutil\\.WriteFile|os\\.WriteFile)\\([^)]*\\+\\s*\"",
+                // File path taken straight from the HTTP request.
+                "regex:(os\\.Open|os\\.OpenFile|os\\.Create|os\\.ReadFile|ioutil\\.ReadFile|ioutil\\.WriteFile|os\\.WriteFile)\\([^)]*r\\.(URL|Form|Header)",
+                // http.ServeFile fed request-controlled path (canonical CWE-22).
+                "regex:http\\.ServeFile\\([^)]*r\\.(URL|Form)",
+                "regex:http\\.ServeFile\\([^)]*\\+"
+            ]),
+            finding_type: Some("Path Traversal"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-22"),
+            description: Some("A filesystem path is derived from untrusted input. Resolve and validate with filepath.Clean and confine to a base directory before opening."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["path-traversal", "cwe-22", "go"])
+        )
+    ]
+)

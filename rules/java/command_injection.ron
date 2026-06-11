@@ -1,0 +1,26 @@
+(
+    rules: [
+        // CWE-78: OS Command Injection via Runtime.exec / ProcessBuilder.
+        // "regex:^exec$" anchors to the exec() method only (avoids executeQuery etc).
+        // ProcessBuilder is matched as a constructor type name.
+        (
+            id: Some("java-command-injection"),
+            name: Some("OS Command Injection"),
+            category: Some("command-injection"),
+            mode: "search",
+            patterns: Some([
+                "regex:^exec$",
+                "ProcessBuilder"
+            ]),
+            finding_type: Some("OS Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
+            description: Some("User-controlled data passed to Runtime.exec or ProcessBuilder, enabling OS command injection."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["command-injection", "cwe-78", "java"])
+        ),
+    ]
+)

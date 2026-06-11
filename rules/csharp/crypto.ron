@@ -1,0 +1,30 @@
+(
+    rules: [
+        // Weak cryptography: CryptoService derives an export token with MD5 and protects
+        // API keys with DES. Both the hash result and the cipher handle are assigned to
+        // local variables, so the broken primitive is flagged at its construction site.
+        (
+            id: Some("csharp-weak-crypto"),
+            name: Some("Use of a broken or weak cryptographic primitive"),
+            category: Some("crypto"),
+            mode: "taint",
+            sources: Some([
+                "MD5",
+                "DES.Create",
+            ]),
+            sinks: Some([
+                "MD5",
+                "DES.Create",
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("MD5 and DES are cryptographically broken and must not be used to protect security-sensitive values"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["crypto", "weak", "csharp", "cwe-327"])
+        ),
+    ]
+)

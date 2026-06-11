@@ -10,7 +10,7 @@ use indicatif::{ProgressBar, ProgressStyle, ProgressDrawTarget};
 use memmap2::Mmap;
 use rayon::prelude::*;
 use std::cell::RefCell;
-use std::collections::{HashMap, BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -250,7 +250,8 @@ impl ScanningLogic {
             }
         }
 
-        if language_support.name() == "javascript" || language_support.name() == "typescript" || language_support.name() == "tsx" {
+        if language_support.name() == "javascript" || language_support.name() == "typescript" || language_support.name() == "tsx"
+            || language_support.name() == "python" {
             Self::scan_assignments(tree.root_node(), source, filepath, rules, language_support, &mut findings, &mut processed_lines);
         }
 
@@ -285,11 +286,16 @@ impl ScanningLogic {
         findings: &mut Vec<crate::models::Finding>,
         processed_lines: &mut std::collections::HashSet<(usize, String, String)>,
     ) {
-        if matches!(node.kind(), "assignment_expression" | "expression_statement" | "member_expression") {
+        // Python represents assignments as `assignment` / `augmented_assignment`
+        // nodes; matching them directly avoids the comparison-operator heuristic
+        // below (which would reject SQL strings containing `>=` / `<=`).
+        let is_definite_assignment = matches!(node.kind(), "assignment" | "augmented_assignment");
+
+        if is_definite_assignment || matches!(node.kind(), "assignment_expression" | "expression_statement" | "member_expression") {
             let node_text = crate::parser::get_node_text(&node, source);
 
             // Check for direct assignment patterns (e.g., element.innerHTML = value)
-            if CommonUtils::is_valid_assignment_text(&node_text) || Self::is_dom_assignment(&node_text) {
+            if is_definite_assignment || CommonUtils::is_valid_assignment_text(&node_text) || Self::is_dom_assignment(&node_text) {
                 let assignment_target = CommonUtils::extract_variable_from_assignment(&node_text, true)
                     .unwrap_or_else(|| Self::extract_assignment_target(&node_text));
 
@@ -299,7 +305,13 @@ impl ScanningLogic {
                             rule, &node, source, filepath, &assignment_target, language_support,
                         ) {
                             let line_key = (finding.line, finding.function.clone(), finding.finding_type.clone());
-                            if !processed_lines.contains(&line_key) {
+                            // A call-shaped sink (e.g. subprocess.Popen(shell=True)) can be
+                            // matched both by the call pass and here via its `=`-bearing
+                            // pattern; the call pass records a different `function`, so also
+                            // guard on (line, finding_type) to avoid a duplicate finding.
+                            let already = processed_lines.contains(&line_key)
+                                || findings.iter().any(|f| f.line == finding.line && f.finding_type == finding.finding_type);
+                            if !already {
                                 processed_lines.insert(line_key);
                                 findings.push(finding);
                             }

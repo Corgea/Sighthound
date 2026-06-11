@@ -4,14 +4,14 @@ version = "0.1.1"
 edition = "2021"
 authors = ["Corgea Team"]
 description = "A blazing fast vulnerability scanner for source code using tree-sitter"
-repository = "https://github.com/corgea/greppy_prototype"
+repository = "https://github.com/corgea/sighthound"
 
 [[bin]]
 name = "sighthound"
 path = "src/main.rs"
 
 [features]
-default = ["python", "java", "javascript", "tsx", "html", "django"]
+default = ["python", "java", "javascript", "tsx", "typescript", "go", "ruby", "csharp", "html", "django"]
 python = ["tree-sitter-python"]
 java = ["tree-sitter-java"]
 javascript = ["tree-sitter-javascript"]
@@ -71,4 +71,3 @@ path = "tests/integration/main.rs"
 [[test]]
 name = "end_to_end_tests"
 path = "tests/end_to_end/main.rs"
-

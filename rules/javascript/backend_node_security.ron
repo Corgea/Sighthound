@@ -1,0 +1,371 @@
+(
+    rules: [
+        // ==================== CWE-89: SQL Injection (inline concat / template) ====================
+        (
+            id: Some("js-node-sqli-inline-001"),
+            name: Some("SQL Injection via concatenated/interpolated query"),
+            category: Some("sql-injection"),
+            mode: "search",
+            patterns: Some([
+                "regex:runSql\\([^)]*\\+",
+                "regex:rawQuery\\([^)]*\\+",
+                "regex:rawQuery\\(\\s*[A-Za-z_$]",
+                "regex:db.rawGet\\([^)]*\\+",
+                "regex:db.rawAll\\([^)]*\\+",
+                "regex:connection.query\\([^)]*\\+",
+                "regex:sequelize.literal\\((?:key)?",
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("User-controlled data concatenated/interpolated into a SQL query string"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["injection", "sql", "backend", "cwe-89"])
+        ),
+        // ==================== CWE-89: SQL Injection (dynamic query reaching a sink) ====================
+        // Search (not taint) so exactly one finding is emitted on the sink call node.
+        // The taint engine matched every enclosing node (.push(...), arrow fn, sink),
+        // producing duplicate findings on a single flow that scored as FPs.
+        // A quoted string literal first arg (e.g. db.all("SELECT ...")) is parameterized
+        // and excluded by the leading identifier/backtick character class. The trailing
+        // "(?:key)?" forces full-node-text matching (see rule_needs_full_context).
+        (
+            id: Some("js-node-sqli-sink-001"),
+            name: Some("SQL Injection via dynamic query passed to a sink"),
+            category: Some("sql-injection"),
+            mode: "search",
+            patterns: Some([
+                "regex:connection.query\\(\\s*[A-Za-z_$][\\w$.]*\\s*[,)](?:key)?",
+                "regex:connection.query\\(\\s*`[^`]*\\$\\{(?:key)?",
+                "regex:sequelize.query\\(\\s*[A-Za-z_$][\\w$.]*\\s*[,)](?:key)?",
+                "regex:sequelize.query\\(\\s*`[^`]*\\$\\{(?:key)?",
+                "regex:db.all\\(\\s*[A-Za-z_$][\\w$.]*\\s*[,)](?:key)?",
+                "regex:db.all\\(\\s*`[^`]*\\$\\{(?:key)?",
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("A pre-built or interpolated query string is passed to a SQL execution sink"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["injection", "sql", "backend", "cwe-89"])
+        ),
+        // ==================== CWE-22: Path Traversal ====================
+        (
+            id: Some("js-node-path-traversal-001"),
+            name: Some("Path Traversal via unsanitized path join"),
+            category: Some("path-traversal"),
+            mode: "search",
+            patterns: Some([
+                "regex:path.join\\([\\s\\S]{0,300},\\s*[A-Za-z_$][\\w$]*\\s*\\)(?:key)?",
+                "regex:path.resolve\\([\\s\\S]{0,300},\\s*[A-Za-z_$][\\w$]*\\s*\\)(?:key)?",
+                "regex:path.join\\([\\s\\S]{0,200},\\s*`[^`]*\\$\\{",
+                "regex:path.resolve\\([\\s\\S]{0,200},\\s*`[^`]*\\$\\{",
+                "regex:makeTenantPath\\([\\s\\S]{0,120},\\s*[A-Za-z_$](?:key)?",
+            ]),
+            finding_type: Some("Path Traversal"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-22"),
+            description: Some("Untrusted value joined into a filesystem path without validation"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["path-traversal", "backend", "cwe-22"])
+        ),
+        // ==================== CWE-78: OS Command Injection ====================
+        (
+            id: Some("js-node-command-injection-001"),
+            name: Some("OS Command Injection via child_process exec"),
+            category: Some("command-injection"),
+            mode: "search",
+            patterns: Some([
+                "regex:exec\\([^)]*\\+",
+                "regex:execSync\\([^)]*\\+",
+                "regex:execCommand\\([^)]*\\+",
+                "regex:exec\\(\\s*[A-Za-z_$][\\w$]*\\s*[,)]",
+                "regex:execSync\\(\\s*[A-Za-z_$][\\w$]*\\s*[,)]",
+            ]),
+            finding_type: Some("Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
+            description: Some("Untrusted data passed to a shell command execution sink"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["injection", "command", "backend", "cwe-78"])
+        ),
+        // ==================== CWE-918: SSRF ====================
+        (
+            id: Some("js-node-ssrf-001"),
+            name: Some("SSRF via fetch with caller-controlled URL"),
+            category: Some("ssrf"),
+            mode: "search",
+            patterns: Some([
+                "regex:fetch\\(\\s*[A-Za-z_$][\\w$.]*",
+                "regex:fetchJsonFromUrl\\(\\s*[A-Za-z_$]",
+                "regex:httpClient.fetchText\\(\\s*[A-Za-z_$]",
+            ]),
+            finding_type: Some("SSRF"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-918"),
+            description: Some("Caller-controlled URL passed to an outbound HTTP request"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["ssrf", "backend", "cwe-918"])
+        ),
+        // ==================== CWE-601: Open Redirect ====================
+        (
+            id: Some("js-node-open-redirect-001"),
+            name: Some("Open Redirect via caller-controlled target"),
+            category: Some("open-redirect"),
+            mode: "search",
+            patterns: Some([
+                "regex:NextResponse.redirect\\(\\s*[A-Za-z_$][\\w$]*(?:key)?",
+                "regex:res.redirect\\(\\s*req",
+                "regex:redirectAfterLogin\\(\\s*[A-Za-z_$](?:key)?",
+                "regex:redirectToTarget\\(\\s*[A-Za-z_$](?:key)?",
+                "regex:redirectWithFallback\\(\\s*[A-Za-z_$](?:key)?",
+            ]),
+            finding_type: Some("Open Redirect"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-601"),
+            description: Some("Redirect target is derived from caller-controlled input"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["open-redirect", "backend", "cwe-601"])
+        ),
+        // ==================== CWE-1321: Prototype Pollution / Object Injection ====================
+        (
+            id: Some("js-node-object-injection-001"),
+            name: Some("Object Property Injection via dynamic key assignment"),
+            category: Some("object-injection"),
+            mode: "search",
+            patterns: Some([
+                // obj[key] = <value> where the right-hand side is a plain
+                // identifier/member or a bracket access (the classic deep-merge /
+                // clone shape). Excluding a call RHS (next char "(") drops noise like
+                // req.params[name] = decodeURIComponent(...) and collapses recursive
+                // merges to the named-function patterns below, avoiding duplicate
+                // findings on the same merge routine.
+                "regex:[\\w)\\]][\\w.]*\\[[A-Za-z_$][\\w$.()\\-]*\\]\\s*=\\s*[A-Za-z_$][\\w$.]*(?:\\[[^\\]]*\\])?(?:[^\\w(]|$)",
+                "regex:mergeSettings\\((?:key)?",
+                "regex:setDeep\\((?:key)?",
+                "regex:Object.assign\\([\\s\\S]{0,40}Object.prototype(?:key)?",
+            ]),
+            finding_type: Some("Object Property Injection"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-1321"),
+            description: Some("Attacker-controlled key assigned to an object can pollute the prototype chain"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["object-injection", "prototype", "backend", "cwe-1321"])
+        ),
+        // ==================== CWE-79: Reflected XSS via raw HTML response ====================
+        (
+            id: Some("js-node-xss-response-001"),
+            name: Some("Reflected XSS via raw HTML response"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                // The literal "=" in the first pattern forces full-node-text matching
+                // (see rule_needs_full_context) so the call body is inspected, not just
+                // the constructor name.
+                "regex:new Response\\([\\s\\S]{0,200}=[\\s\\S]{0,200}text/html",
+                "regex:new Response\\(\\s*[A-Za-z_$][\\w$]*,[\\s\\S]{0,160}text/html",
+                "regex:res.send\\(\\s*`[^`]*\\$\\{[\\s\\S]{0,200}`",
+                "regex:res.write\\(\\s*[A-Za-z_$][\\w$.]*\\s*\\)",
+                "regex:res.end\\(\\s*`[^`]*\\$\\{[\\s\\S]{0,200}`",
+            ]),
+            finding_type: Some("Reflected XSS"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("HTML response body built from caller input returned with text/html content type"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["xss", "backend", "cwe-79"])
+        ),
+        // ==================== CWE-79/80/116: Reflected XSS via HTML template literal ====================
+        // A compact HTML template literal (tag immediately after the opening backtick,
+        // so multi-line page-shell templates that only re-embed pre-escaped fragments
+        // are skipped) that interpolates a value WITHOUT an escaping wrapper. The token
+        // after "${" must be a bare identifier/member terminated by "}", whitespace, or
+        // an operator ("||", "?", "+") — escapeHtml(...)/encodeURIComponent(...)/money(...)
+        // are excluded because the next char after the name is "(". The literal "<" plus
+        // the "(?:key)?" tail force full-node-text matching (see rule_needs_full_context).
+        (
+            id: Some("js-node-xss-template-001"),
+            name: Some("Reflected XSS via unescaped HTML template literal"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                // "^[^`]*`" anchors so the node's FIRST backtick must open the HTML
+                // template. This keeps view helpers / .map() row builders but drops
+                // enclosing IIFE/arrow ancestor nodes whose first backtick is a SQL
+                // string (full-node-text matching would otherwise flag them too).
+                "regex:^[^`]*`\\s{0,2}<[^`]{0,300}\\$\\{[A-Za-z_$][\\w$.]*\\s*[}|?+](?:key)?",
+            ]),
+            finding_type: Some("Reflected XSS"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Untrusted value interpolated into an HTML template literal without output encoding"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["xss", "backend", "cwe-79", "cwe-80", "cwe-116"])
+        ),
+        // ==================== CWE-79: XSS via dangerouslySetInnerHTML (taint) ====================
+        (
+            id: Some("js-node-xss-dangerous-001"),
+            name: Some("XSS via dangerouslySetInnerHTML"),
+            category: Some("xss"),
+            mode: "taint",
+            sources: Some([
+                "html",
+                "markup",
+                "rawHtml",
+                "dangerousHtml",
+            ]),
+            sinks: Some([
+                "dangerouslySetInnerHTML",
+            ]),
+            sanitizers: Some([
+                "DOMPurify.sanitize",
+                "escapeHTML",
+                "sanitizeHtml",
+            ]),
+            finding_type: Some("XSS"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Component renders caller-controlled value as raw HTML"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["xss", "react", "frontend", "cwe-79"])
+        ),
+        // ==================== CWE-526: Environment/Secret Exposure ====================
+        (
+            id: Some("js-node-env-exposure-001"),
+            name: Some("Environment variable exposure in response"),
+            category: Some("info-exposure"),
+            mode: "search",
+            patterns: Some([
+                "regex:Response.json\\([\\s\\S]{0,400}process.env(?:key)?",
+                "regex:res.json\\([\\s\\S]{0,400}process.env(?:key)?",
+                "regex:res.send\\([\\s\\S]{0,200}process.env(?:key)?",
+                "regex:res.html\\([\\s\\S]{0,500}process.env(?:key)?",
+                // Config/secret loaders that fan out to process.env values.
+                "regex:(?i)Response.json\\([\\s\\S]{0,400}secret",
+                "regex:res.json\\([\\s\\S]{0,200}publicRuntime",
+                "regex:res.json\\([\\s\\S]{0,200}supportBundle",
+            ]),
+            finding_type: Some("Information Exposure"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-526"),
+            description: Some("Process environment / secrets returned in an HTTP response"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["info-exposure", "secrets", "backend", "cwe-526"])
+        ),
+        // ==================== CWE-532: Sensitive data logging ====================
+        (
+            id: Some("js-node-sensitive-logging-001"),
+            name: Some("Sensitive data written to logs"),
+            category: Some("info-exposure"),
+            mode: "search",
+            patterns: Some([
+                "regex:logEvent\\([^)]*password",
+                "regex:logEvent\\([^)]*token",
+                "regex:console.log\\([^)]*password",
+                "regex:console.error\\([^)]*password",
+                "regex:auditLogger.info\\([\\s\\S]{0,200}password",
+                "regex:auditLogger.info\\([\\s\\S]{0,200}req.body",
+                "regex:auditLogger.info\\([\\s\\S]{0,200}credit_card",
+            ]),
+            finding_type: Some("Sensitive Data Logging"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-532"),
+            description: Some("Credentials or tokens written to application logs"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["info-exposure", "logging", "backend", "cwe-532"])
+        ),
+        // ==================== CWE-94: Code Injection ====================
+        (
+            id: Some("js-node-code-injection-001"),
+            name: Some("Code Injection via dynamic evaluation"),
+            category: Some("code-injection"),
+            mode: "search",
+            patterns: Some([
+                "regex:eval\\(\\s*[A-Za-z_$](?:key)?",
+                "regex:new Function\\(\\s*[A-Za-z_$](?:key)?",
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-94"),
+            description: Some("User-controlled input passed to a dynamic code evaluation sink"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["injection", "code", "backend", "cwe-94"])
+        ),
+        // ==================== CWE-117: Log Injection ====================
+        (
+            id: Some("js-node-log-injection-001"),
+            name: Some("Log Injection via unsanitized input"),
+            category: Some("log-injection"),
+            mode: "search",
+            patterns: Some([
+                "regex:logLine\\([^)]*\\+",
+                "regex:auditLogger.raw\\([^)]*\\+",
+            ]),
+            finding_type: Some("Log Injection"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-117"),
+            description: Some("Untrusted input written to a log without neutralizing newlines"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["log-injection", "backend", "cwe-117"])
+        ),
+        // ==================== CWE-200: Sensitive object exposure in response ====================
+        (
+            id: Some("js-node-info-exposure-001"),
+            name: Some("Sensitive object exposed in HTTP response"),
+            category: Some("info-exposure"),
+            mode: "search",
+            patterns: Some([
+                // The literal "token"/"key" substrings below also force full-node-text
+                // matching (see rule_needs_full_context) for every pattern in this rule.
+                // Internal session / user records returned verbatim.
+                "regex:res.json\\(\\s*req.session\\b",
+                "regex:(?i)Response.json\\([\\s\\S]{0,200}\\bsession\\b",
+                "regex:Response.json\\(\\s*\\{\\s*users\\s*\\}",
+                // Caller-visible records that carry payment / loyalty secrets.
+                "regex:(?i)Response.json\\([\\s\\S]{0,200}card[_]?token",
+                "regex:res.json\\([\\s\\S]{0,80}contractPayload",
+                "regex:res.json\\([\\s\\S]{0,80}publicProfile",
+                "regex:res.json\\([\\s\\S]{0,80}.receipt\\(",
+            ]),
+            finding_type: Some("Information Exposure"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-200"),
+            description: Some("Internal user/session records or sensitive fields are serialized directly into an HTTP response"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["info-exposure", "backend", "cwe-200", "cwe-201", "cwe-359"])
+        ),
+        // ==================== CWE-312: Credentials returned to client ====================
+        (
+            id: Some("js-node-credential-exposure-001"),
+            name: Some("Stored credentials returned in API response"),
+            category: Some("info-exposure"),
+            mode: "search",
+            patterns: Some([
+                "regex:(?i)res.json\\([\\s\\S]{0,80}withsecrets",
+                "regex:(?i)Response.json\\([\\s\\S]{0,200}password",
+            ]),
+            finding_type: Some("Credential Exposure"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-312"),
+            description: Some("User credential material (passwords, reset tokens) is serialized into an HTTP response"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["info-exposure", "credentials", "backend", "cwe-312", "cwe-522"])
+        ),
+    ],
+)

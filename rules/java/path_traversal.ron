@@ -1,0 +1,26 @@
+(
+    rules: [
+        // CWE-22: Path Traversal via java.nio.file.Files read/write with
+        // user-controlled paths.
+        (
+            id: Some("java-path-traversal-files"),
+            name: Some("Path Traversal via Files API"),
+            category: Some("path-traversal"),
+            mode: "search",
+            patterns: Some([
+                "readString",
+                "readAllLines",
+                "writeString"
+            ]),
+            finding_type: Some("Path Traversal"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-22"),
+            description: Some("User-controlled path passed to a filesystem read/write, allowing path traversal."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["path-traversal", "cwe-22", "java"])
+        ),
+    ]
+)

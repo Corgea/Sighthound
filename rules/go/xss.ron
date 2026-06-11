@@ -1,0 +1,51 @@
+// Go Cross-Site Scripting rules (CWE-79)
+// See sql_injection.ron header for engine/full-context conventions.
+(
+    rules: [
+        // template.HTML / template.JS bypass html/template auto-escaping.
+        (
+            id: Some("go-xss-template-html"),
+            name: Some("XSS via template.HTML escaping bypass"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "regex:template\\.(HTML|JS|CSS|HTMLAttr|URL|Srcset)\\(\\s*[a-z][A-Za-z0-9_.]*",
+                "regex:template\\.(HTML|JS|CSS|HTMLAttr|URL|Srcset)\\([^)]*\\+"
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Converting dynamic data to template.HTML/JS/CSS bypasses html/template auto-escaping and can introduce XSS. Only mark trusted, static content as safe."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["xss", "cwe-79", "go"])
+        ),
+
+        // Writing raw / formatted untrusted data directly to the HTTP response.
+        (
+            id: Some("go-xss-raw-response-write"),
+            name: Some("XSS via raw write to HTTP response"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                // <writer>.Write([]byte(... + ...)) raw response body. Constrained
+                // to common HTTP response-writer receivers to avoid flagging file
+                // or buffer writes.
+                "regex:\\b(w|rw|wr)\\.Write\\(\\[\\]byte\\([^)]*\\+",
+                "regex:\\.Writer\\.Write\\(\\[\\]byte\\([^)]*\\+",
+                // fmt.Fprintf/Fprint to the writer with a non-literal payload.
+                "regex:fmt\\.Fprintf?\\(\\s*w\\b[^)]*\\+",
+                "regex:fmt\\.Fprintf?\\(\\s*w\\b[^)]*r\\.(URL|Form)",
+                // io.WriteString(w, userInput)
+                "regex:io\\.WriteString\\(\\s*w\\b[^)]*\\+"
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Untrusted data is written directly into the HTTP response without HTML escaping. Use html/template or html.EscapeString."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["xss", "cwe-79", "go"])
+        )
+    ]
+)

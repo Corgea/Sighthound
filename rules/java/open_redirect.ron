@@ -1,0 +1,35 @@
+(
+    rules: [
+        // CWE-601: Open Redirect. redirect()/sendRedirect() with a non-literal
+        // (user-controlled) destination. not_literal on arg0 drops hardcoded
+        // safe redirects like redirect("/dashboard").
+        (
+            id: Some("java-open-redirect"),
+            name: Some("Open Redirect"),
+            category: Some("open-redirect"),
+            mode: "search",
+            patterns: Some([
+                "redirect",
+                "sendRedirect"
+            ]),
+            finding_type: Some("Open Redirect"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-601"),
+            description: Some("User-controlled value used as a redirect destination, enabling open redirect."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_literal",
+                    value: "",
+                    condition_type: Some("not_literal"),
+                    argument_position: Some(0)
+                )
+            ]),
+            tags: Some(["open-redirect", "cwe-601", "java"])
+        ),
+    ]
+)

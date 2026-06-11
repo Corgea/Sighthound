@@ -1,125 +1,59 @@
 (
     rules: [
-        // Search mode rules for command injection patterns
+        // Always-shell command sinks: os.system / os.popen / os.exec* / os.spawn*
+        // are inherently a shell/exec of a command string. Bare dotted names are
+        // matched against the function name.
         (
             id: Some("python-cmd-injection-001"),
             name: Some("OS Command Execution"),
-            category: Some("injection"),
+            category: Some("command_execution"),
             mode: "search",
             patterns: Some([
-                "os\\.system\\(",
-                "os\\.popen\\(",
-                "os\\.spawn.*\\(",
-                "subprocess\\.call\\(",
-                "subprocess\\.run\\(",
-                "subprocess\\.Popen\\(",
-                "subprocess\\.check_output\\(",
-                "subprocess\\.check_call\\(",
+                "os.system",
+                "os.popen",
+                "os.spawnl",
+                "os.spawnv",
+                "os.execl",
+                "os.execv",
+                "commands.getoutput",
+                "pty.spawn",
             ]),
             finding_type: Some("Command Injection"),
             severity: Some("High"),
             confidence: Some("Medium"),
             cwe_id: Some("cwe-78"),
-            description: Some("Command execution detected - verify input is properly sanitized"),
+            description: Some("OS command execution sink - verify the command is not built from untrusted input"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
             tags: Some(["command", "injection", "os"])
         ),
+
+        // subprocess.* only when shell=True (the dangerous form). The "=" in the
+        // pattern forces full-call-text matching, so list-arg / no-shell calls
+        // (e.g. subprocess.Popen(["notepad.exe"])) do not match.
         (
             id: Some("python-cmd-injection-002"),
-            name: Some("Shell Command with String Formatting"),
-            category: Some("injection"),
+            name: Some("Subprocess with shell=True"),
+            category: Some("command_execution"),
             mode: "search",
             patterns: Some([
-                "system.*%.*",
-                "system.*format.*",
-                "popen.*%.*",
-                "popen.*format.*",
-                "call.*%.*",
-                "call.*format.*",
-                "run.*%.*",
-                "run.*format.*",
-            ]),
-            finding_type: Some("Command Injection"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-78"),
-            description: Some("Command constructed using string formatting, highly vulnerable to injection"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["command", "injection", "shell"])
-        ),
-        (
-            id: Some("python-cmd-injection-003"),
-            name: Some("Shell Command with Concatenation"),
-            category: Some("injection"),
-            mode: "search",
-            patterns: Some([
-                "system.*\\+.*",
-                "popen.*\\+.*",
-                "call.*\\+.*",
-                "run.*\\+.*",
-                "Popen.*\\+.*",
+                "*subprocess.call(*shell=True*",
+                "*subprocess.run(*shell=True*",
+                "*subprocess.Popen(*shell=True*",
+                "*subprocess.check_output(*shell=True*",
+                "*subprocess.check_call(*shell=True*",
+                "*subprocess.getoutput(*",
             ]),
             finding_type: Some("Command Injection"),
             severity: Some("High"),
-            confidence: Some("High"),
+            confidence: Some("Medium"),
             cwe_id: Some("cwe-78"),
-            description: Some("Command constructed using string concatenation, vulnerable to injection"),
+            description: Some("subprocess invoked with shell=True; a shell command built from untrusted input is RCE"),
             file_types: Some((
                 extensions: Some([".py"])
             )),
-            tags: Some(["command", "injection", "shell"])
+            tags: Some(["command", "injection", "subprocess"])
         ),
-        
-        // Taint mode rules for command injection data flows
-        (
-            id: Some("python-cmd-taint-001"),
-            name: Some("Command Injection Taint Flow"),
-            category: Some("injection"),
-            mode: "taint",
-            sources: Some([
-                "request.*",
-                "request\\.args\\.",
-                "request\\.form\\.",
-                "request\\.json\\.",
-                "input\\(",
-                "sys\\.argv",
-                "os\\.environ",
-                "flask\\.request",
-                "django\\.request",
-                "raw_input\\(",
-            ]),
-            sinks: Some([
-                "os\\.system",
-                "os\\.popen",
-                "os\\.spawn",
-                "subprocess\\.call",
-                "subprocess\\.run",
-                "subprocess\\.Popen",
-                "subprocess\\.check_output",
-                "subprocess\\.check_call",
-                "exec\\(",
-                "eval\\(",
-            ]),
-            sanitizers: Some([
-                "shlex\\.quote",
-                "pipes\\.quote",
-                "escape\\(",
-                "sanitize\\(",
-                "validate\\(",
-            ]),
-            finding_type: Some("Command Injection via Taint Flow"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-78"),
-            description: Some("User input flows directly to command execution without proper sanitization"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["command", "injection", "taint", "shell"])
-        )
     ]
-) 
+)

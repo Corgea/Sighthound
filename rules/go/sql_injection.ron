@@ -1,0 +1,79 @@
+// Go SQL Injection rules (CWE-89)
+//
+// Engine notes for Go search rules in this directory:
+//  - The Go scanner only visits call_expression nodes in search mode.
+//  - A rule matches against the FULL call text (so package-qualified patterns
+//    like `db.Query(...)` work) ONLY when at least one of its patterns contains
+//    a "full-context indicator" (e.g. `+`, `%`, `=`). Otherwise patterns are
+//    matched against the bare selector method name only (e.g. `Query`).
+//  - Rules that need full context but have no natural indicator include the
+//    sentinel pattern `=__force_full_context__` (never matches real code).
+(
+    rules: [
+        // Concatenated / Sprintf-built SQL passed into a query/exec sink.
+        (
+            id: Some("go-sql-injection-concat"),
+            name: Some("SQL Injection via string concatenation"),
+            category: Some("sql-injection"),
+            mode: "search",
+            // Note: Sprintf-built SQL is handled by go-sql-injection-sprintf to
+            // avoid double-reporting an inline `Query(fmt.Sprintf(...))` line.
+            patterns: Some([
+                "regex:\\.(Query|QueryContext|QueryRow|QueryRowContext|Exec|ExecContext|Prepare)\\([^)]*\"\\s*\\+",
+                "regex:\\.(Query|QueryContext|QueryRow|QueryRowContext|Exec|ExecContext|Prepare)\\([^)]*\\+\\s*\""
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("User-controlled data is concatenated or formatted into a SQL statement passed to a database call. Use parameterized queries (? / $1 placeholders)."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["sql", "injection", "cwe-89", "go"])
+        ),
+
+        // fmt.Sprintf used to build a SQL string (precursor to SQLi).
+        (
+            id: Some("go-sql-injection-sprintf"),
+            name: Some("SQL statement built with fmt.Sprintf"),
+            category: Some("sql-injection"),
+            mode: "search",
+            patterns: Some([
+                "regex:fmt\\.Sprintf\\(\\s*\"[^\"]*(SELECT|INSERT INTO|UPDATE |DELETE FROM|UNION SELECT|DROP TABLE|FROM |WHERE |VALUES)",
+                "=__force_full_context__"
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-89"),
+            description: Some("A SQL statement is assembled with fmt.Sprintf; if any verb is filled with untrusted input this is SQL injection. Prefer parameterized queries."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["sql", "injection", "cwe-89", "go"])
+        ),
+
+        // Taint variant (parity / data-flow intent). Kept for completeness.
+        (
+            id: Some("go-sql-injection-taint"),
+            name: Some("SQL Injection via tainted data flow"),
+            category: Some("sql-injection"),
+            mode: "taint",
+            sources: Some([
+                "r.URL.Query", "FormValue", "PostFormValue", "r.PostForm", "r.Form",
+                "mux.Vars", "c.Param", "c.Query", "c.PostForm", "os.Getenv"
+            ]),
+            sinks: Some([
+                "Query", "QueryContext", "QueryRow", "QueryRowContext",
+                "Exec", "ExecContext", "Prepare"
+            ]),
+            sanitizers: Some([
+                "strconv.Atoi", "strconv.ParseInt", "strconv.ParseUint"
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("Untrusted request data flows into a SQL execution call without parameterization."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["sql", "injection", "cwe-89", "taint", "go"])
+        )
+    ]
+)

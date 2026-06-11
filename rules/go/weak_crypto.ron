@@ -1,0 +1,51 @@
+// Go weak cryptography rules (CWE-327) and insecure randomness (CWE-338)
+// See sql_injection.ron header for engine/full-context conventions. These rules
+// flag a dangerous call regardless of arguments, so they carry the
+// `=__force_full_context__` sentinel to force full-call-text matching.
+(
+    rules: [
+        // Broken / weak hash and cipher primitives.
+        (
+            id: Some("go-weak-crypto-algorithm"),
+            name: Some("Use of broken or weak cryptographic primitive"),
+            category: Some("crypto"),
+            mode: "search",
+            patterns: Some([
+                "regex:md5\\.(New|Sum)\\(",
+                "regex:sha1\\.(New|Sum)\\(",
+                "regex:des\\.(NewCipher|NewTripleDESCipher)\\(",
+                "regex:rc4\\.NewCipher\\(",
+                "=__force_full_context__"
+            ]),
+            finding_type: Some("Weak Cryptography"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("MD5, SHA-1, DES, 3DES and RC4 are cryptographically broken. Use SHA-256+/SHA-3 for hashing and AES-GCM or ChaCha20-Poly1305 for encryption."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["crypto", "weak-hash", "cwe-327", "go"])
+        ),
+
+        // math/rand used where a cryptographically secure RNG is required.
+        (
+            id: Some("go-insecure-random"),
+            name: Some("Insecure randomness from math/rand"),
+            category: Some("crypto"),
+            mode: "search",
+            // Methods unique to math/rand (avoids crypto/rand.Read / crypto/rand.Int
+            // which are secure and share the `rand` selector).
+            patterns: Some([
+                "regex:rand\\.(Intn|Int31|Int31n|Int63|Int63n|Uint32|Uint64|Float32|Float64|Perm|Shuffle)\\(",
+                "regex:rand\\.New\\(",
+                "=__force_full_context__"
+            ]),
+            finding_type: Some("Insecure Randomness"),
+            severity: Some("Medium"),
+            confidence: Some("Low"),
+            cwe_id: Some("cwe-338"),
+            description: Some("math/rand is not cryptographically secure. For tokens, secrets, IDs or keys use crypto/rand instead."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["crypto", "insecure-random", "cwe-338", "cwe-330", "go"])
+        )
+    ]
+)

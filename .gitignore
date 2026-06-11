@@ -64,3 +64,14 @@ target/
 debug/
 release/
 .DS_Store
+
+# External benchmark corpus (separate/large repo, cloned locally)
+/fusion-benchmarks/
+
+# Generated benchmark scan artifacts (reproducible via bench/run_bench.py)
+/bench/results/
+/bench/*.json
+
+# Python bytecode cache
+__pycache__/
+*.pyc

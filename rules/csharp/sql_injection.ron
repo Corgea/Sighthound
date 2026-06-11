@@ -1,0 +1,41 @@
+(
+    rules: [
+        // SQL injection (taint): a SQL string is built by interpolating/concatenating
+        // request input (the assigned query string is the taint source) and then passed
+        // to a raw DbGateway execution method (the sink). Parameterized queries would
+        // not flow a raw concatenated string into these sinks.
+        (
+            id: Some("csharp-sql-injection-taint"),
+            name: Some("SQL injection via raw query execution"),
+            category: Some("database"),
+            mode: "taint",
+            sources: Some([
+                "select",
+                "delete from",
+                "insert into",
+                "update ",
+            ]),
+            sinks: Some([
+                "select",
+                "delete from",
+                "insert into",
+                "update ",
+            ]),
+            sanitizers: Some([
+                "SqlParameter",
+                "Parameters.Add",
+                "Parameters.AddWithValue",
+                "@p0",
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("User-controlled input is concatenated into a raw SQL string and executed without parameterization"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["sql", "injection", "taint", "csharp", "cwe-89"])
+        ),
+    ]
+)

@@ -137,6 +137,15 @@ pub fn detect_language_from_path(file_path: &Path) -> Option<&'static str> {
         
         // Java extensions  
         "java" | "jav" => Some("java"),
+
+        // C# extensions
+        "cs" | "csx" => Some("csharp"),
+
+        // Go extensions
+        "go" => Some("go"),
+
+        // Ruby extensions
+        "rb" | "rbw" | "rake" => Some("ruby"),
         
         // JavaScript extensions (including modern variants)
         "js" | "mjs" | "cjs" | "jsx" => Some("javascript"),

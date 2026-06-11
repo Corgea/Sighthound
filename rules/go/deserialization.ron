@@ -1,0 +1,43 @@
+// Go unsafe deserialization rules (CWE-502)
+// See sql_injection.ron header for engine/full-context conventions.
+(
+    rules: [
+        (
+            id: Some("go-unsafe-yaml-unmarshal"),
+            name: Some("Potentially unsafe YAML deserialization"),
+            category: Some("deserialization"),
+            mode: "search",
+            patterns: Some([
+                "regex:yaml\\.Unmarshal\\(",
+                "regex:yaml\\.NewDecoder\\([^)]*\\)\\.Decode\\(",
+                "=__force_full_context__"
+            ]),
+            finding_type: Some("Unsafe Deserialization"),
+            severity: Some("Medium"),
+            confidence: Some("Low"),
+            cwe_id: Some("cwe-502"),
+            description: Some("Deserializing untrusted YAML into dynamic/interface types can be abused. Unmarshal into a strict, well-defined struct and validate the result."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["deserialization", "cwe-502", "go"])
+        ),
+
+        // gob/json decoding into interface{} (type-confusion / reflection abuse).
+        (
+            id: Some("go-unsafe-gob-decode"),
+            name: Some("Gob decoding of untrusted data"),
+            category: Some("deserialization"),
+            mode: "search",
+            patterns: Some([
+                "regex:gob\\.NewDecoder\\([^)]*\\)\\.Decode\\(",
+                "=__force_full_context__"
+            ]),
+            finding_type: Some("Unsafe Deserialization"),
+            severity: Some("Medium"),
+            confidence: Some("Low"),
+            cwe_id: Some("cwe-502"),
+            description: Some("encoding/gob decodes arbitrary Go values and is unsafe on untrusted input. Only decode data from trusted sources."),
+            file_types: Some(( extensions: Some([".go"]) )),
+            tags: Some(["deserialization", "cwe-502", "go"])
+        )
+    ]
+)

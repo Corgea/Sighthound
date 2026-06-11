@@ -1,0 +1,26 @@
+(
+    rules: [
+        // CWE-611: XML External Entity injection. DocumentBuilderFactory /
+        // newDocumentBuilder used without disabling external entities.
+        (
+            id: Some("java-xxe"),
+            name: Some("XML External Entity (XXE) Injection"),
+            category: Some("xxe"),
+            mode: "search",
+            patterns: Some([
+                "newDocumentBuilder",
+                "newSAXParser",
+                "createXMLStreamReader"
+            ]),
+            finding_type: Some("XML External Entity Injection"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-611"),
+            description: Some("XML parsed without disabling external entities, allowing XXE injection."),
+            file_types: Some((
+                extensions: Some([".java"])
+            )),
+            tags: Some(["xxe", "cwe-611", "java"])
+        ),
+    ]
+)

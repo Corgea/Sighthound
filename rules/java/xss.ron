@@ -1,0 +1,77 @@
+(
+    rules: [
+        // CWE-79: Reflected/stored XSS via raw HTML assembly. Flags
+        // StringBuilder.append(<dynamic value>) where the appended value is
+        // neither a string literal nor wrapped in an HTML escaper. The
+        // not_literal condition drops the static markup appends; the
+        // argument_not_sanitized condition drops Html.escape(...) wrapped values.
+        (
+            id: Some("java-xss-raw-html-append"),
+            name: Some("Cross-Site Scripting via Raw HTML"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "append"
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Untrusted value concatenated into an HTML response without escaping, allowing cross-site scripting."),
+            file_types: Some((
+                extensions: Some([".java"]),
+                include_patterns: Some(["*views*"])
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_literal",
+                    value: "",
+                    condition_type: Some("not_literal"),
+                    argument_position: Some(0)
+                ),
+                (
+                    field: "argument",
+                    operator: "not_sanitized",
+                    value: "",
+                    condition_type: Some("argument_not_sanitized"),
+                    patterns: Some(["*escape*", "*encode*", "*sanitize*"])
+                )
+            ]),
+            tags: Some(["xss", "cwe-79", "java"])
+        ),
+
+        // CWE-79: Stored XSS source. A controller persists request-supplied text
+        // (setText) without sanitization; it is later rendered unescaped. Scoped
+        // to controllers and non-literal arguments so seed/data fixtures and
+        // constant text do not flag.
+        (
+            id: Some("java-xss-stored-settext"),
+            name: Some("Stored Cross-Site Scripting"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "setText"
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Untrusted request input persisted via setText without encoding, surfacing as stored cross-site scripting when rendered."),
+            file_types: Some((
+                extensions: Some([".java"]),
+                include_patterns: Some(["*controllers*"])
+            )),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_literal",
+                    value: "",
+                    condition_type: Some("not_literal"),
+                    argument_position: Some(0)
+                )
+            ]),
+            tags: Some(["xss", "cwe-79", "java"])
+        ),
+    ]
+)

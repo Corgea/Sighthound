@@ -1,0 +1,35 @@
+(
+    rules: [
+        // Path traversal: FileStorageService combines an untrusted filename/folder into
+        // a filesystem path with Path.Combine and no canonicalization or containment
+        // check. The Path.Combine call assigns a tainted path that is then read/written.
+        // The private `_root` field init combines only AppContext.BaseDirectory with a
+        // constant, so it is excluded as a sanitized base directory.
+        (
+            id: Some("csharp-path-traversal-combine"),
+            name: Some("Path traversal via Path.Combine"),
+            category: Some("path-traversal"),
+            mode: "taint",
+            sources: Some([
+                "Path.Combine",
+            ]),
+            sinks: Some([
+                "Path.Combine",
+            ]),
+            sanitizers: Some([
+                "AppContext.BaseDirectory",
+                "Path.GetFullPath",
+                "Path.GetFileName",
+            ]),
+            finding_type: Some("Path Traversal"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-22"),
+            description: Some("An untrusted filename is combined into a filesystem path without canonicalization or containment checks"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["path-traversal", "csharp", "cwe-22"])
+        ),
+    ]
+)

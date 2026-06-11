@@ -1,0 +1,43 @@
+(
+    rules: [
+        // Command injection: ReportService builds a shell command with interpolated
+        // request input and runs it via new ProcessStartInfo("sh", $"-c ...").
+        (
+            id: Some("csharp-command-injection-process"),
+            name: Some("OS command injection via ProcessStartInfo"),
+            category: Some("command-injection"),
+            mode: "search",
+            patterns: Some([
+                "ProcessStartInfo",
+            ]),
+            finding_type: Some("Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-78"),
+            description: Some("Untrusted input is interpolated into a process command line and executed"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["command", "injection", "csharp", "cwe-78"])
+        ),
+        // XXE: XmlDocument with an external XmlUrlResolver loads attacker XML.
+        (
+            id: Some("csharp-xxe-urlresolver"),
+            name: Some("XML external entity processing"),
+            category: Some("xxe"),
+            mode: "search",
+            patterns: Some([
+                "XmlUrlResolver",
+            ]),
+            finding_type: Some("XXE"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-611"),
+            description: Some("An external XML resolver is enabled before loading untrusted XML, allowing external entity processing"),
+            file_types: Some((
+                extensions: Some([".cs"])
+            )),
+            tags: Some(["xxe", "csharp", "cwe-611"])
+        ),
+    ]
+)

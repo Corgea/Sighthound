@@ -1,0 +1,33 @@
+(
+    rules: [
+        // === SEARCH: dynamic Regexp built from user input (ReDoS / regex injection) ===
+        (
+            id: Some("ruby-redos-dynamic-regexp"),
+            name: Some("ReDoS / Regex Injection via dynamic Regexp"),
+            category: Some("redos"),
+            mode: "search",
+            patterns: Some([
+                "*Regexp.new(*params*", "*Regexp.new(*#{*", "*Regexp.new(*cookies*", "*Regexp.new(*request*",
+                "*Regexp.compile(*params*", "*Regexp.compile(*#{*",
+                "*Regexp.union(*params*",
+                "=__sh_fullctx__"
+            ]),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_sanitized",
+                    value: "",
+                    condition_type: Some("argument_not_sanitized"),
+                    patterns: Some(["Regexp.escape", "Regexp.quote"])
+                )
+            ]),
+            finding_type: Some("Regular Expression Denial of Service"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-1333"),
+            description: Some("Building a Regexp from request data allows attacker-controlled patterns (regex injection / catastrophic backtracking). Use Regexp.escape or a fixed pattern."),
+            file_types: Some((extensions: Some([".rb"]))),
+            tags: Some(["redos", "cwe-1333", "cwe-400", "ruby"])
+        )
+    ]
+)
