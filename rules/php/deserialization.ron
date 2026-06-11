@@ -1,0 +1,23 @@
+(
+    rules: [
+        // Unsafe deserialization of untrusted data (PHP object injection).
+        (
+            id: Some("php-deser-001"),
+            name: Some("Unsafe Deserialization"),
+            category: Some("deserialization"),
+            mode: "search",
+            patterns: Some([
+                "unserialize",
+            ]),
+            finding_type: Some("Unsafe Deserialization"),
+            severity: Some("Critical"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-502"),
+            description: Some("unserialize() on untrusted data enables PHP object injection / RCE"),
+            file_types: Some((
+                extensions: Some([".php"])
+            )),
+            tags: Some(["deserialization", "object-injection"])
+        ),
+    ]
+)

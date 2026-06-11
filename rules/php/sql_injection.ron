@@ -1,0 +1,59 @@
+(
+    rules: [
+        // SQL string assembled by concatenation/interpolation. Each pattern carries
+        // `=` so the engine (a) treats it as an assignment-scanner rule and (b)
+        // matches the whole statement text rather than just a callee name. Fires on
+        // `$sql = "SELECT ... " . $x` / `$sql = "SELECT ... $x ..."`. Static or
+        // parameterized queries (no variable concatenation/interpolation) do not match.
+        (
+            id: Some("php-sql-001"),
+            name: Some("SQL Injection via Dynamic Query"),
+            category: Some("database"),
+            mode: "search",
+            patterns: Some([
+                "*= *SELECT*. $*",
+                "*= *INSERT*. $*",
+                "*= *UPDATE*. $*",
+                "*= *DELETE*. $*",
+                "*= *SELECT*.$*",
+                "*= *INSERT*.$*",
+                "*= *UPDATE*.$*",
+                "*= *DELETE*.$*",
+                "*= *SELECT*{$*",
+                "*= *SELECT*= $*",
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("SQL query assembled from string concatenation/interpolation with a variable; use parameterized queries"),
+            file_types: Some((
+                extensions: Some([".php"])
+            )),
+            tags: Some(["sql", "injection", "database"])
+        ),
+
+        // Legacy raw query functions, matched by callee name.
+        (
+            id: Some("php-sql-002"),
+            name: Some("Raw SQL Query API"),
+            category: Some("database"),
+            mode: "search",
+            patterns: Some([
+                "mysqli_query",
+                "mysql_query",
+                "pg_query",
+                "pg_send_query",
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-89"),
+            description: Some("Legacy raw SQL query API; verify the query is not built from untrusted input"),
+            file_types: Some((
+                extensions: Some([".php"])
+            )),
+            tags: Some(["sql", "injection", "database"])
+        ),
+    ]
+)

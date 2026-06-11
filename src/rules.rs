@@ -96,6 +96,16 @@ const EMBEDDED_HTML: &[&str] = &[
     include_str!("../rules/html/thymeleaf.ron"),
 ];
 
+const EMBEDDED_PHP: &[&str] = &[
+    include_str!("../rules/php/sql_injection.ron"),
+    include_str!("../rules/php/command_injection.ron"),
+    include_str!("../rules/php/code_injection.ron"),
+    include_str!("../rules/php/ssrf.ron"),
+    include_str!("../rules/php/deserialization.ron"),
+    include_str!("../rules/php/file_upload.ron"),
+    include_str!("../rules/php/taint.ron"),
+];
+
 // Structure for centralized exclusion patterns
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ExclusionPatterns {
@@ -201,6 +211,7 @@ impl Rules {
             "go" => all_rules.extend(Self::parse_embedded(EMBEDDED_GO, "Go")?),
             "ruby" => all_rules.extend(Self::parse_embedded(EMBEDDED_RUBY, "Ruby")?),
             "html" | "django" => all_rules.extend(Self::parse_embedded(EMBEDDED_HTML, "HTML")?),
+            "php" => all_rules.extend(Self::parse_embedded(EMBEDDED_PHP, "PHP")?),
             _ => {
                 return Err(anyhow::anyhow!("No embedded rules available for language: {}", language));
             }

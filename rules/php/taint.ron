@@ -1,0 +1,52 @@
+(
+    rules: [
+        // Superglobal / request input flowing into an execution sink. Also ensures
+        // a PHP-only repo always has at least one taint-mode rule (the combined
+        // scan mode requires one).
+        (
+            id: Some("php-taint-001"),
+            name: Some("Untrusted Input to Dangerous Sink"),
+            category: Some("injection"),
+            mode: "taint",
+            sources: Some([
+                "$_GET",
+                "$_POST",
+                "$_REQUEST",
+                "$_COOKIE",
+                "$_SERVER",
+                "$_FILES",
+                "php://input",
+                "->input(",
+            ]),
+            sinks: Some([
+                "query(",
+                "exec(",
+                "fetchOne(",
+                "fetchAll(",
+                "shell_exec(",
+                "system(",
+                "eval(",
+                "file_get_contents(",
+                "include",
+                "require",
+            ]),
+            sanitizers: Some([
+                "intval",
+                "htmlspecialchars",
+                "escapeshellarg",
+                "escapeshellcmd",
+                "preg_match",
+                "filter_var",
+            ]),
+            finding_type: Some("Tainted Data Flow"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-89"),
+            description: Some("Untrusted request input flows to a dangerous sink without sanitization"),
+            file_types: Some((
+                extensions: Some([".php"])
+            )),
+            tags: Some(["taint", "injection"])
+        ),
+    ]
+)

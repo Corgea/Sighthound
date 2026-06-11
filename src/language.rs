@@ -33,6 +33,8 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
         "html" => Ok(Box::new(HTMLLanguage)),
         #[cfg(feature = "django")]
         "django" | "django-html" => Ok(Box::new(DjangoTemplateLanguage)),
+        #[cfg(feature = "php")]
+        "php" => Ok(Box::new(PHPLanguage)),
         _ => {
             let mut supported = Vec::new();
             #[cfg(feature = "python")]
@@ -55,6 +57,8 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
             supported.push("html");
             #[cfg(feature = "django")]
             supported.push("django");
+            #[cfg(feature = "php")]
+            supported.push("php");
 
             anyhow::bail!(
                 "Unsupported language: {}. Supported languages: {}",
@@ -303,6 +307,50 @@ impl LanguageSupport for CSharpLanguage {
 
     fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>> {
         node.child_by_field_name("argument_list")
+    }
+}
+
+// PHP Implementation
+#[cfg(feature = "php")]
+pub struct PHPLanguage;
+
+#[cfg(feature = "php")]
+impl LanguageSupport for PHPLanguage {
+    fn name(&self) -> &'static str { "php" }
+    fn file_extension(&self) -> &'static str { ".php" }
+    fn tree_sitter_language(&self) -> Language { tree_sitter_php::LANGUAGE_PHP.into() }
+    fn call_node_types(&self) -> &[&'static str] {
+        &[
+            "function_call_expression",
+            "member_call_expression",
+            "nullsafe_member_call_expression",
+            "scoped_call_expression",
+            "object_creation_expression",
+        ]
+    }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        match node.kind() {
+            // foo(...) / namespaced\foo(...)
+            "function_call_expression" => node
+                .child_by_field_name("function")
+                .map(|child| get_node_text_slice(&child, source)),
+            // $obj->method(...) / $obj?->method(...) / Class::method(...)
+            "member_call_expression"
+            | "nullsafe_member_call_expression"
+            | "scoped_call_expression" => node
+                .child_by_field_name("name")
+                .map(|child| get_node_text_slice(&child, source)),
+            // new Class(...)
+            "object_creation_expression" => node
+                .named_child(0)
+                .map(|child| get_node_text_slice(&child, source)),
+            _ => None,
+        }
+    }
+
+    fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>> {
+        node.child_by_field_name("arguments")
     }
 }
 

@@ -1,0 +1,31 @@
+(
+    rules: [
+        // Outbound request sinks, matched by callee name. file_get_contents/fopen
+        // with a remote URL are SSRF; cURL/socket helpers are unambiguous.
+        (
+            id: Some("php-ssrf-001"),
+            name: Some("Server-Side Request Forgery"),
+            category: Some("ssrf"),
+            mode: "search",
+            // NOTE: `file_get_contents`/`fopen` are excluded - in these apps they
+            // overwhelmingly read local files (constant or internal paths), so
+            // matching them by name produced far more false positives than SSRF
+            // true positives. cURL/socket helpers are unambiguous outbound requests.
+            patterns: Some([
+                "curl_exec",
+                "fsockopen",
+                "stream_socket_client",
+                "get_headers",
+            ]),
+            finding_type: Some("SSRF"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-918"),
+            description: Some("Outbound request sink; if the target is attacker-controlled this is SSRF"),
+            file_types: Some((
+                extensions: Some([".php"])
+            )),
+            tags: Some(["ssrf", "request"])
+        ),
+    ]
+)

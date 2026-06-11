@@ -146,6 +146,9 @@ pub fn detect_language_from_path(file_path: &Path) -> Option<&'static str> {
 
         // Ruby extensions
         "rb" | "rbw" | "rake" => Some("ruby"),
+
+        // PHP extensions
+        "php" | "php3" | "php4" | "php5" | "php7" | "phtml" => Some("php"),
         
         // JavaScript extensions (including modern variants)
         "js" | "mjs" | "cjs" | "jsx" => Some("javascript"),

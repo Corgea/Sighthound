@@ -1,0 +1,27 @@
+(
+    rules: [
+        // Dynamic code evaluation sinks, matched by callee name.
+        (
+            id: Some("php-code-001"),
+            name: Some("Code Injection via Dynamic Evaluation"),
+            category: Some("code_execution"),
+            mode: "search",
+            patterns: Some([
+                "eval",
+                "assert",
+                "create_function",
+                "call_user_func",
+                "call_user_func_array",
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-94"),
+            description: Some("Dynamic code evaluation can lead to arbitrary code execution"),
+            file_types: Some((
+                extensions: Some([".php"])
+            )),
+            tags: Some(["code", "injection", "rce", "eval"])
+        ),
+    ]
+)

@@ -251,7 +251,7 @@ impl ScanningLogic {
         }
 
         if language_support.name() == "javascript" || language_support.name() == "typescript" || language_support.name() == "tsx"
-            || language_support.name() == "python" {
+            || language_support.name() == "python" || language_support.name() == "php" {
             Self::scan_assignments(tree.root_node(), source, filepath, rules, language_support, &mut findings, &mut processed_lines);
         }
 

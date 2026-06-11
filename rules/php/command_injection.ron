@@ -1,0 +1,33 @@
+(
+    rules: [
+        // OS command execution sinks, matched by function name (the engine's call
+        // pass matches the bare callee name). These APIs execute a shell command
+        // and are dangerous whenever any argument is dynamic.
+        (
+            id: Some("php-cmd-001"),
+            name: Some("OS Command Injection"),
+            category: Some("command_injection"),
+            mode: "search",
+            // NOTE: bare "exec" is intentionally excluded - PDO's `$db->exec($sql)`
+            // is SQL execution, not an OS command, and matching it produced large
+            // numbers of false positives. `shell_exec` still covers the common case.
+            patterns: Some([
+                "shell_exec",
+                "passthru",
+                "proc_open",
+                "pcntl_exec",
+                "popen",
+                "system",
+            ]),
+            finding_type: Some("Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-78"),
+            description: Some("OS command execution sink; if any argument is attacker-controlled this is command injection"),
+            file_types: Some((
+                extensions: Some([".php"])
+            )),
+            tags: Some(["command", "injection", "rce"])
+        ),
+    ]
+)

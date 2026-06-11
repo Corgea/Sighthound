@@ -1,0 +1,24 @@
+(
+    rules: [
+        // Unrestricted file upload - move_uploaded_file persists an uploaded file,
+        // and in these apps it is done without validating type/extension.
+        (
+            id: Some("php-upload-001"),
+            name: Some("Unrestricted File Upload"),
+            category: Some("file_upload"),
+            mode: "search",
+            patterns: Some([
+                "move_uploaded_file",
+            ]),
+            finding_type: Some("Unrestricted File Upload"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-434"),
+            description: Some("Uploaded file persisted without validating type/extension; can allow webshell upload"),
+            file_types: Some((
+                extensions: Some([".php"])
+            )),
+            tags: Some(["upload", "file"])
+        ),
+    ]
+)
