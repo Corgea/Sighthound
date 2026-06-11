@@ -293,9 +293,20 @@ impl LanguageSupport for CSharpLanguage {
 
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
         match node.kind() {
+            // `invocation_expression` exposes the callee under the `function` field
+            // (there is no `name` field). For `obj.Method(...)` the function is a
+            // `member_access_expression`; resolve its `name` child so method-name
+            // rules match. Plain `Method(...)` has an identifier function.
             "invocation_expression" => {
-                node.child_by_field_name("name")
-                    .map(|child| get_node_text_slice(&child, source))
+                node.child_by_field_name("function").map(|func| {
+                    if func.kind() == "member_access_expression" {
+                        func.child_by_field_name("name")
+                            .map(|name| get_node_text_slice(&name, source))
+                            .unwrap_or_else(|| get_node_text_slice(&func, source))
+                    } else {
+                        get_node_text_slice(&func, source)
+                    }
+                })
             }
             "object_creation_expression" => {
                 node.child_by_field_name("type")
