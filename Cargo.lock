@@ -265,15 +265,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
-name = "dbg_breakpoint"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb333c8dc699012c0694fe7c7eca7d625f2bceeeef44fd1de39008d6a6abf777"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "deranged"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -780,7 +771,6 @@ dependencies = [
  "anyhow",
  "clap",
  "crossbeam",
- "dbg_breakpoint",
  "env_logger",
  "glob",
  "ignore",

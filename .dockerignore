@@ -1,0 +1,12 @@
+target/
+build/
+.git/
+.github/
+.cursor/
+fusion-benchmarks/
+bench/results/
+bench/*.json
+**/*.rs.bk
+.DS_Store
+.env
+.env.*

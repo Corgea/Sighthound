@@ -1,0 +1,42 @@
+name: Bug Report
+description: Report a bug in Sighthound
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Security vulnerabilities in
+        Sighthound itself should be reported privately — see SECURITY.md.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Sighthound version
+      placeholder: "0.1.1"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS and Rust version
+      placeholder: "macOS 15, rustc 1.89.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Command, input files, and rule set if applicable.
+    validations:
+      required: true

@@ -36,7 +36,7 @@ def generate_password():
 
 
 # Hardcoded secret
-API_KEY = "sk-1234567890abcdef"  # Hardcoded secret
+API_KEY = "sk-fake-test-key-not-real"  # Hardcoded secret
 
 
 # Safe patterns (should not trigger)

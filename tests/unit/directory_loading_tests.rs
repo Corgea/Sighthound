@@ -1,6 +1,6 @@
 use sighthound::rules::Rules;
-use tempfile::TempDir;
 use std::fs;
+use tempfile::TempDir;
 
 #[cfg(test)]
 mod directory_loading_tests {
@@ -82,13 +82,17 @@ mod directory_loading_tests {
         // All rules from both files are merged into a single flat list.
         assert_eq!(rules.rules.len(), 4);
 
-        let patterns: Vec<&str> = rules.rules.iter()
+        let patterns: Vec<&str> = rules
+            .rules
+            .iter()
             .filter_map(|r| r.pattern.as_deref())
             .collect();
         assert!(patterns.contains(&"sql_inject"));
         assert!(patterns.contains(&"weak_crypto"));
 
-        let finding_types: Vec<&str> = rules.rules.iter()
+        let finding_types: Vec<&str> = rules
+            .rules
+            .iter()
             .filter_map(|r| r.finding_type.as_deref())
             .collect();
         assert!(finding_types.contains(&"sql_injection"));
@@ -101,14 +105,20 @@ mod directory_loading_tests {
 
         let result = Rules::load_from_path(temp_dir.path().to_str().unwrap());
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("No valid .ron rules files found"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No valid .ron rules files found"));
     }
 
     #[test]
     fn test_load_from_nonexistent_path() {
         let result = Rules::load_from_path("/nonexistent/path");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("neither a file nor a directory"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("neither a file nor a directory"));
     }
 
     #[test]
@@ -121,7 +131,10 @@ mod directory_loading_tests {
 
         let result = Rules::load_from_path(file_path.to_str().unwrap());
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unsupported file format. Only .ron files are supported"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unsupported file format. Only .ron files are supported"));
     }
 
     #[test]
@@ -132,8 +145,7 @@ mod directory_loading_tests {
         let rules1: Rules = ron::from_str(ron1).expect("parse rules1");
         let rules2: Rules = ron::from_str(ron2).expect("parse rules2");
 
-        let merged = Rules::merge_rules(vec![rules1, rules2])
-            .expect("Failed to merge rules");
+        let merged = Rules::merge_rules(vec![rules1, rules2]).expect("Failed to merge rules");
 
         assert_eq!(merged.rules.len(), 3);
     }

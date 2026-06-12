@@ -1,6 +1,6 @@
+use crate::language::{get_language_support, LanguageSupport};
 use anyhow::{Context, Result};
-use tree_sitter::{Parser as TSParser, Tree, Node};
-use crate::language::{LanguageSupport, get_language_support};
+use tree_sitter::{Node, Parser as TSParser, Tree};
 
 pub struct LanguageParser {
     parser: TSParser,
@@ -12,13 +12,20 @@ impl LanguageParser {
         let language_support = get_language_support(language_name)?;
         let language = language_support.tree_sitter_language();
         let mut parser = TSParser::new();
-        parser.set_language(&language).context("Failed to set language")?;
+        parser
+            .set_language(&language)
+            .context("Failed to set language")?;
 
-        Ok(Self { parser, language_support })
+        Ok(Self {
+            parser,
+            language_support,
+        })
     }
 
     pub fn parse(&mut self, source: &[u8]) -> Result<Tree> {
-        self.parser.parse(source, None).context("Failed to parse file")
+        self.parser
+            .parse(source, None)
+            .context("Failed to parse file")
     }
 
     pub fn file_extension(&self) -> &str {
@@ -46,8 +53,8 @@ pub fn get_node_text_slice<'a>(node: &Node, source: &'a [u8]) -> &'a str {
 
 // Language-agnostic tree traversal
 pub fn traverse_calls_only<'a>(
-    node: Node<'a>, 
-    language_support: &'a dyn LanguageSupport
+    node: Node<'a>,
+    language_support: &'a dyn LanguageSupport,
 ) -> impl Iterator<Item = Node<'a>> + 'a {
     let call_types = language_support.call_node_types();
     TreeCallIterator::new(node, call_types)
@@ -60,7 +67,10 @@ struct TreeCallIterator<'a> {
 
 impl<'a> TreeCallIterator<'a> {
     fn new(root: Node<'a>, call_types: &'a [&'static str]) -> Self {
-        Self { stack: vec![root], call_types }
+        Self {
+            stack: vec![root],
+            call_types,
+        }
     }
 }
 
@@ -79,7 +89,7 @@ impl<'a> Iterator for TreeCallIterator<'a> {
                     }
                 }
             }
-            
+
             // Return if this node type is a call node for the current language
             if self.call_types.contains(&node.kind()) {
                 return Some(node);

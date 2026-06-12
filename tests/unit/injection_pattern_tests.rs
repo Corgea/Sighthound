@@ -1,7 +1,7 @@
 use sighthound::language::{get_language_support, LanguageSupport};
+use sighthound::parser::{get_node_text, LanguageParser};
 use sighthound::rules::{check_for_injection_pattern, is_literal_node};
 use sighthound::scanner::core::ScanningLogic;
-use sighthound::parser::{LanguageParser, get_node_text};
 
 /// Return true if any call node in the tree has an injectable (non-literal,
 /// separator-bearing) argument according to the scanner heuristic.
@@ -12,16 +12,9 @@ fn any_call_has_injection(language: &str, code: &str) -> bool {
     let source = code.as_bytes();
     let tree = parser.parse(source).expect("parse");
 
-    fn visit(
-        node: &tree_sitter::Node,
-        source: &[u8],
-        ls: &dyn LanguageSupport,
-        found: &mut bool,
-    ) {
+    fn visit(node: &tree_sitter::Node, source: &[u8], ls: &dyn LanguageSupport, found: &mut bool) {
         for call_type in ls.call_node_types() {
-            if node.kind() == *call_type
-                && ScanningLogic::has_injection_pattern(node, source, ls)
-            {
+            if node.kind() == *call_type && ScanningLogic::has_injection_pattern(node, source, ls) {
                 *found = true;
                 return;
             }
@@ -34,8 +27,23 @@ fn any_call_has_injection(language: &str, code: &str) -> bool {
     }
 
     let mut found = false;
-    visit(&tree.root_node(), source, language_support.as_ref(), &mut found);
+    visit(
+        &tree.root_node(),
+        source,
+        language_support.as_ref(),
+        &mut found,
+    );
     found
+}
+
+#[cfg(any(feature = "python", feature = "javascript"))]
+fn visit_all<F: FnMut(&tree_sitter::Node)>(node: &tree_sitter::Node, f: &mut F) {
+    f(node);
+    for i in 0..node.child_count() {
+        if let Some(child) = node.child(i) {
+            visit_all(&child, f);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -49,10 +57,22 @@ mod injection_pattern_tests {
 
         // Command separators / chaining.
         assert!(check_for_injection_pattern("cmd; rm -rf /", ls.as_ref()));
-        assert!(check_for_injection_pattern("ls -la && malware", ls.as_ref()));
-        assert!(check_for_injection_pattern("echo 'safe' || dangerous_cmd", ls.as_ref()));
-        assert!(check_for_injection_pattern("result = $(whoami)", ls.as_ref()));
-        assert!(check_for_injection_pattern("`cat /etc/passwd`", ls.as_ref()));
+        assert!(check_for_injection_pattern(
+            "ls -la && malware",
+            ls.as_ref()
+        ));
+        assert!(check_for_injection_pattern(
+            "echo 'safe' || dangerous_cmd",
+            ls.as_ref()
+        ));
+        assert!(check_for_injection_pattern(
+            "result = $(whoami)",
+            ls.as_ref()
+        ));
+        assert!(check_for_injection_pattern(
+            "`cat /etc/passwd`",
+            ls.as_ref()
+        ));
 
         // Dangerous function calls.
         assert!(check_for_injection_pattern("eval(userCode)", ls.as_ref()));
@@ -62,8 +82,14 @@ mod injection_pattern_tests {
         // Template / URL-scheme indicators.
         assert!(check_for_injection_pattern("Hello {{ user }}", ls.as_ref()));
         assert!(check_for_injection_pattern("{% if admin %}", ls.as_ref()));
-        assert!(check_for_injection_pattern("javascript:alert(1)", ls.as_ref()));
-        assert!(check_for_injection_pattern("data:text/html,<script>", ls.as_ref()));
+        assert!(check_for_injection_pattern(
+            "javascript:alert(1)",
+            ls.as_ref()
+        ));
+        assert!(check_for_injection_pattern(
+            "data:text/html,<script>",
+            ls.as_ref()
+        ));
     }
 
     #[test]
@@ -73,10 +99,19 @@ mod injection_pattern_tests {
 
         // Plain queries / format strings without separators are not flagged by
         // this language-agnostic indicator check.
-        assert!(!check_for_injection_pattern("SELECT * FROM users", ls.as_ref()));
-        assert!(!check_for_injection_pattern("'SELECT * FROM users WHERE id = %s'", ls.as_ref()));
+        assert!(!check_for_injection_pattern(
+            "SELECT * FROM users",
+            ls.as_ref()
+        ));
+        assert!(!check_for_injection_pattern(
+            "'SELECT * FROM users WHERE id = %s'",
+            ls.as_ref()
+        ));
         assert!(!check_for_injection_pattern("${userInput}", ls.as_ref()));
-        assert!(!check_for_injection_pattern("query.format(user_id)", ls.as_ref()));
+        assert!(!check_for_injection_pattern(
+            "query.format(user_id)",
+            ls.as_ref()
+        ));
         assert!(!check_for_injection_pattern("variable_name", ls.as_ref()));
         assert!(!check_for_injection_pattern("123456", ls.as_ref()));
         assert!(!check_for_injection_pattern("", ls.as_ref()));
@@ -86,7 +121,10 @@ mod injection_pattern_tests {
     #[test]
     fn test_edge_cases_unsupported_language() {
         let unsupported_result = get_language_support("unsupported");
-        assert!(unsupported_result.is_err(), "Should fail for unsupported language");
+        assert!(
+            unsupported_result.is_err(),
+            "Should fail for unsupported language"
+        );
     }
 
     #[test]
@@ -97,16 +135,20 @@ mod injection_pattern_tests {
 def run(cmd):
     subprocess.call("ping " + cmd + "; rm -rf /")
 "#;
-        assert!(any_call_has_injection("python", vulnerable),
-            "Should detect injectable argument in command-building concatenation");
+        assert!(
+            any_call_has_injection("python", vulnerable),
+            "Should detect injectable argument in command-building concatenation"
+        );
 
         // A literal argument is not injectable.
         let safe = r#"
 def get_all_users():
     cursor.execute("SELECT * FROM users")
 "#;
-        assert!(!any_call_has_injection("python", safe),
-            "Literal query argument should not be flagged");
+        assert!(
+            !any_call_has_injection("python", safe),
+            "Literal query argument should not be flagged"
+        );
     }
 
     #[test]
@@ -119,8 +161,10 @@ public class T {
     }
 }
 "#;
-        assert!(any_call_has_injection("java", vulnerable),
-            "Should detect injectable argument in Java command concatenation");
+        assert!(
+            any_call_has_injection("java", vulnerable),
+            "Should detect injectable argument in Java command concatenation"
+        );
 
         let safe = r#"
 public class T {
@@ -129,8 +173,10 @@ public class T {
     }
 }
 "#;
-        assert!(!any_call_has_injection("java", safe),
-            "Literal Java query argument should not be flagged");
+        assert!(
+            !any_call_has_injection("java", safe),
+            "Literal Java query argument should not be flagged"
+        );
     }
 
     #[test]
@@ -141,16 +187,20 @@ function getUser(userId) {
     db.execute("SELECT * FROM users WHERE id = " + userId + "; DROP TABLE users");
 }
 "#;
-        assert!(any_call_has_injection("javascript", vulnerable),
-            "Should detect injectable argument in JS query concatenation");
+        assert!(
+            any_call_has_injection("javascript", vulnerable),
+            "Should detect injectable argument in JS query concatenation"
+        );
 
         let safe = r#"
 function safe() {
     db.execute("SELECT COUNT(*) FROM users");
 }
 "#;
-        assert!(!any_call_has_injection("javascript", safe),
-            "Literal JS query argument should not be flagged");
+        assert!(
+            !any_call_has_injection("javascript", safe),
+            "Literal JS query argument should not be flagged"
+        );
     }
 
     #[test]
@@ -198,20 +248,13 @@ function safe() {
             if node.kind() == "template_string" {
                 saw_template = true;
                 // Template strings interpolate values, so they are NOT literals.
-                assert!(!is_literal_node(node), "template string should not be a literal");
+                assert!(
+                    !is_literal_node(node),
+                    "template string should not be a literal"
+                );
             }
             let _ = get_node_text(node, source);
         });
         assert!(saw_template, "expected a template_string node");
-    }
-}
-
-#[cfg(any(feature = "python", feature = "javascript"))]
-fn visit_all<F: FnMut(&tree_sitter::Node)>(node: &tree_sitter::Node, f: &mut F) {
-    f(node);
-    for i in 0..node.child_count() {
-        if let Some(child) = node.child(i) {
-            visit_all(&child, f);
-        }
     }
 }

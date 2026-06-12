@@ -1,50 +1,37 @@
 # Test Organization
 
-This directory contains all the tests for the vulnerability scanner. The tests are organized into three categories:
+This directory contains all tests for Sighthound, organized into three suites.
 
 ## Directory Structure
 
 - **unit/**: Tests for individual components
-  - `injection_pattern_tests.rs`: Tests for injection pattern detection
-  - `django_xss_prevention_tests.rs`: Tests for Django XSS prevention
-  - `file_pattern_tests.rs`: Tests for file pattern matching
-  - `directory_loading_tests.rs`: Tests for directory loading
-  - `rule_deserialization_tests.rs`: Tests for rule deserialization
-  - `pattern_matching_tests.rs`: Tests for pattern matching
+  - `injection_pattern_tests.rs`: Injection pattern detection
+  - `django_xss_prevention_tests.rs`: Django XSS prevention
+  - `file_pattern_tests.rs`: File pattern matching
+  - `directory_loading_tests.rs`: Directory loading
+  - `rule_deserialization_tests.rs`: Rule deserialization
+  - `pattern_matching_tests.rs`: Pattern matching
 
 - **integration/**: Tests for multiple components working together
-  - `integration_tests.rs`: Tests for integrating rule parsing, scanning, and results
+  - `integration_tests.rs`: Rule parsing, scanning, and results integration
 
-- **end_to_end/**: Tests for the entire system
-  - `end_to_end_injection_tests.rs`: End-to-end tests for injection vulnerability detection
-
-## Running Tests
-
-To run all tests:
-```bash
-cargo test
-```
-
-To run a specific category of tests:
-```bash
-cargo test unit_tests
-cargo test integration_tests
-cargo test end_to_end_tests
-```
-
-To run a specific test:
-```bash
-cargo test pattern_matching
-```
+- **end_to_end/**: Full scanner flows
+  - `end_to_end_injection_tests.rs`: End-to-end injection detection
 
 ## Test Fixtures
 
-Test fixtures (sample code and rule files) are located in the `test_fixtures/` directory at the project root.
+Sample code and scenarios live under `tests/test_files/`:
 
-- `test_fixtures/python/`: Python test files
-- `test_fixtures/java/`: Java test files
-- `test_fixtures/rules/`: Rule files for testing
+- `python/`, `javascript/`, etc. — language-specific fixtures
+- `false_positives/` — patterns that must not be flagged
+- `multi_file_taint_tests/` — cross-file taint scenarios
 
-## Test Scripts
+## Running Tests
 
-Test scripts and utilities are located in the `test_scripts/` directory at the project root. 
+```bash
+cargo test                       # all suites
+cargo test --test unit_tests
+cargo test --test integration_tests
+cargo test --test end_to_end_tests
+cargo test pattern_matching      # filter by test name
+```

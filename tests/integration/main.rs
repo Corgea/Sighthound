@@ -1,2 +1,3 @@
 // Integration tests for the vulnerability scanner
-mod integration_tests; 
+#![allow(clippy::module_inception)]
+mod integration_tests;

@@ -6,8 +6,8 @@ import requests
 from lxml import etree
 
 # Example hardcoded AWS credentials (sensitive data leakage)
-aws_access_key_id = "AKIA2JAPX77RGLB664VE"
-aws_secret = "v5xpjkWYoy45fGKFSMajSn+sqs22WI2niacX9yO5"
+aws_access_key_id = "AKIAFAKEKEY00000000"
+aws_secret = "fake-secret-not-real-do-not-use-in-production"
 
 app = Flask(__name__)
 

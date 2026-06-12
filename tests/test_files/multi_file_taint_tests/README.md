@@ -1,10 +1,10 @@
 # Comprehensive Multi-File Taint Analysis Test Suite
 
-This directory contains a comprehensive test suite designed to validate the multi-file taint analysis fixes implemented in Greppy.
+This directory contains a comprehensive test suite designed to validate the multi-file taint analysis fixes implemented in Sighthound.
 
-## 🎯 **Test Strategy Overview**
+## Test Strategy Overview
 
-The test suite implements the testing strategy defined in `../../TAINT_TESTING_STRATEGY.md` and focuses on 5 critical categories:
+The test suite focuses on 5 critical categories:
 
 ### **Category 1: Valid Cross-File Flows** (Should DETECT ✅)
 - **Test 1.1**: Direct function import flow

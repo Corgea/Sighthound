@@ -1,6 +1,6 @@
+use crate::parser;
 use std::collections::{HashMap, HashSet};
 use tree_sitter::{Node, Tree};
-use crate::parser;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CodeType {
@@ -39,6 +39,12 @@ struct FrameworkInfo {
     code_type: CodeType,
 }
 
+impl Default for FrameworkRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FrameworkRegistry {
     pub fn new() -> Self {
         let mut frameworks = HashMap::new();
@@ -46,7 +52,10 @@ impl FrameworkRegistry {
         // Frontend frameworks
         let frontend_frameworks = vec![
             ("React", vec!["react", "react-dom"]),
-            ("Next.js", vec!["next/link", "next/router", "next/head", "@next/"]),
+            (
+                "Next.js",
+                vec!["next/link", "next/router", "next/head", "@next/"],
+            ),
             ("Angular", vec!["@angular/core"]),
             ("Vue", vec!["vue", "vue-router"]),
             ("Nuxt.js", vec!["nuxt", "@nuxtjs", "@nuxt/"]),
@@ -74,7 +83,10 @@ impl FrameworkRegistry {
             ("Recoil", vec!["recoil"]),
             ("MobX", vec!["mobx"]),
             ("Pinia", vec!["pinia"]),
-            ("TanStack Query", vec!["@tanstack/react-query", "@tanstack/vue-query"]),
+            (
+                "TanStack Query",
+                vec!["@tanstack/react-query", "@tanstack/vue-query"],
+            ),
             ("SWR", vec!["swr"]),
             ("Vite", vec!["vite", "@vitejs/"]),
             ("Webpack", vec!["webpack"]),
@@ -110,10 +122,13 @@ impl FrameworkRegistry {
         ];
 
         for (name, sigs) in frontend_frameworks {
-            frameworks.insert(name, FrameworkInfo {
-                signatures: sigs,
-                code_type: CodeType::Frontend,
-            });
+            frameworks.insert(
+                name,
+                FrameworkInfo {
+                    signatures: sigs,
+                    code_type: CodeType::Frontend,
+                },
+            );
         }
 
         // Backend frameworks
@@ -146,10 +161,13 @@ impl FrameworkRegistry {
         ];
 
         for (name, sigs) in backend_frameworks {
-            frameworks.insert(name, FrameworkInfo {
-                signatures: sigs,
-                code_type: CodeType::Backend,
-            });
+            frameworks.insert(
+                name,
+                FrameworkInfo {
+                    signatures: sigs,
+                    code_type: CodeType::Backend,
+                },
+            );
         }
 
         Self { frameworks }
@@ -177,9 +195,11 @@ impl FrameworkRegistry {
         let mut frontend_matches = 0;
         let mut backend_matches = 0;
 
-        for (_, info) in &self.frameworks {
+        for info in self.frameworks.values() {
             let has_match = info.signatures.iter().any(|sig| {
-                imports.iter().any(|imp| imp.to_lowercase().contains(&sig.to_lowercase()))
+                imports
+                    .iter()
+                    .any(|imp| imp.to_lowercase().contains(&sig.to_lowercase()))
             });
 
             if has_match {
@@ -214,17 +234,20 @@ impl CodeTypeDetector {
         }
     }
 
-    pub fn detect_code_type(&self, file_path: &str, content: &str, language: &str) -> CodeType {
+    pub fn detect_code_type(&self, _file_path: &str, content: &str, language: &str) -> CodeType {
         // First try framework detection
         let imports = self.extract_imports(content, language);
         let framework_result = self.framework_registry.detect_from_frameworks(&imports);
-        
+
         if framework_result != CodeType::Unknown {
             return framework_result;
         }
 
         // Then try AST analysis for JavaScript/TypeScript
-        if matches!(language.to_lowercase().as_str(), "javascript" | "typescript" | "tsx") {
+        if matches!(
+            language.to_lowercase().as_str(),
+            "javascript" | "typescript" | "tsx"
+        ) {
             if let Ok(mut parser) = crate::parser::LanguageParser::new(language) {
                 if let Ok(tree) = parser.parse(content.as_bytes()) {
                     let ast_result = self.detect_from_ast(&tree, content.as_bytes());
@@ -244,12 +267,14 @@ impl CodeTypeDetector {
         // Default fallback based on language
         match language.to_lowercase().as_str() {
             "javascript" | "typescript" | "tsx" | "jsx" => CodeType::Frontend,
-            "python" | "java" | "rust" | "go" | "php" | "ruby" | "c" | "cpp" | "c#" | "csharp" => CodeType::Backend,
+            "python" | "java" | "rust" | "go" | "php" | "ruby" | "c" | "cpp" | "c#" | "csharp" => {
+                CodeType::Backend
+            }
             _ => CodeType::Unknown,
         }
     }
 
-    fn extract_imports(&self, content: &str, language: &str) -> Vec<String> {
+    fn extract_imports(&self, content: &str, _language: &str) -> Vec<String> {
         let mut imports = Vec::new();
 
         // Extract require() calls
@@ -276,15 +301,13 @@ impl CodeTypeDetector {
 
         // Frontend signals
         frontend_score += self.score_frontend_signals(tree, source);
-        
+
         // Backend signals
         backend_score += self.score_backend_signals(tree, source);
 
         if frontend_score > 0 && backend_score == 0 {
             CodeType::Frontend
-        } else if backend_score > 0 && frontend_score == 0 {
-            CodeType::Backend
-        } else if backend_score > frontend_score {
+        } else if backend_score > 0 && (frontend_score == 0 || backend_score > frontend_score) {
             CodeType::Backend
         } else if frontend_score > backend_score {
             CodeType::Frontend
@@ -299,26 +322,42 @@ impl CodeTypeDetector {
 
         // DOM methods
         let dom_methods = vec![
-            "getElementById", "getElementsByClassName", "querySelector", "querySelectorAll",
-            "createElement", "appendChild", "addEventListener"
+            "getElementById",
+            "getElementsByClassName",
+            "querySelector",
+            "querySelectorAll",
+            "createElement",
+            "appendChild",
+            "addEventListener",
         ];
 
         // Browser objects
         let browser_objects = vec![
-            "document", "window", "navigator", "localStorage", "sessionStorage",
-            "location", "history", "screen"
+            "document",
+            "window",
+            "navigator",
+            "localStorage",
+            "sessionStorage",
+            "location",
+            "history",
+            "screen",
         ];
 
         // React hooks
         let react_hooks = vec![
-            "useState", "useEffect", "useContext", "useReducer", "useMemo", "useCallback"
+            "useState",
+            "useEffect",
+            "useContext",
+            "useReducer",
+            "useMemo",
+            "useCallback",
         ];
 
         // Check for call expressions
         self.walk_tree(&root_node, &mut |node| {
             if node.kind() == "call_expression" {
                 let text = parser::get_node_text(&node, source);
-                
+
                 // Check for DOM methods
                 for method in &dom_methods {
                     if text.contains(method) {
@@ -364,7 +403,7 @@ impl CodeTypeDetector {
 
         // Node.js core modules
         let core_modules = vec![
-            "fs", "path", "http", "https", "crypto", "os", "util", "events"
+            "fs", "path", "http", "https", "crypto", "os", "util", "events",
         ];
 
         // Node.js globals
@@ -376,11 +415,13 @@ impl CodeTypeDetector {
         self.walk_tree(&root_node, &mut |node| {
             if node.kind() == "call_expression" {
                 let text = parser::get_node_text(&node, source);
-                
+
                 // Check for require calls with core modules
                 if text.starts_with("require(") {
                     for module in &core_modules {
-                        if text.contains(&format!("'{}'", module)) || text.contains(&format!("\"{}\"", module)) {
+                        if text.contains(&format!("'{}'", module))
+                            || text.contains(&format!("\"{}\"", module))
+                        {
                             score += 3;
                         }
                     }
@@ -412,11 +453,13 @@ impl CodeTypeDetector {
         let frontend_sigs = self.framework_registry.get_frontend_signatures();
         let backend_sigs = self.framework_registry.get_backend_signatures();
 
-        let frontend_matches = imports.iter()
+        let frontend_matches = imports
+            .iter()
             .filter(|imp| frontend_sigs.iter().any(|sig| imp.contains(sig)))
             .count();
 
-        let backend_matches = imports.iter()
+        let backend_matches = imports
+            .iter()
             .filter(|imp| backend_sigs.iter().any(|sig| imp.contains(sig)))
             .count();
 
@@ -431,12 +474,12 @@ impl CodeTypeDetector {
         }
     }
 
-    fn walk_tree<F>(&self, node: &Node, callback: &mut F) 
+    fn walk_tree<F>(&self, node: &Node, callback: &mut F)
     where
         F: FnMut(Node),
     {
         callback(*node);
-        
+
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             self.walk_tree(&child, callback);
@@ -448,4 +491,4 @@ impl Default for CodeTypeDetector {
     fn default() -> Self {
         Self::new()
     }
-} 
+}

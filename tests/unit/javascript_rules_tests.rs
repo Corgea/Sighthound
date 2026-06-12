@@ -1,5 +1,5 @@
-use sighthound::rules::Rules;
 use sighthound::models::UnifiedRule;
+use sighthound::rules::Rules;
 
 /// Collect every literal pattern string referenced by a rule set
 /// (`pattern`, `patterns`, `sinks`).
@@ -27,12 +27,18 @@ fn load_js_rules() -> Rules {
 #[test]
 fn test_javascript_rules_load() {
     let rules = load_js_rules();
-    assert!(!rules.rules.is_empty(), "JavaScript rules should not be empty");
+    assert!(
+        !rules.rules.is_empty(),
+        "JavaScript rules should not be empty"
+    );
 
     // Every search rule must carry a matchable pattern or patterns.
     for rule in rules.rules.iter().filter(|r| r.mode == "search") {
-        assert!(rule.pattern.is_some() || rule.patterns.is_some(),
-            "Each search rule should have a pattern or patterns: {:?}", rule.id);
+        assert!(
+            rule.pattern.is_some() || rule.patterns.is_some(),
+            "Each search rule should have a pattern or patterns: {:?}",
+            rule.id
+        );
     }
 }
 
@@ -42,9 +48,14 @@ fn test_dom_xss_sinks_present() {
     let patterns = collect_patterns(&rules.rules);
     let joined = patterns.join("\n");
 
-    assert!(joined.contains("innerHTML"), "JS rules should cover innerHTML");
-    assert!(joined.contains("document.write") || joined.contains("write"),
-        "JS rules should cover document.write");
+    assert!(
+        joined.contains("innerHTML"),
+        "JS rules should cover innerHTML"
+    );
+    assert!(
+        joined.contains("document.write") || joined.contains("write"),
+        "JS rules should cover document.write"
+    );
 }
 
 #[test]
@@ -63,7 +74,13 @@ fn test_rules_carry_cwe_metadata() {
     // findings can be matched to ground-truth labels.
     let with_cwe = rules.rules.iter().any(|r| {
         r.cwe_id.is_some()
-            || r.tags.as_ref().map(|t| t.iter().any(|tag| tag.to_lowercase().starts_with("cwe"))).unwrap_or(false)
+            || r.tags
+                .as_ref()
+                .map(|t| t.iter().any(|tag| tag.to_lowercase().starts_with("cwe")))
+                .unwrap_or(false)
     });
-    assert!(with_cwe, "Expected at least one JavaScript rule to carry CWE metadata");
+    assert!(
+        with_cwe,
+        "Expected at least one JavaScript rule to carry CWE metadata"
+    );
 }

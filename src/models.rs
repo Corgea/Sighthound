@@ -52,8 +52,8 @@ pub struct TraceStep {
     pub line: usize,
     pub code: String,
     pub variable: String,
-    pub operation: String,   // "assignment", "parameter", "return", "method_call"
-    pub function: String,    // Containing function name
+    pub operation: String, // "assignment", "parameter", "return", "method_call"
+    pub function: String,  // Containing function name
 }
 
 /// Core taint flow data structure
@@ -71,7 +71,7 @@ pub struct TaintFlow {
     pub is_cross_file: bool,
     // Rule information for better reporting
     pub rule_id: Option<String>,
-    pub rule_name: Option<String>, 
+    pub rule_name: Option<String>,
     pub rule_description: Option<String>,
     pub rule_finding_type: Option<String>,
 }
@@ -98,7 +98,7 @@ pub struct TaintSink {
     pub variable: String,
     pub operation: String,
     pub code: String,
-    // Branch tracking for control flow awareness  
+    // Branch tracking for control flow awareness
     pub branch_id: Option<String>,
 }
 
@@ -156,80 +156,80 @@ pub struct UnifiedRule {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub id: Option<String>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub name: Option<String>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub description: Option<String>,
-    
+
     // Category field for organization
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub category: Option<String>,
-    
+
     // Analysis mode - determines how the rule is processed
     #[serde(default = "default_search_mode")]
     pub mode: String, // "search" (default) or "taint"
-    
+
     // Pattern matching (used in search mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub pattern: Option<String>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub patterns: Option<Vec<String>>,
-    
+
     // Taint analysis fields (used when mode = "taint")
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub sources: Option<Vec<String>>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub sinks: Option<Vec<String>>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub propagators: Option<Vec<String>>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub sanitizers: Option<Vec<String>>,
-    
+
     // Metadata and configuration
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub finding_type: Option<String>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub severity: Option<String>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub confidence: Option<String>,
-    
+
     // File filtering
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub file_types: Option<FileTypes>,
-    
+
     // Advanced conditions for pattern matching
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conditions: Option<Vec<Condition>>,
-    
+
     // Additional metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub cwe_id: Option<String>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub message: Option<String>,
@@ -280,62 +280,88 @@ pub struct Condition {
     pub ancestor_types: Option<Vec<String>>,
 }
 
-
-
 /// CLI configuration structure
 #[derive(clap::Parser)]
 #[command(
     name = "sighthound",
     about = "A fast vulnerability scanner for source code",
-    long_about = "Corgea Greppy - A high-performance vulnerability scanner that uses tree-sitter for AST-based analysis with parallel processing support.\n\nBy default, runs both simple pattern-based analysis and taint analysis for comprehensive vulnerability detection. Use --simple-analysis or --taint-analysis to run only one mode.\n\nSupports both explicit mode (specify language and rules) and auto-detection mode (automatically detect file types and load appropriate rules). Rules must be in RON format."
+    long_about = "Sighthound - A high-performance vulnerability scanner that uses tree-sitter for AST-based analysis with parallel processing support.\n\nBy default, runs both simple pattern-based analysis and taint analysis for comprehensive vulnerability detection. Use --simple-analysis or --taint-analysis to run only one mode.\n\nSupports both explicit mode (specify language and rules) and auto-detection mode (automatically detect file types and load appropriate rules). Rules must be in RON format."
 )]
 pub struct Cli {
     /// Root directory to scan
     #[arg(help = "Root directory to scan for vulnerabilities")]
     pub root_dir: Option<String>,
-    
+
     /// Language to scan (optional - triggers explicit mode when used with rules_path)
     #[arg(help = "Programming language to scan (python, java, javascript, tsx, html, django)")]
     pub language: Option<String>,
-    
+
     /// Rules file or directory path (optional - triggers explicit mode when used with language)
     #[arg(help = "Path to rules file (.ron) or directory containing multiple .ron rule files")]
     pub rules_path: Option<String>,
-    
+
     /// Custom rules directory (overrides default 'rules' directory)
-    #[arg(long, help = "Custom rules directory to use instead of default 'rules' directory")]
+    #[arg(
+        long,
+        help = "Custom rules directory to use instead of default 'rules' directory"
+    )]
     pub rules_dir: Option<String>,
-    
+
     /// Use embedded rules instead of loading from files (default: true)
-    #[arg(long, default_value = "true", help = "Use rules embedded in the binary instead of loading from files (default: true)")]
+    #[arg(
+        long,
+        default_value = "true",
+        help = "Use rules embedded in the binary instead of loading from files (default: true)"
+    )]
     pub use_embedded_rules: bool,
-    
+
     /// Disable embedded rules and use file-based rules instead
-    #[arg(long, help = "Disable embedded rules and load rules from files (overrides --use-embedded-rules)")]
+    #[arg(
+        long,
+        help = "Disable embedded rules and load rules from files (overrides --use-embedded-rules)"
+    )]
     pub use_file_rules: bool,
-    
+
     /// Output format (text, json, csv)
-    #[arg(short, long, default_value = "text", help = "Output format: text, json, or csv")]
+    #[arg(
+        short,
+        long,
+        default_value = "text",
+        help = "Output format: text, json, or csv"
+    )]
     pub output_format: String,
-    
+
     /// Verbose output
     #[arg(short, long, help = "Enable verbose output showing more details")]
     pub verbose: bool,
-    
+
     /// Only show summary
-    #[arg(short, long, help = "Only show vulnerability summary without individual findings")]
+    #[arg(
+        short,
+        long,
+        help = "Only show vulnerability summary without individual findings"
+    )]
     pub summary_only: bool,
 
     /// Disable parallel processing (use single-threaded mode)
-    #[arg(long, help = "Disable parallel processing for debugging or specific use cases")]
+    #[arg(
+        long,
+        help = "Disable parallel processing for debugging or specific use cases"
+    )]
     pub single_threaded: bool,
 
     /// Number of threads to use for parallel processing (default: CPU cores)
-    #[arg(long, help = "Number of threads for parallel processing (default: auto-detect CPU cores)")]
+    #[arg(
+        long,
+        help = "Number of threads for parallel processing (default: auto-detect CPU cores)"
+    )]
     pub threads: Option<usize>,
 
     /// Enable taint analysis mode only (default: both search and taint)
-    #[arg(long, help = "Run only taint analysis (data flow tracking from sources to sinks)")]
+    #[arg(
+        long,
+        help = "Run only taint analysis (data flow tracking from sources to sinks)"
+    )]
     pub taint_analysis: bool,
 
     /// Enable simple analysis mode only (default: both search and taint)
@@ -347,11 +373,17 @@ pub struct Cli {
     pub skip_minified: Option<bool>,
 
     /// Filter by code type (frontend, backend, or both)
-    #[arg(long, help = "Filter by code type: frontend, backend, or both (default: both)")]
+    #[arg(
+        long,
+        help = "Filter by code type: frontend, backend, or both (default: both)"
+    )]
     pub code_type: Option<String>,
 
     /// Filter by programming language
-    #[arg(long, help = "Filter by programming language: javascript, typescript, python, java, etc.")]
+    #[arg(
+        long,
+        help = "Filter by programming language: javascript, typescript, python, java, etc."
+    )]
     pub language_filter: Option<String>,
 
     /// Print version information
@@ -369,23 +401,23 @@ impl UnifiedRule {
     pub fn is_taint_rule(&self) -> bool {
         self.mode == "taint"
     }
-    
+
     pub fn is_search_rule(&self) -> bool {
         self.mode == "search"
     }
-    
+
     pub fn get_category(&self) -> &str {
         self.category.as_deref().unwrap_or("unknown")
     }
-    
+
     pub fn get_finding_type(&self) -> &str {
         self.finding_type.as_deref().unwrap_or("vulnerability")
     }
-    
+
     pub fn get_severity(&self) -> &str {
         self.severity.as_deref().unwrap_or("Medium")
     }
-    
+
     pub fn get_confidence(&self) -> &str {
         self.confidence.as_deref().unwrap_or("Medium")
     }
@@ -413,11 +445,11 @@ impl Finding {
             tags: None,
         }
     }
-    
+
     pub fn is_critical(&self) -> bool {
         self.severity.to_lowercase() == "high" || self.severity.to_lowercase() == "critical"
     }
-    
+
     pub fn add_trace(&mut self, trace: TraceStep) {
         if let Some(ref mut traces) = self.traces {
             traces.push(trace);
@@ -425,7 +457,7 @@ impl Finding {
             self.traces = Some(vec![trace]);
         }
     }
-    
+
     /// Extract CWE ID from tags field and set the cwe_id field
     pub fn extract_cwe_id(&mut self) {
         if let Some(ref tags) = self.tags {
@@ -438,20 +470,20 @@ impl Finding {
             }
         }
     }
-    
+
     /// Extract CWE ID from tags if present
     pub fn extract_cwe_id_from_tags(tags: &Option<Vec<String>>) -> Option<String> {
-        tags.as_ref()
-            .and_then(|tag_list| {
-                tag_list.iter()
-                    .find(|tag| tag.starts_with("cwe-"))
-                    .map(|tag| tag.to_string())
-            })
+        tags.as_ref().and_then(|tag_list| {
+            tag_list
+                .iter()
+                .find(|tag| tag.starts_with("cwe-"))
+                .map(|tag| tag.to_string())
+        })
     }
-    
+
     /// Extract CWE ID from rule tags (kept for backward compatibility)
     pub fn extract_cwe_id_with_fallback(tags: &[String], _finding_type: &str) -> Option<String> {
         // Get CWE from rule tags only
         Finding::extract_cwe_id_from_tags(&Some(tags.to_vec()))
     }
-} 
+}

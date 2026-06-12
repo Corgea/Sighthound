@@ -1,6 +1,6 @@
-use sighthound::rules::{Rules, rule_matches_pattern_unified, validate_unified_rule_patterns};
-use tempfile::NamedTempFile;
+use sighthound::rules::{rule_matches_pattern_unified, validate_unified_rule_patterns, Rules};
 use std::io::Write;
+use tempfile::NamedTempFile;
 
 #[cfg(test)]
 mod integration_tests {
@@ -47,10 +47,22 @@ mod integration_tests {
             assert!(validate_unified_rule_patterns(rule).is_ok());
         }
 
-        assert!(rule_matches_pattern_unified(&rules.rules[0], "pyperclip.copy"));
-        assert!(!rule_matches_pattern_unified(&rules.rules[0], "pyperclip.paste"));
-        assert!(rule_matches_pattern_unified(&rules.rules[1], "pyperclip.paste"));
-        assert!(!rule_matches_pattern_unified(&rules.rules[1], "pyperclip.copy"));
+        assert!(rule_matches_pattern_unified(
+            &rules.rules[0],
+            "pyperclip.copy"
+        ));
+        assert!(!rule_matches_pattern_unified(
+            &rules.rules[0],
+            "pyperclip.paste"
+        ));
+        assert!(rule_matches_pattern_unified(
+            &rules.rules[1],
+            "pyperclip.paste"
+        ));
+        assert!(!rule_matches_pattern_unified(
+            &rules.rules[1],
+            "pyperclip.copy"
+        ));
     }
 
     #[test]
@@ -131,10 +143,22 @@ mod integration_tests {
     fn test_rule_validation_integration() {
         // Valid patterns (literal + regex) validate; an invalid regex must fail.
         let test_cases = vec![
-            (r#"(rules: [(mode: "search", pattern: Some("test_function"), finding_type: Some("test"))])"#, true),
-            (r#"(rules: [(mode: "search", patterns: Some(["test1", "test2"]), finding_type: Some("test"))])"#, true),
-            (r#"(rules: [(mode: "search", pattern: Some("regex:^valid[0-9]+$"), finding_type: Some("test"))])"#, true),
-            (r#"(rules: [(mode: "search", pattern: Some("regex:[unterminated"), finding_type: Some("test"))])"#, false),
+            (
+                r#"(rules: [(mode: "search", pattern: Some("test_function"), finding_type: Some("test"))])"#,
+                true,
+            ),
+            (
+                r#"(rules: [(mode: "search", patterns: Some(["test1", "test2"]), finding_type: Some("test"))])"#,
+                true,
+            ),
+            (
+                r#"(rules: [(mode: "search", pattern: Some("regex:^valid[0-9]+$"), finding_type: Some("test"))])"#,
+                true,
+            ),
+            (
+                r#"(rules: [(mode: "search", pattern: Some("regex:[unterminated"), finding_type: Some("test"))])"#,
+                false,
+            ),
         ];
 
         for (rules_content, should_be_valid) in test_cases {
@@ -145,9 +169,17 @@ mod integration_tests {
             for rule in &rules.rules {
                 let validation_result = validate_unified_rule_patterns(rule);
                 if should_be_valid {
-                    assert!(validation_result.is_ok(), "Rule should be valid: {:?}", rule);
+                    assert!(
+                        validation_result.is_ok(),
+                        "Rule should be valid: {:?}",
+                        rule
+                    );
                 } else {
-                    assert!(validation_result.is_err(), "Rule should be invalid: {:?}", rule);
+                    assert!(
+                        validation_result.is_err(),
+                        "Rule should be invalid: {:?}",
+                        rule
+                    );
                 }
             }
         }
@@ -190,9 +222,18 @@ mod integration_tests {
         assert_eq!(file_types1.exclude_patterns, None);
 
         let file_types2 = rules.rules[1].file_types.as_ref().unwrap();
-        assert_eq!(file_types2.extensions, Some(vec![".py".to_string(), ".pyw".to_string()]));
-        assert_eq!(file_types2.include_patterns, Some(vec!["*test*".to_string()]));
-        assert_eq!(file_types2.exclude_patterns, Some(vec!["*safe*".to_string()]));
+        assert_eq!(
+            file_types2.extensions,
+            Some(vec![".py".to_string(), ".pyw".to_string()])
+        );
+        assert_eq!(
+            file_types2.include_patterns,
+            Some(vec!["*test*".to_string()])
+        );
+        assert_eq!(
+            file_types2.exclude_patterns,
+            Some(vec!["*safe*".to_string()])
+        );
     }
 
     #[test]
@@ -239,11 +280,14 @@ mod integration_tests {
         assert_eq!(conditions[0].patterns, None);
 
         assert_eq!(conditions[1].pattern, None);
-        assert_eq!(conditions[1].patterns, Some(vec![
-            "*.exe*".to_string(),
-            "*.bat*".to_string(),
-            "*.cmd*".to_string(),
-        ]));
+        assert_eq!(
+            conditions[1].patterns,
+            Some(vec![
+                "*.exe*".to_string(),
+                "*.bat*".to_string(),
+                "*.cmd*".to_string(),
+            ])
+        );
     }
 
     #[test]

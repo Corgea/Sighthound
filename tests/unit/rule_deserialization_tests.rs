@@ -1,6 +1,6 @@
 use sighthound::rules::Rules;
-use tempfile::NamedTempFile;
 use std::io::Write;
+use tempfile::NamedTempFile;
 
 #[cfg(test)]
 mod deserialization_tests {
@@ -53,17 +53,21 @@ mod deserialization_tests {
             ],
         )"#;
 
-        let rules: Rules = ron::from_str(ron_content).expect("Failed to parse multiple-patterns RON");
+        let rules: Rules =
+            ron::from_str(ron_content).expect("Failed to parse multiple-patterns RON");
 
         assert_eq!(rules.rules.len(), 1);
 
         let rule = &rules.rules[0];
         assert_eq!(rule.pattern, None);
-        assert_eq!(rule.patterns, Some(vec![
-            "pyperclip.paste".to_string(),
-            "pyperclip.copy".to_string(),
-            "*.to_clipboard".to_string(),
-        ]));
+        assert_eq!(
+            rule.patterns,
+            Some(vec![
+                "pyperclip.paste".to_string(),
+                "pyperclip.copy".to_string(),
+                "*.to_clipboard".to_string(),
+            ])
+        );
         assert_eq!(rule.finding_type, Some("clipboard_access".to_string()));
     }
 
@@ -79,7 +83,8 @@ mod deserialization_tests {
             ],
         )"#;
 
-        let rules: Rules = ron::from_str(ron_content).expect("Failed to parse RON without explicit mode");
+        let rules: Rules =
+            ron::from_str(ron_content).expect("Failed to parse RON without explicit mode");
         assert_eq!(rules.rules.len(), 1);
         assert_eq!(rules.rules[0].mode, "search");
         assert_eq!(rules.rules[0].pattern, Some("os.system".to_string()));
@@ -113,10 +118,13 @@ mod deserialization_tests {
         assert_eq!(rules.rules[0].patterns, None);
 
         assert_eq!(rules.rules[1].pattern, None);
-        assert_eq!(rules.rules[1].patterns, Some(vec![
-            "multi_pattern_1".to_string(),
-            "multi_pattern_2".to_string(),
-        ]));
+        assert_eq!(
+            rules.rules[1].patterns,
+            Some(vec![
+                "multi_pattern_1".to_string(),
+                "multi_pattern_2".to_string(),
+            ])
+        );
     }
 
     #[test]
@@ -164,18 +172,27 @@ mod deserialization_tests {
 
         assert_eq!(conditions[0].pattern, Some("shell=True".to_string()));
         assert_eq!(conditions[0].patterns, None);
-        assert_eq!(conditions[0].condition_type, Some("has_argument".to_string()));
+        assert_eq!(
+            conditions[0].condition_type,
+            Some("has_argument".to_string())
+        );
 
         assert_eq!(conditions[1].pattern, None);
-        assert_eq!(conditions[1].patterns, Some(vec![
-            "*.exe*".to_string(),
-            "*.bat*".to_string(),
-        ]));
+        assert_eq!(
+            conditions[1].patterns,
+            Some(vec!["*.exe*".to_string(), "*.bat*".to_string(),])
+        );
 
         let file_types = rule.file_types.as_ref().unwrap();
         assert_eq!(file_types.extensions, Some(vec![".py".to_string()]));
-        assert_eq!(file_types.include_patterns, Some(vec!["*test*".to_string()]));
-        assert_eq!(file_types.exclude_patterns, Some(vec!["*safe*".to_string()]));
+        assert_eq!(
+            file_types.include_patterns,
+            Some(vec!["*test*".to_string()])
+        );
+        assert_eq!(
+            file_types.exclude_patterns,
+            Some(vec!["*safe*".to_string()])
+        );
     }
 
     #[test]
@@ -217,11 +234,14 @@ mod deserialization_tests {
         assert_eq!(rules.rules.len(), 2);
 
         let keylogger_rule = &rules.rules[0];
-        assert_eq!(keylogger_rule.patterns, Some(vec![
-            "keyboard.hook".to_string(),
-            "keyboard.on_press".to_string(),
-            "pynput.*".to_string(),
-        ]));
+        assert_eq!(
+            keylogger_rule.patterns,
+            Some(vec![
+                "keyboard.hook".to_string(),
+                "keyboard.on_press".to_string(),
+                "pynput.*".to_string(),
+            ])
+        );
         assert_eq!(keylogger_rule.severity, Some("high".to_string()));
         assert_eq!(keylogger_rule.confidence, Some("medium".to_string()));
 
@@ -251,7 +271,8 @@ mod deserialization_tests {
             ],
         )"#;
 
-        let rules: Rules = ron::from_str(ron_content).expect("Failed to parse RON with omitted optionals");
+        let rules: Rules =
+            ron::from_str(ron_content).expect("Failed to parse RON with omitted optionals");
 
         assert_eq!(rules.rules.len(), 1);
 

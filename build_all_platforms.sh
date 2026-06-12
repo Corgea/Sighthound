@@ -51,8 +51,8 @@ cargo build --release
 # Create macOS release directory
 
 mkdir -p ./build/sighthound_macos/
-cp ./target/release/sighthound ./sighthound_macos/
-cp -r rules/ ./sighthound_macos/
+cp ./target/release/sighthound ./build/sighthound_macos/
+cp -r rules/ ./build/sighthound_macos/
 
 # Copy binaries to destination folder if specified
 if [ -n "$SIGHTHOUND_DESTINATION_FOLDER" ]; then
@@ -74,7 +74,7 @@ if [ -n "$SIGHTHOUND_DESTINATION_FOLDER" ]; then
     
     # Copy macOS binary
     echo "Copying macOS binary..."
-    cp -r ./sighthound_macos/* "$SIGHTHOUND_DESTINATION_FOLDER/osx/"
+    cp -r ./build/sighthound_macos/* "$SIGHTHOUND_DESTINATION_FOLDER/osx/"
     
     echo "✅ Binaries copied successfully to destination folder"
 fi
@@ -83,6 +83,6 @@ echo ""
 echo "✅ Multi-platform build completed!"
 echo ""
 echo "📁 Binaries created:"
-echo "   ./sighthound_linux_x64/sighthound     - For x86_64 (Intel/AMD servers, most EC2)"
-echo "   ./sighthound_linux_arm64/sighthound   - For ARM64 (Apple Silicon, Graviton instances)"
-echo "   ./sighthound_macos/sighthound         - For macOS ($(uname -m))"
+echo "   ./build/sighthound_linux_x64/sighthound     - For x86_64 (Intel/AMD servers, most EC2)"
+echo "   ./build/sighthound_linux_arm64/sighthound   - For ARM64 (Apple Silicon, Graviton instances)"
+echo "   ./build/sighthound_macos/sighthound         - For macOS ($(uname -m))"

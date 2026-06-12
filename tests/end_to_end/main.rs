@@ -1,2 +1,3 @@
 // End-to-end tests for the vulnerability scanner
-mod end_to_end_injection_tests; 
+#![allow(clippy::module_inception)]
+mod end_to_end_injection_tests;

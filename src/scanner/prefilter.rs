@@ -1,10 +1,10 @@
+use crate::config::filters::SKIP_MINIFIED_PATTERNS;
+use crate::parser::{get_node_text, LanguageParser};
+use crate::rules::Rules;
+use crate::scanner::utils::matches_glob_pattern;
+use anyhow::Result;
 use std::fs;
 use std::path::Path;
-use anyhow::Result;
-use crate::rules::Rules;
-use crate::parser::{LanguageParser, get_node_text};
-use crate::config::filters::SKIP_MINIFIED_PATTERNS;
-use crate::scanner::utils::matches_glob_pattern;
 use tree_sitter::Node;
 
 #[derive(Debug, Clone)]
@@ -20,15 +20,20 @@ impl PreFilter {
         Self::with_options(rules, language, true, Vec::new())
     }
 
-    pub fn with_options(rules: &Rules, language: &str, skip_minified: bool, custom_patterns: Vec<String>) -> Self {
+    pub fn with_options(
+        rules: &Rules,
+        language: &str,
+        skip_minified: bool,
+        custom_patterns: Vec<String>,
+    ) -> Self {
         // Check if we have any malware detection rules
         let is_malicious_scan = rules.rules.iter().any(|rule| {
-            rule.name.as_ref().map_or(false, |name| {
+            rule.name.as_ref().is_some_and(|name| {
                 let name_lower = name.to_lowercase();
-                name_lower.contains("malware") ||
-                name_lower.contains("malicious") ||
-                name_lower.contains("backdoor") ||
-                name_lower.contains("trojan")
+                name_lower.contains("malware")
+                    || name_lower.contains("malicious")
+                    || name_lower.contains("backdoor")
+                    || name_lower.contains("trojan")
             }) || rule.get_category().to_lowercase().contains("malware")
         });
 
@@ -58,7 +63,8 @@ impl PreFilter {
         }
 
         // Skip minified files for JavaScript/TypeScript if enabled
-        if self.skip_minified && self.is_js_or_ts_language() && self.is_minified_js_file(file_path) {
+        if self.skip_minified && self.is_js_or_ts_language() && self.is_minified_js_file(file_path)
+        {
             return false;
         }
 
@@ -74,11 +80,12 @@ impl PreFilter {
     /// Simple text/doc file detection
     fn is_text_or_doc_file(&self, file_path: &str) -> bool {
         let path_lower = file_path.to_lowercase();
-        
+
         // File extensions
-        let skip_extensions = [".txt", ".md", ".rst", ".pdf", ".doc", ".docx", 
-                              ".jpg", ".png", ".gif", ".svg", ".ico"];
-        
+        let skip_extensions = [
+            ".txt", ".md", ".rst", ".pdf", ".doc", ".docx", ".jpg", ".png", ".gif", ".svg", ".ico",
+        ];
+
         if skip_extensions.iter().any(|ext| path_lower.ends_with(ext)) {
             return true;
         }
@@ -88,8 +95,9 @@ impl PreFilter {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("");
-            
-        ["readme", "license", "changelog", "authors"].iter()
+
+        ["readme", "license", "changelog", "authors"]
+            .iter()
             .any(|name| filename.starts_with(name))
     }
 
@@ -131,8 +139,11 @@ impl PreFilter {
     /// Simple heuristic to detect minified content (edge cases only)
     fn is_likely_minified_content(&self, file_path: &str) -> bool {
         // Only check JS/TS files
-        if !file_path.ends_with(".js") && !file_path.ends_with(".jsx") && 
-           !file_path.ends_with(".ts") && !file_path.ends_with(".tsx") {
+        if !file_path.ends_with(".js")
+            && !file_path.ends_with(".jsx")
+            && !file_path.ends_with(".ts")
+            && !file_path.ends_with(".tsx")
+        {
             return false;
         }
 
@@ -141,7 +152,7 @@ impl PreFilter {
             Ok(content) => {
                 let line_count = content.lines().count();
                 let char_count = content.len();
-                
+
                 // Single line with lots of content = likely minified
                 line_count <= 3 && char_count > 2000
             }
@@ -164,10 +175,10 @@ impl PreFilter {
         let source = fs::read(file_path)?;
         let mut parser = LanguageParser::new(&self.language)?;
         let tree = parser.parse(&source)?;
-        
+
         let mut imports_text = String::new();
         self.collect_imports(&tree.root_node(), &source, &mut imports_text);
-        
+
         Ok(imports_text.to_lowercase())
     }
 
@@ -197,41 +208,69 @@ impl PreFilter {
     fn has_test_patterns(&self, imports_text: &str) -> bool {
         let test_patterns = [
             // Universal test indicators
-            "test", "mock", "spec", "jest", "pytest", "unittest",
-            "cypress", "selenium", "junit", "testng", "mocha",
+            "test",
+            "mock",
+            "spec",
+            "jest",
+            "pytest",
+            "unittest",
+            "cypress",
+            "selenium",
+            "junit",
+            "testng",
+            "mocha",
             // Language specific
-            "django.test", "flask.testing", "@testing-library",
-            "org.junit", "org.mockito", "org.testng",
+            "django.test",
+            "flask.testing",
+            "@testing-library",
+            "org.junit",
+            "org.mockito",
+            "org.testng",
         ];
-        
-        test_patterns.iter().any(|pattern| imports_text.contains(pattern))
+
+        test_patterns
+            .iter()
+            .any(|pattern| imports_text.contains(pattern))
     }
 
     /// Simple pattern matching for migration frameworks
     fn has_migration_patterns(&self, imports_text: &str) -> bool {
         let migration_patterns = [
-            "migration", "migrations", "migrate", "alembic", "flyway", "liquibase",
-            "django.db.migrations", "sequelize", "knex", "typeorm",
+            "migration",
+            "migrations",
+            "migrate",
+            "alembic",
+            "flyway",
+            "liquibase",
+            "django.db.migrations",
+            "sequelize",
+            "knex",
+            "typeorm",
         ];
-        
-        migration_patterns.iter().any(|pattern| imports_text.contains(pattern))
+
+        migration_patterns
+            .iter()
+            .any(|pattern| imports_text.contains(pattern))
     }
 
-    pub fn filter_files(&self, files: Vec<std::path::PathBuf>) -> (Vec<std::path::PathBuf>, FilterStats) {
+    pub fn filter_files(
+        &self,
+        files: Vec<std::path::PathBuf>,
+    ) -> (Vec<std::path::PathBuf>, FilterStats) {
         let mut included = 0;
         let mut filtered_out = 0;
         let mut minified_filtered = 0;
         let mut test_filtered = 0;
         let mut doc_filtered = 0;
-        
+
         let filtered: Vec<_> = files
             .into_iter()
             .filter(|path| {
                 let path_str = path.to_string_lossy();
-                
+
                 // Optimized filtering with single-pass checks to avoid redundancy
                 let filter_result = self.check_file_with_reason(&path_str);
-                
+
                 match filter_result {
                     FilterReason::Include => {
                         included += 1;
@@ -255,9 +294,9 @@ impl PreFilter {
                 }
             })
             .collect();
-        
-        let stats = FilterStats { 
-            included, 
+
+        let stats = FilterStats {
+            included,
             filtered_out,
             minified_filtered,
             test_filtered,
@@ -286,7 +325,8 @@ impl PreFilter {
         }
 
         // Check minified files for JS/TS (potentially expensive, so do conditionally)
-        if self.skip_minified && self.is_js_or_ts_language() && self.is_minified_js_file(file_path) {
+        if self.skip_minified && self.is_js_or_ts_language() && self.is_minified_js_file(file_path)
+        {
             return FilterReason::Minified;
         }
 
@@ -323,21 +363,26 @@ impl FilterStats {
     }
 
     pub fn filter_percentage(&self) -> f32 {
-        if self.total() == 0 { 0.0 } else { 
-            (self.filtered_out as f32 / self.total() as f32) * 100.0 
+        if self.total() == 0 {
+            0.0
+        } else {
+            (self.filtered_out as f32 / self.total() as f32) * 100.0
         }
     }
 }
 
 impl std::fmt::Display for FilterStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, 
-            "📊 Pre-filter: {} included, {} filtered out ({:.1}% reduction)",
-            self.included, self.filtered_out, self.filter_percentage()
+        write!(
+            f,
+            "pre-filter: {} included, {} filtered out ({:.1}% reduction)",
+            self.included,
+            self.filtered_out,
+            self.filter_percentage()
         )?;
-        
+
         if self.minified_filtered > 0 || self.test_filtered > 0 || self.doc_filtered > 0 {
-            write!(f, "\n   ↳ ")?;
+            write!(f, "\n     ")?;
             let mut details = Vec::new();
             if self.minified_filtered > 0 {
                 details.push(format!("{} minified", self.minified_filtered));
@@ -350,7 +395,7 @@ impl std::fmt::Display for FilterStats {
             }
             write!(f, "{}", details.join(", "))?;
         }
-        
+
         Ok(())
     }
-} 
+}

@@ -1,26 +1,24 @@
-use crate::rules::FileTypes;
-use std::path::{Path, PathBuf};
-use std::collections::{HashMap, BTreeMap};
-use anyhow::Result;
-use walkdir::WalkDir;
-use rayon::prelude::*;
-use std::sync::{Arc, Mutex};
-use crate::config::filters::SKIP_DIRS;
-use tree_sitter::Node;
 use crate::common::CommonUtils;
+use crate::config::filters::SKIP_DIRS;
 use crate::parser::get_node_text;
+use crate::rules::FileTypes;
+use anyhow::Result;
 use ignore::WalkBuilder;
 use once_cell::sync::Lazy;
+use rayon::prelude::*;
+use std::collections::{BTreeMap, HashMap};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use tree_sitter::Node;
+use walkdir::WalkDir;
 
-static GIT_IGNORE_CACHE: Lazy<Mutex<HashMap<PathBuf, bool>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static GIT_IGNORE_CACHE: Lazy<Mutex<HashMap<PathBuf, bool>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Check if a file path matches a glob pattern (delegates to common utils)
 pub fn matches_glob_pattern(pattern: &str, file_path: &str) -> bool {
     crate::common::CommonUtils::matches_file_pattern(pattern, file_path)
 }
-
-
-
 
 pub fn is_git_ignored(path: &Path) -> bool {
     {
@@ -108,7 +106,8 @@ pub fn rule_applies_to_file(file_types: Option<&FileTypes>, file_path: &str) -> 
         if let Some(file_extension) = Path::new(file_path).extension() {
             if let Some(ext_str) = file_extension.to_str() {
                 let ext_with_dot = format!(".{}", ext_str);
-                if !extensions.contains(&ext_str.to_string()) && !extensions.contains(&ext_with_dot) {
+                if !extensions.contains(&ext_str.to_string()) && !extensions.contains(&ext_with_dot)
+                {
                     return false;
                 }
             }
@@ -129,13 +128,13 @@ pub fn rule_applies_to_file_path(file_types: Option<&FileTypes>, file_path: &Pat
 /// Detect programming language from file path
 pub fn detect_language_from_path(file_path: &Path) -> Option<&'static str> {
     let file_name = file_path.file_name()?.to_str()?;
-    
+
     // Handle standard extensions
     match file_path.extension()?.to_str()? {
         // Python extensions
         "py" | "pyw" | "pyi" | "pyx" => Some("python"),
-        
-        // Java extensions  
+
+        // Java extensions
         "java" | "jav" => Some("java"),
 
         // C# extensions
@@ -149,53 +148,72 @@ pub fn detect_language_from_path(file_path: &Path) -> Option<&'static str> {
 
         // PHP extensions
         "php" | "php3" | "php4" | "php5" | "php7" | "phtml" => Some("php"),
-        
+
         // JavaScript extensions (including modern variants)
         "js" | "mjs" | "cjs" | "jsx" => Some("javascript"),
-        
+
         // TypeScript extensions (including all variants)
         "ts" | "tsx" | "mts" | "cts" => Some("tsx"),
-        
+
         // HTML and template extensions
         "html" | "htm" | "xhtml" | "shtml" | "dhtml" => Some("html"),
-        
+
         // Template file extensions that should be treated as HTML
-        "hbs" | "handlebars" | "mustache" | "twig" | "njk" | "nunjucks" | "ejs" | "pug" | "jade" => Some("html"),
-        
+        "hbs" | "handlebars" | "mustache" | "twig" | "njk" | "nunjucks" | "ejs" | "pug"
+        | "jade" => Some("html"),
+
         // Vue.js single file components (contain HTML, JS, and CSS)
         "vue" => Some("javascript"),
-        
-        // Svelte components 
+
+        // Svelte components
         "svelte" => Some("javascript"),
-        
+
         // Handle config files and other special cases
         _ => {
             // Check for JavaScript/TypeScript config files
-            if file_name.contains("webpack") || file_name.contains("rollup") || file_name.contains("vite") {
-                if file_name.ends_with(".config.js") || file_name.ends_with(".config.mjs") || file_name.ends_with(".config.cjs") {
+            if file_name.contains("webpack")
+                || file_name.contains("rollup")
+                || file_name.contains("vite")
+            {
+                if file_name.ends_with(".config.js")
+                    || file_name.ends_with(".config.mjs")
+                    || file_name.ends_with(".config.cjs")
+                {
                     return Some("javascript");
                 }
-                if file_name.ends_with(".config.ts") || file_name.ends_with(".config.mts") || file_name.ends_with(".config.cts") {
+                if file_name.ends_with(".config.ts")
+                    || file_name.ends_with(".config.mts")
+                    || file_name.ends_with(".config.cts")
+                {
                     return Some("tsx");
                 }
             }
-            
+
             // Check for Python files with unusual extensions
-            if file_name.ends_with("file") && (file_name.contains("requirements") || file_name.contains("Pipfile")) {
+            if file_name.ends_with("file")
+                && (file_name.contains("requirements") || file_name.contains("Pipfile"))
+            {
                 return Some("python");
             }
-            
+
             None
         }
     }
 }
 
 /// Discover files by language with configurable parallelism
-pub fn discover_files_by_language(root_dir: &str, parallel: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language(
+    root_dir: &str,
+    parallel: bool,
+) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     discover_files_by_language_with_progress(root_dir, parallel, true)
 }
 
-pub fn discover_files_by_language_with_progress(root_dir: &str, parallel: bool, show_progress: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language_with_progress(
+    root_dir: &str,
+    parallel: bool,
+    show_progress: bool,
+) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     let estimated_languages = crate::config::ScanDefaults::ESTIMATED_LANGUAGES;
 
     if parallel {
@@ -206,7 +224,11 @@ pub fn discover_files_by_language_with_progress(root_dir: &str, parallel: bool, 
 }
 
 /// Internal parallel file discovery implementation
-fn discover_files_parallel(root_dir: &str, estimated_languages: usize, show_progress: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
+fn discover_files_parallel(
+    root_dir: &str,
+    estimated_languages: usize,
+    _show_progress: bool,
+) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     let all_paths: Vec<PathBuf> = WalkDir::new(root_dir)
         .follow_links(false)
         .into_iter()
@@ -228,7 +250,9 @@ fn discover_files_parallel(root_dir: &str, estimated_languages: usize, show_prog
                     } else {
                         Some(e.path().to_path_buf())
                     }
-                } else { None }
+                } else {
+                    None
+                }
             })
         })
         .collect();
@@ -236,17 +260,11 @@ fn discover_files_parallel(root_dir: &str, estimated_languages: usize, show_prog
     let estimated_files_per_lang = if all_paths.is_empty() {
         crate::config::ScanDefaults::ESTIMATED_FILES_PER_LANG
     } else {
-        (all_paths.len() / estimated_languages).max(crate::config::ScanDefaults::ESTIMATED_FILES_PER_LANG)
+        (all_paths.len() / estimated_languages)
+            .max(crate::config::ScanDefaults::ESTIMATED_FILES_PER_LANG)
     };
 
-    if show_progress {
-        println!("📂 Discovered {} files total, estimating {} files per language",
-                 all_paths.len(), estimated_files_per_lang);
-    }
-
-    let files_by_language = Arc::new(Mutex::new(
-        BTreeMap::<String, Vec<PathBuf>>::new()
-    ));
+    let files_by_language = Arc::new(Mutex::new(BTreeMap::<String, Vec<PathBuf>>::new()));
 
     all_paths.par_iter().for_each(|path| {
         if let Some(language) = detect_language_from_path(path) {
@@ -264,7 +282,11 @@ fn discover_files_parallel(root_dir: &str, estimated_languages: usize, show_prog
 }
 
 /// Internal sequential file discovery implementation
-fn discover_files_sequential(root_dir: &str, estimated_languages: usize, _show_progress: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
+fn discover_files_sequential(
+    root_dir: &str,
+    _estimated_languages: usize,
+    _show_progress: bool,
+) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     let mut files_by_language = BTreeMap::new();
 
     for entry in WalkDir::new(root_dir)
@@ -286,7 +308,11 @@ fn discover_files_sequential(root_dir: &str, estimated_languages: usize, _show_p
                 if let Some(language) = detect_language_from_path(entry.path()) {
                     files_by_language
                         .entry(language.to_string())
-                        .or_insert_with(|| Vec::with_capacity(crate::config::ScanDefaults::ESTIMATED_FILES_PER_LANG))
+                        .or_insert_with(|| {
+                            Vec::with_capacity(
+                                crate::config::ScanDefaults::ESTIMATED_FILES_PER_LANG,
+                            )
+                        })
                         .push(entry.path().to_path_buf());
                 }
             }
@@ -297,22 +323,32 @@ fn discover_files_sequential(root_dir: &str, estimated_languages: usize, _show_p
 }
 
 /// Parallel file discovery (replaces legacy wrapper)
-pub fn discover_files_by_language_parallel(root_dir: &str) -> Result<BTreeMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language_parallel(
+    root_dir: &str,
+) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     discover_files_by_language(root_dir, true)
 }
 
 /// Sequential file discovery (replaces legacy wrapper)
-pub fn discover_files_by_language_sequential(root_dir: &str) -> Result<BTreeMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language_sequential(
+    root_dir: &str,
+) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     discover_files_by_language(root_dir, false)
 }
 
 /// Parallel file discovery with progress control
-pub fn discover_files_by_language_parallel_with_progress(root_dir: &str, show_progress: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language_parallel_with_progress(
+    root_dir: &str,
+    show_progress: bool,
+) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     discover_files_by_language_with_progress(root_dir, true, show_progress)
 }
 
 /// Sequential file discovery with progress control
-pub fn discover_files_by_language_sequential_with_progress(root_dir: &str, show_progress: bool) -> Result<BTreeMap<String, Vec<PathBuf>>> {
+pub fn discover_files_by_language_sequential_with_progress(
+    root_dir: &str,
+    show_progress: bool,
+) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     discover_files_by_language_with_progress(root_dir, false, show_progress)
 }
 
@@ -346,11 +382,11 @@ impl AstUtils {
     fn is_configuration_pattern(code: &str) -> bool {
         // SPECIFIC configuration patterns only - not broad keyword matching
         let specific_config_patterns = [
-            ".setdefault(",           // os.environ.setdefault()
-            "load_config(",           // config loading
-            "configure(",             // configure() calls
-            "settings.",              // settings.SOMETHING
-            "_config.",               // some_config.something
+            ".setdefault(", // os.environ.setdefault()
+            "load_config(", // config loading
+            "configure(",   // configure() calls
+            "settings.",    // settings.SOMETHING
+            "_config.",     // some_config.something
         ];
 
         // Only match if it's clearly a configuration operation, not just containing keywords
@@ -371,8 +407,8 @@ impl AstUtils {
             "sys.argv",
         ];
 
-        user_input_patterns.iter().any(|&p| code.contains(p)) ||
-        (pattern.contains("environ") && Self::is_environment_read(code))
+        user_input_patterns.iter().any(|&p| code.contains(p))
+            || (pattern.contains("environ") && Self::is_environment_read(code))
     }
 
     /// Check if environment access is reading (source) vs setting (config)
@@ -423,10 +459,16 @@ impl AstUtils {
 
     /// Check if node is a function definition
     pub fn is_function_node(node: &Node) -> bool {
-        matches!(node.kind(),
-            "function_definition" | "function_declaration" | "method_definition" |
-            "arrow_function" | "function_expression" | "generator_function" |
-            "async_function" | "constructor_definition"
+        matches!(
+            node.kind(),
+            "function_definition"
+                | "function_declaration"
+                | "method_definition"
+                | "arrow_function"
+                | "function_expression"
+                | "generator_function"
+                | "async_function"
+                | "constructor_definition"
         )
     }
 
@@ -480,26 +522,43 @@ impl AstUtils {
 
     fn check_python_sanitization(code: &str) -> bool {
         let py_sanitizers = [
-            "html.escape", "cgi.escape", "urllib.parse.quote", "bleach.clean",
-            "markupsafe.escape", "jinja2.escape", "django.utils.html.escape",
+            "html.escape",
+            "cgi.escape",
+            "urllib.parse.quote",
+            "bleach.clean",
+            "markupsafe.escape",
+            "jinja2.escape",
+            "django.utils.html.escape",
         ];
         py_sanitizers.iter().any(|pattern| code.contains(pattern))
     }
 
     fn check_java_sanitization(code: &str) -> bool {
         let java_sanitizers = [
-            "StringEscapeUtils.escape", "ESAPI.encoder", "URLEncoder.encode",
-            "StringUtils.escape", ".encode(", "sanitize(",
+            "StringEscapeUtils.escape",
+            "ESAPI.encoder",
+            "URLEncoder.encode",
+            "StringUtils.escape",
+            ".encode(",
+            "sanitize(",
         ];
         java_sanitizers.iter().any(|pattern| code.contains(pattern))
     }
 
     fn check_generic_sanitization(code: &str) -> bool {
         let generic_sanitizers = [
-            "sanitize(", "escape(", "encode(", "clean(", "validate(",
-            "filter(", "purify(", "safe(",
+            "sanitize(",
+            "escape(",
+            "encode(",
+            "clean(",
+            "validate(",
+            "filter(",
+            "purify(",
+            "safe(",
         ];
-        generic_sanitizers.iter().any(|pattern| code.contains(pattern))
+        generic_sanitizers
+            .iter()
+            .any(|pattern| code.contains(pattern))
     }
 
     /// Extract variables from expression with semantic understanding
@@ -509,7 +568,9 @@ impl AstUtils {
 
         match node.kind() {
             "assignment" | "assignment_expression" => {
-                if let Some(target) = CommonUtils::extract_variable_from_assignment(&node_text, false) {
+                if let Some(target) =
+                    CommonUtils::extract_variable_from_assignment(&node_text, false)
+                {
                     variables.push(SemanticVariable {
                         name: target,
                         var_type: VariableType::AssignmentTarget,

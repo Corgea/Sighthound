@@ -1,6 +1,6 @@
-# LLM Rule Writing Guide for Greppy Security Scanner
+# LLM Rule Writing Guide for Sighthound
 
-This guide helps LLMs understand how to write effective security rules for the Greppy vulnerability scanner. The scanner uses RON (Rusty Object Notation) format and supports both pattern-based search and taint flow analysis.
+This guide helps LLMs understand how to write effective security rules for the Sighthound vulnerability scanner. The scanner uses RON (Rusty Object Notation) format and supports both pattern-based search and taint flow analysis.
 
 ## Table of Contents
 1. [Rule Modes Overview](#rule-modes-overview)

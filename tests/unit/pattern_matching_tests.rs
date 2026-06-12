@@ -1,5 +1,7 @@
-use sighthound::rules::{match_pattern, match_any_pattern, rule_matches_pattern_unified, validate_unified_rule_patterns};
 use sighthound::models::UnifiedRule;
+use sighthound::rules::{
+    match_any_pattern, match_pattern, rule_matches_pattern_unified, validate_unified_rule_patterns,
+};
 
 /// Build a minimal search-mode rule for pattern-matching tests.
 fn search_rule(pattern: Option<&str>, patterns: Option<Vec<&str>>) -> UnifiedRule {
@@ -35,8 +37,8 @@ mod pattern_matching_tests {
         // A non-wildcard, non-regex pattern matches as a substring of the text.
         assert!(match_pattern("print", "print"));
         assert!(match_pattern("os.system", "os.system"));
-        assert!(match_pattern("print", "printf"));      // "printf" contains "print"
-        assert!(match_pattern("system", "os.system"));  // "os.system" contains "system"
+        assert!(match_pattern("print", "printf")); // "printf" contains "print"
+        assert!(match_pattern("system", "os.system")); // "os.system" contains "system"
         assert!(!match_pattern("os.system", "os.path"));
         assert!(!match_pattern("xyz", "os.system"));
     }
@@ -135,10 +137,7 @@ mod pattern_matching_tests {
 
     #[test]
     fn test_wildcard_patterns_in_multiple_patterns() {
-        let rule = search_rule(
-            None,
-            Some(vec!["*.tk*", "*.exe*", "keyboard.*"]),
-        );
+        let rule = search_rule(None, Some(vec!["*.tk*", "*.exe*", "keyboard.*"]));
 
         assert!(rule_matches_pattern_unified(&rule, "malicious.tk"));
         assert!(rule_matches_pattern_unified(&rule, "bad.tk.com"));
@@ -186,7 +185,10 @@ mod pattern_matching_tests {
         assert!(match_any_pattern(&sql_injection_patterns, "execute"));
         assert!(match_any_pattern(&sql_injection_patterns, "cursor.execute"));
         assert!(match_any_pattern(&sql_injection_patterns, "db.execute"));
-        assert!(match_any_pattern(&sql_injection_patterns, "conn.execute_query"));
+        assert!(match_any_pattern(
+            &sql_injection_patterns,
+            "conn.execute_query"
+        ));
 
         // Strings that contain none of the patterns as a substring don't match.
         assert!(!match_any_pattern(&sql_injection_patterns, "fetchone"));
@@ -200,8 +202,14 @@ mod pattern_matching_tests {
         ];
 
         assert!(match_any_pattern(&command_injection_patterns, "os.system"));
-        assert!(match_any_pattern(&command_injection_patterns, "subprocess.call"));
-        assert!(match_any_pattern(&command_injection_patterns, "subprocess.Popen"));
+        assert!(match_any_pattern(
+            &command_injection_patterns,
+            "subprocess.call"
+        ));
+        assert!(match_any_pattern(
+            &command_injection_patterns,
+            "subprocess.Popen"
+        ));
         assert!(match_any_pattern(&command_injection_patterns, "shell=True"));
 
         let crypto_patterns = vec![
@@ -234,8 +242,16 @@ mod performance_tests {
         ];
 
         let test_strings = vec![
-            "print", "malware.exe", "hello", "os.system", "subprocess.call",
-            "safe_function", "file.txt", "HELLO", "os.path", "process.run",
+            "print",
+            "malware.exe",
+            "hello",
+            "os.system",
+            "subprocess.call",
+            "safe_function",
+            "file.txt",
+            "HELLO",
+            "os.path",
+            "process.run",
         ];
 
         let start = Instant::now();
@@ -248,7 +264,11 @@ mod performance_tests {
         }
         let duration = start.elapsed();
         println!("Pattern matching 50,000 times took: {:?}", duration);
-        assert!(duration.as_secs() < 30, "Pattern matching too slow: {:?}", duration);
+        assert!(
+            duration.as_secs() < 30,
+            "Pattern matching too slow: {:?}",
+            duration
+        );
     }
 
     #[test]
@@ -256,14 +276,30 @@ mod performance_tests {
         let rule = search_rule(
             None,
             Some(vec![
-                "print", "*.exe", "os.system", "subprocess.*", "*password*",
-                "regex:^[a-z]+$", "eval", "exec", "*.dll", "malloc",
+                "print",
+                "*.exe",
+                "os.system",
+                "subprocess.*",
+                "*password*",
+                "regex:^[a-z]+$",
+                "eval",
+                "exec",
+                "*.dll",
+                "malloc",
             ]),
         );
 
         let test_strings = vec![
-            "print", "malware.exe", "os.system", "subprocess.call", "get_password",
-            "hello", "eval", "exec", "library.dll", "malloc",
+            "print",
+            "malware.exe",
+            "os.system",
+            "subprocess.call",
+            "get_password",
+            "hello",
+            "eval",
+            "exec",
+            "library.dll",
+            "malloc",
         ];
 
         let start = Instant::now();
@@ -273,7 +309,14 @@ mod performance_tests {
             }
         }
         let duration = start.elapsed();
-        println!("Multiple pattern rule matching 10,000 times took: {:?}", duration);
-        assert!(duration.as_secs() < 30, "Multiple pattern matching too slow: {:?}", duration);
+        println!(
+            "Multiple pattern rule matching 10,000 times took: {:?}",
+            duration
+        );
+        assert!(
+            duration.as_secs() < 30,
+            "Multiple pattern matching too slow: {:?}",
+            duration
+        );
     }
 }

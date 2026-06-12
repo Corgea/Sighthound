@@ -1,0 +1,40 @@
+name: Rule Request
+description: Request a new security rule or rule improvement
+title: "[Rule]: "
+labels: ["rules"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        See the [Rule Writing Guide](../rules/RULE_WRITING_GUIDE.md). PRs with
+        rules and test fixtures are welcome.
+
+  - type: textarea
+    id: vulnerability
+    attributes:
+      label: Vulnerability or pattern
+      description: CWE, language, and the dangerous API or data flow.
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: "python"
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example vulnerable code
+      description: Minimal code sample that should be detected.
+    validations:
+      required: true
+
+  - type: textarea
+    id: safe_example
+    attributes:
+      label: Example safe code (optional)
+      description: Code that should NOT be flagged (helps reduce false positives).
