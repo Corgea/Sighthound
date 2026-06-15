@@ -13,11 +13,10 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy source code
-COPY . .
-
-# Remove Cargo.lock to avoid version conflicts in container
-RUN rm -f Cargo.lock
+# Copy manifest and lockfile first for better layer caching
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY rules ./rules
 
 # Set build-time environment variables
 ARG GIT_HASH

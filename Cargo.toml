@@ -2,9 +2,15 @@
 name = "sighthound"
 version = "0.1.1"
 edition = "2021"
+rust-version = "1.89"
 authors = ["Corgea Team"]
 description = "A blazing fast vulnerability scanner for source code using tree-sitter"
-repository = "https://github.com/corgea/sighthound"
+readme = "README.md"
+license = "Apache-2.0 OR MIT"
+homepage = "https://github.com/Corgea/Sighthound"
+repository = "https://github.com/Corgea/Sighthound"
+keywords = ["security", "static-analysis", "sast", "vulnerability-scanner"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "sighthound"
@@ -54,7 +60,7 @@ log = "0.4"
 env_logger = "0.10"
 ignore = "0.4"
 lazy_static = "1.4"
-dbg_breakpoint="0.1.1"
+
 [dev-dependencies]
 tempfile = "3.8"
 
@@ -73,3 +79,7 @@ path = "tests/integration/main.rs"
 [[test]]
 name = "end_to_end_tests"
 path = "tests/end_to_end/main.rs"
+
+[[example]]
+name = "basic_scan"
+path = "examples/basic_scan.rs"
