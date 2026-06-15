@@ -29,7 +29,6 @@ use syntect::parsing::SyntaxSet;
 use walkdir::WalkDir;
 
 use crate::common::CommonUtils;
-use crate::config::filters::SKIP_DIRS;
 use crate::models::Finding;
 use crate::parser::LanguageParser;
 use crate::rules::Rules;
@@ -112,6 +111,12 @@ impl TaintRuleDeduplicator {
     fn matches_source_pattern(&self, text: &str) -> Option<String> {
         log::debug!("[SOURCE_MATCH] Checking text: '{}'", text);
         for pattern in &self.source_patterns {
+            if Self::is_bare_call_source_pattern(pattern)
+                && !Self::matches_bare_call_source(pattern, text)
+            {
+                continue;
+            }
+
             if CommonUtils::matches_taint_pattern(pattern, text) {
                 log::debug!(
                     "[SOURCE_MATCH] Matched pattern: '{}' in text: '{}'",
@@ -123,6 +128,32 @@ impl TaintRuleDeduplicator {
         }
         log::debug!("[SOURCE_MATCH] No patterns matched for text: '{}'", text);
         None
+    }
+
+    fn is_bare_call_source_pattern(pattern: &str) -> bool {
+        let Some(name) = pattern.strip_suffix('(') else {
+            return false;
+        };
+
+        !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    }
+
+    fn matches_bare_call_source(pattern: &str, text: &str) -> bool {
+        let mut search_start = 0;
+        while let Some(relative_pos) = text[search_start..].find(pattern) {
+            let pos = search_start + relative_pos;
+            let before = text[..pos].chars().next_back();
+            let has_identifier_prefix =
+                before.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.');
+
+            if !has_identifier_prefix {
+                return true;
+            }
+
+            search_start = pos + pattern.len();
+        }
+
+        false
     }
 
     /// Check if a pattern matches any sink
@@ -140,6 +171,114 @@ impl TaintRuleDeduplicator {
         }
         log::debug!("[SINK_MATCH] No patterns matched for text: '{}'", text);
         None
+    }
+}
+
+struct TaintExpressionUtils;
+
+impl TaintExpressionUtils {
+    fn normalize_variable(expression: &str) -> String {
+        let trimmed = expression
+            .trim()
+            .trim_end_matches(';')
+            .split_whitespace()
+            .last()
+            .unwrap_or("")
+            .trim();
+        let trimmed = trimmed.trim_start_matches('$');
+        let name: String = trimmed
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect();
+
+        if CommonUtils::is_valid_variable_name(&name) {
+            name
+        } else {
+            String::new()
+        }
+    }
+
+    fn extract_php_variables(expression: &str) -> Vec<String> {
+        let mut variables = Vec::new();
+        let chars: Vec<char> = expression.chars().collect();
+        let mut index = 0;
+
+        while index < chars.len() {
+            if chars[index] == '$' {
+                let start = index + 1;
+                let mut end = start;
+                while end < chars.len() && (chars[end].is_ascii_alphanumeric() || chars[end] == '_')
+                {
+                    end += 1;
+                }
+
+                if end > start {
+                    let name: String = chars[start..end].iter().collect();
+                    if CommonUtils::is_valid_variable_name(&name) {
+                        variables.push(name);
+                    }
+                }
+
+                index = end;
+            } else {
+                index += 1;
+            }
+        }
+
+        variables.sort();
+        variables.dedup();
+        variables
+    }
+
+    fn expression_has_sanitizer(rule: &crate::rules::UnifiedRule, expression: &str) -> bool {
+        rule.sanitizers.as_ref().is_some_and(|sanitizers| {
+            sanitizers.iter().any(|sanitizer| {
+                let matched = expression.contains(sanitizer);
+                if matched {
+                    log::debug!(
+                        "[SANITIZER_CHECK] Found sanitizer '{}' in sink: '{}'",
+                        sanitizer,
+                        expression
+                    );
+                }
+                matched
+            })
+        })
+    }
+
+    fn expression_has_any_sanitizer(
+        rules: &[&crate::rules::UnifiedRule],
+        expression: &str,
+    ) -> bool {
+        rules
+            .iter()
+            .any(|rule| Self::expression_has_sanitizer(rule, expression))
+    }
+
+    fn strip_inline_comment(expression: &str) -> &str {
+        expression
+            .split_once('#')
+            .map(|(code, _)| code.trim())
+            .unwrap_or_else(|| expression.trim())
+    }
+
+    fn expression_references_variable(expression: &str, variable: &str) -> bool {
+        let mut start = 0;
+        while let Some(relative_pos) = expression[start..].find(variable) {
+            let pos = start + relative_pos;
+            let before = expression[..pos].chars().next_back();
+            let after = expression[pos + variable.len()..].chars().next();
+            let before_boundary = before.is_none_or(|c| !(c.is_ascii_alphanumeric() || c == '_'));
+            let after_boundary = after.is_none_or(|c| !(c.is_ascii_alphanumeric() || c == '_'));
+
+            if before_boundary && after_boundary {
+                return true;
+            }
+
+            start = pos + variable.len();
+        }
+
+        false
     }
 }
 
@@ -914,7 +1053,7 @@ impl ScanningLogic {
         source: &[u8],
         tree: &tree_sitter::Tree,
         taint_rules: &[&crate::rules::UnifiedRule],
-        _language_support: &dyn crate::language::LanguageSupport,
+        language_support: &dyn crate::language::LanguageSupport,
     ) -> Vec<crate::models::Finding> {
         let mut findings = Vec::new();
 
@@ -1000,8 +1139,8 @@ impl ScanningLogic {
 
             // Look for assignment patterns: var = source_call()
             if CommonUtils::is_valid_assignment_text(&node_text) {
-                if let Some(var_name) =
-                    CommonUtils::extract_variable_from_assignment(&node_text, false)
+                if let Some(var_name) = Self::extract_taint_assignment_target(&node_text)
+                    .or_else(|| CommonUtils::extract_variable_from_assignment(&node_text, false))
                 {
                     // Extract the right side of assignment for source matching
                     if let Some(eq_pos) = node_text.find('=') {
@@ -1012,6 +1151,17 @@ impl ScanningLogic {
                         if let Some(source_pattern) =
                             rule_deduplicator.matches_source_pattern(assignment_value)
                         {
+                            if TaintExpressionUtils::expression_has_any_sanitizer(
+                                &applicable_rules,
+                                assignment_value,
+                            ) {
+                                log::debug!(
+                                    "[ASSIGNMENT_ANALYSIS] Assignment value '{}' contains sanitizer; not recording taint",
+                                    assignment_value
+                                );
+                                continue;
+                            }
+
                             log::debug!("[ASSIGNMENT_ANALYSIS] Assignment value '{}' matches source pattern '{}'", assignment_value, source_pattern);
                             flow_tracker.record_tainted_variable(
                                 var_name,
@@ -1030,42 +1180,46 @@ impl ScanningLogic {
             }
 
             // Check for taint propagation through operations
-            if let Some((target_var, dependent_vars)) = Self::detect_taint_propagation(&node_text) {
-                log::debug!(
-                    "[TAINT_PROPAGATION] Detected propagation: '{}' depends on {:?} in '{}'",
-                    target_var,
-                    dependent_vars,
-                    node_text
-                );
-                flow_tracker.record_taint_propagation(&target_var, &dependent_vars);
+            if !TaintExpressionUtils::expression_has_any_sanitizer(&applicable_rules, &node_text) {
+                if let Some((target_var, dependent_vars)) =
+                    Self::detect_taint_propagation(&node_text)
+                {
+                    log::debug!(
+                        "[TAINT_PROPAGATION] Detected propagation: '{}' depends on {:?} in '{}'",
+                        target_var,
+                        dependent_vars,
+                        node_text
+                    );
+                    flow_tracker.record_taint_propagation(&target_var, &dependent_vars);
 
-                // Check if any dependent variables are tainted and propagate to target
-                for dep_var in &dependent_vars {
-                    if let Some(taint_info) = flow_tracker
-                        .is_variable_tainted(dep_var, &func_name)
-                        .cloned()
-                    {
-                        log::debug!(
-                            "[TAINT_PROPAGATION] Propagating taint from '{}' to '{}' ({})",
-                            dep_var,
-                            target_var,
-                            taint_info.source_pattern
-                        );
+                    // Check if any dependent variables are tainted and propagate to target
+                    for dep_var in &dependent_vars {
+                        if let Some(taint_info) = flow_tracker
+                            .is_variable_tainted(dep_var, &func_name)
+                            .cloned()
+                        {
+                            log::debug!(
+                                "[TAINT_PROPAGATION] Propagating taint from '{}' to '{}' ({})",
+                                dep_var,
+                                target_var,
+                                taint_info.source_pattern
+                            );
 
-                        // Mark target variable as tainted (inheriting from the dependent variable)
-                        flow_tracker.record_tainted_variable(
-                            target_var.clone(),
-                            TaintVariableInfo {
-                                source_line: taint_info.source_line,
-                                source_pattern: taint_info.source_pattern.clone(),
-                                source_function: taint_info.source_function.clone(),
-                                assignment_code: format!(
-                                    "Propagated from {} via: {}",
-                                    dep_var, node_text
-                                ),
-                            },
-                        );
-                        break; // Only need one tainted dependency to taint the target
+                            // Mark target variable as tainted (inheriting from the dependent variable)
+                            flow_tracker.record_tainted_variable(
+                                target_var.clone(),
+                                TaintVariableInfo {
+                                    source_line: taint_info.source_line,
+                                    source_pattern: taint_info.source_pattern.clone(),
+                                    source_function: taint_info.source_function.clone(),
+                                    assignment_code: format!(
+                                        "Propagated from {} via: {}",
+                                        dep_var, node_text
+                                    ),
+                                },
+                            );
+                            break; // Only need one tainted dependency to taint the target
+                        }
                     }
                 }
             }
@@ -1086,11 +1240,62 @@ impl ScanningLogic {
                     line
                 );
                 // Extract ALL variables used in this sink (enhanced extraction)
-                let used_variables = CommonUtils::extract_all_variables(&node_text);
+                let mut used_variables = if language_support.name() == "php" {
+                    TaintExpressionUtils::extract_php_variables(&node_text)
+                } else {
+                    CommonUtils::extract_all_variables(&node_text)
+                };
+                used_variables.sort();
+                used_variables.dedup();
                 log::debug!(
                     "[SINK_ANALYSIS] Extracted variables from sink: {:?}",
                     used_variables
                 );
+
+                if !used_variables.is_empty() && Self::is_actionable_sink_node(node.kind()) {
+                    if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(&node_text)
+                    {
+                        if let Some(rule) = rule_deduplicator
+                            .get_rule_for_combination(&source_pattern, &sink_pattern)
+                        {
+                            if !TaintExpressionUtils::expression_has_sanitizer(rule, &node_text)
+                                && !flow_tracker
+                                    .is_flow_processed(line, &source_pattern, &sink_pattern)
+                            {
+                                flow_tracker
+                                    .mark_flow_processed(line, &source_pattern, &sink_pattern);
+
+                                let taint_source = crate::models::TaintSource {
+                                    file: filepath.to_string(),
+                                    line,
+                                    function: func_name.clone(),
+                                    variable: source_pattern.clone(),
+                                    operation: source_pattern.clone(),
+                                    code: node_text.clone(),
+                                    branch_id: None,
+                                };
+
+                                let taint_sink = crate::models::TaintSink {
+                                    file: filepath.to_string(),
+                                    line,
+                                    function: func_name.clone(),
+                                    variable: source_pattern.clone(),
+                                    operation: sink_pattern.clone(),
+                                    code: node_text.clone(),
+                                    branch_id: None,
+                                };
+
+                                findings.push(Self::create_taint_finding(
+                                    &taint_source,
+                                    &taint_sink,
+                                    rule,
+                                    tree,
+                                    source,
+                                ));
+                            }
+                        }
+                    }
+                }
 
                 // Check if ANY of these variables are tainted
                 for used_variable in used_variables.clone() {
@@ -1103,24 +1308,12 @@ impl ScanningLogic {
                             .get_rule_for_combination(&taint_info.source_pattern, &sink_pattern)
                         {
                             // Check if the sink expression contains sanitizers before creating finding
-                            if let Some(sanitizers) = &rule.sanitizers {
-                                let mut is_sanitized = false;
-                                for sanitizer in sanitizers {
-                                    if node_text.contains(sanitizer) {
-                                        log::debug!(
-                                            "[SANITIZER_CHECK] Found sanitizer '{}' in sink: '{}'",
-                                            sanitizer,
-                                            node_text
-                                        );
-                                        is_sanitized = true;
-                                        break;
-                                    }
-                                }
-
-                                if is_sanitized {
-                                    log::debug!("[SANITIZER_CHECK] Skipping finding due to sanitization: '{}'", node_text);
-                                    continue; // Skip this finding as it's sanitized
-                                }
+                            if TaintExpressionUtils::expression_has_sanitizer(rule, &node_text) {
+                                log::debug!(
+                                    "[SANITIZER_CHECK] Skipping finding due to sanitization: '{}'",
+                                    node_text
+                                );
+                                continue; // Skip this finding as it's sanitized
                             }
 
                             // Ensure we haven't already processed this exact flow
@@ -1224,6 +1417,22 @@ impl ScanningLogic {
                         return Some((left_side.to_string(), dependent_vars));
                     }
                 }
+
+                let target_var = TaintExpressionUtils::normalize_variable(left_side);
+                let mut dependent_vars = CommonUtils::extract_all_variables(right_side);
+                dependent_vars.extend(TaintExpressionUtils::extract_php_variables(right_side));
+                dependent_vars.retain(|var| var != &target_var);
+                dependent_vars.sort();
+                dependent_vars.dedup();
+
+                if !target_var.is_empty() && !dependent_vars.is_empty() {
+                    log::debug!(
+                        "[PROPAGATION_CHECK] Assignment propagation detected: '{}' depends on {:?}",
+                        target_var,
+                        dependent_vars
+                    );
+                    return Some((target_var, dependent_vars));
+                }
             }
         }
 
@@ -1263,6 +1472,20 @@ impl ScanningLogic {
 
         log::debug!("[PROPAGATION_CHECK] No propagation detected");
         None
+    }
+
+    fn extract_taint_assignment_target(node_text: &str) -> Option<String> {
+        let eq_pos = node_text.find('=')?;
+        let left_side = node_text[..eq_pos].trim();
+        let variable = TaintExpressionUtils::normalize_variable(left_side);
+        (!variable.is_empty()).then_some(variable)
+    }
+
+    fn is_actionable_sink_node(node_kind: &str) -> bool {
+        node_kind == "call"
+            || node_kind == "expression_statement"
+            || node_kind.contains("call_expression")
+            || node_kind.contains("invocation")
     }
 
     /// Extract direct variable from simple expressions
@@ -1602,6 +1825,14 @@ impl VulnerabilityScanner {
     }
 
     fn discover_files(&self, root_dir: &str) -> Result<Vec<PathBuf>> {
+        self.discover_files_with_options(root_dir, false)
+    }
+
+    fn discover_files_with_options(
+        &self,
+        root_dir: &str,
+        include_test_fixtures: bool,
+    ) -> Result<Vec<PathBuf>> {
         let mut files = Vec::new();
         // Get extension once using a fresh parser (cheap, happens only once)
         let parser = LanguageParser::new(&self.language)?;
@@ -1613,7 +1844,10 @@ impl VulnerabilityScanner {
             .filter_entry(|e| {
                 if e.file_type().is_dir() {
                     if let Some(name) = e.file_name().to_str() {
-                        return !SKIP_DIRS.contains(&name);
+                        return !crate::scanner::utils::should_skip_dir(
+                            name,
+                            include_test_fixtures,
+                        );
                     }
                 }
                 true
@@ -1696,7 +1930,22 @@ impl VulnerabilityScanner {
         language_name: &str,
         show_progress: bool,
     ) -> Result<Vec<Finding>> {
-        let files = self.discover_files(root_dir)?;
+        self.find_vulnerabilities_parallel_with_options(
+            root_dir,
+            language_name,
+            show_progress,
+            false,
+        )
+    }
+
+    pub fn find_vulnerabilities_parallel_with_options(
+        &self,
+        root_dir: &str,
+        language_name: &str,
+        show_progress: bool,
+        include_test_fixtures: bool,
+    ) -> Result<Vec<Finding>> {
+        let files = self.discover_files_with_options(root_dir, include_test_fixtures)?;
         if files.is_empty() {
             println!("No {} files found in {}", language_name, root_dir);
             return Ok(Vec::new());
@@ -1801,7 +2050,7 @@ impl VulnerabilityScanner {
             .num_threads(1)
             .build_global()
             .ok();
-        self.find_vulnerabilities_parallel(root_dir, language_name, true)
+        self.find_vulnerabilities_parallel_with_options(root_dir, language_name, true, false)
     }
 
     pub fn find_vulnerabilities_unified(
@@ -1810,12 +2059,13 @@ impl VulnerabilityScanner {
         language_name: &str,
         show_progress: bool,
     ) -> Result<Vec<Finding>> {
-        self.find_vulnerabilities_unified_with_filters(
+        self.find_vulnerabilities_unified_with_filters_and_options(
             root_dir,
             language_name,
             show_progress,
             None,
             None,
+            false,
         )
     }
 
@@ -1827,14 +2077,34 @@ impl VulnerabilityScanner {
         code_type_filter: Option<&str>,
         language_filter: Option<&str>,
     ) -> Result<Vec<Finding>> {
+        self.find_vulnerabilities_unified_with_filters_and_options(
+            root_dir,
+            language_name,
+            show_progress,
+            code_type_filter,
+            language_filter,
+            false,
+        )
+    }
+
+    pub fn find_vulnerabilities_unified_with_filters_and_options(
+        &self,
+        root_dir: &str,
+        language_name: &str,
+        show_progress: bool,
+        code_type_filter: Option<&str>,
+        language_filter: Option<&str>,
+        include_test_fixtures: bool,
+    ) -> Result<Vec<Finding>> {
         let files_by_language = if self.language.is_empty() {
-            crate::scanner::utils::discover_files_by_language_with_progress(
+            crate::scanner::utils::discover_files_by_language_with_progress_and_options(
                 root_dir,
                 true,
                 show_progress,
+                include_test_fixtures,
             )?
         } else {
-            let files = self.discover_files(root_dir)?;
+            let files = self.discover_files_with_options(root_dir, include_test_fixtures)?;
             let mut result = std::collections::BTreeMap::new();
             if !files.is_empty() {
                 result.insert(self.language.clone(), files);
@@ -2183,31 +2453,33 @@ impl ScanningLogic {
                 }
 
                 // Check for taint propagation through operations
-                if let Some((target_var, dependent_vars)) =
-                    ScanningLogic::detect_taint_propagation(&node_text)
-                {
-                    flow_tracker.record_taint_propagation(&target_var, &dependent_vars);
+                if !TaintExpressionUtils::expression_has_any_sanitizer(taint_rules, &node_text) {
+                    if let Some((target_var, dependent_vars)) =
+                        ScanningLogic::detect_taint_propagation(&node_text)
+                    {
+                        flow_tracker.record_taint_propagation(&target_var, &dependent_vars);
 
-                    // Check if any dependent variables are tainted and propagate to target
-                    for dep_var in &dependent_vars {
-                        if let Some(taint_info) = flow_tracker
-                            .is_variable_tainted(dep_var, &func_name)
-                            .cloned()
-                        {
-                            // Mark target variable as tainted (inheriting from the dependent variable)
-                            flow_tracker.record_tainted_variable(
-                                target_var.to_string(),
-                                TaintVariableInfo {
-                                    source_line: taint_info.source_line,
-                                    source_pattern: taint_info.source_pattern.clone(),
-                                    source_function: taint_info.source_function.clone(),
-                                    assignment_code: format!(
-                                        "Propagated from {} via: {}",
-                                        dep_var, node_text
-                                    ),
-                                },
-                            );
-                            break; // Only need one tainted dependency to taint the target
+                        // Check if any dependent variables are tainted and propagate to target
+                        for dep_var in &dependent_vars {
+                            if let Some(taint_info) = flow_tracker
+                                .is_variable_tainted(dep_var, &func_name)
+                                .cloned()
+                            {
+                                // Mark target variable as tainted (inheriting from the dependent variable)
+                                flow_tracker.record_tainted_variable(
+                                    target_var.to_string(),
+                                    TaintVariableInfo {
+                                        source_line: taint_info.source_line,
+                                        source_pattern: taint_info.source_pattern.clone(),
+                                        source_function: taint_info.source_function.clone(),
+                                        assignment_code: format!(
+                                            "Propagated from {} via: {}",
+                                            dep_var, node_text
+                                        ),
+                                    },
+                                );
+                                break; // Only need one tainted dependency to taint the target
+                            }
                         }
                     }
                 }
@@ -2980,6 +3252,10 @@ enum VariableSource {
         source_expression: String,
         line: usize,
     },
+    KnownSafe {
+        reason: String,
+        line: usize,
+    },
     FunctionParameter {
         parameter_index: usize,
     },
@@ -2998,6 +3274,13 @@ enum AnalysisResult {
     DefinitelyTainted { flow: VerifiedTaintFlow },
     DefinitelySafe,
     Unknown { reason: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ValueSourceClassification {
+    Safe(String),
+    Tainted(String),
+    Unknown,
 }
 
 /// Multi-file taint analysis infrastructure for cross-file data flow tracking
@@ -4750,6 +5033,15 @@ impl DataFlowTracer {
         );
 
         match variable_source {
+            VariableSource::KnownSafe { reason, line } => {
+                log::debug!(
+                    "[DATA_FLOW_TRACER] Variable proven safe at line {}: {}",
+                    line,
+                    reason
+                );
+                AnalysisResult::DefinitelySafe
+            }
+
             VariableSource::DirectTaintSource { pattern, line } => {
                 log::debug!(
                     "[DATA_FLOW_TRACER] Direct taint source found: {} at line {}",
@@ -4814,9 +5106,10 @@ impl DataFlowTracer {
                     parameter_index
                 );
 
-                // Check if the parameter name matches any taint source patterns
-                if let Some(source_pattern) =
-                    rule_deduplicator.matches_source_pattern(sink_variable)
+                // Only treat parameters as sources when the parameter shape is
+                // explicitly user controlled; broad names like `token` are too noisy.
+                if let ValueSourceClassification::Tainted(source_pattern) =
+                    self.classify_value_source(sink_variable, rule_deduplicator)
                 {
                     log::debug!(
                         "[DATA_FLOW_TRACER] Function parameter '{}' matches source pattern '{}'",
@@ -4976,12 +5269,38 @@ impl DataFlowTracer {
         for (line_num, line) in source_text.lines().enumerate() {
             let line = line.trim();
             if line.starts_with(&format!("{} =", variable_name)) {
-                let rhs = line.split('=').nth(1).unwrap_or("").trim();
+                let rhs = TaintExpressionUtils::strip_inline_comment(
+                    line.split('=').nth(1).unwrap_or("").trim(),
+                );
                 log::debug!(
                     "[COMPUTE_VARIABLE_SOURCE] Found assignment: {} = {}",
                     variable_name,
                     rhs
                 );
+
+                match self.classify_value_source(rhs, rule_deduplicator) {
+                    ValueSourceClassification::Safe(reason) => {
+                        log::debug!(
+                            "[COMPUTE_VARIABLE_SOURCE] Proven-safe assignment: {}",
+                            reason
+                        );
+                        return VariableSource::KnownSafe {
+                            reason,
+                            line: line_num + 1,
+                        };
+                    }
+                    ValueSourceClassification::Tainted(source_pattern) => {
+                        log::debug!(
+                            "[COMPUTE_VARIABLE_SOURCE] Direct taint source: '{}'",
+                            source_pattern
+                        );
+                        return VariableSource::DirectTaintSource {
+                            pattern: source_pattern,
+                            line: line_num + 1,
+                        };
+                    }
+                    ValueSourceClassification::Unknown => {}
+                }
 
                 // Check if RHS is a direct taint source
                 if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(rhs) {
@@ -5125,6 +5444,175 @@ impl DataFlowTracer {
         }
     }
 
+    fn classify_value_source(
+        &self,
+        expression: &str,
+        rule_deduplicator: &TaintRuleDeduplicator,
+    ) -> ValueSourceClassification {
+        let expr = expression.trim();
+
+        if expr.is_empty() {
+            return ValueSourceClassification::Unknown;
+        }
+
+        if expr.starts_with('#') || expr.starts_with("\"\"\"") || expr.starts_with("'''") {
+            return ValueSourceClassification::Safe("comment or docstring".to_string());
+        }
+
+        if self.is_safe_literal_expression(expr) {
+            return ValueSourceClassification::Safe("literal expression".to_string());
+        }
+
+        if expr.contains("setdefault(") {
+            return ValueSourceClassification::Safe(
+                "environment default/configuration write".to_string(),
+            );
+        }
+
+        if Self::is_safe_static_file_read(expr) {
+            return ValueSourceClassification::Safe("static config/template file read".to_string());
+        }
+
+        if let Some(env_key) = Self::extract_env_key(expr) {
+            if Self::is_user_controlled_env_key(&env_key) {
+                let source_pattern = rule_deduplicator
+                    .matches_source_pattern(expr)
+                    .unwrap_or_else(|| format!("env:{}", env_key));
+                return ValueSourceClassification::Tainted(source_pattern);
+            }
+
+            if Self::is_config_env_key(&env_key) {
+                return ValueSourceClassification::Safe(format!(
+                    "static configuration environment key {}",
+                    env_key
+                ));
+            }
+        }
+
+        let lower_expr = expr.to_ascii_lowercase();
+        if lower_expr.contains("input(")
+            || lower_expr.contains("raw_input(")
+            || lower_expr.contains("sys.argv")
+            || lower_expr.contains("request.")
+            || lower_expr.contains("flask.request")
+        {
+            if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(expr) {
+                return ValueSourceClassification::Tainted(source_pattern);
+            }
+        }
+
+        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(expr) {
+            return ValueSourceClassification::Tainted(source_pattern);
+        }
+
+        ValueSourceClassification::Unknown
+    }
+
+    fn is_safe_literal_expression(&self, expression: &str) -> bool {
+        let expr = expression.trim();
+
+        if Self::is_string_literal(expr)
+            || matches!(expr, "True" | "False" | "None" | "true" | "false" | "null")
+            || expr.parse::<f64>().is_ok()
+        {
+            return true;
+        }
+
+        let literal_concat = expr
+            .split('+')
+            .map(str::trim)
+            .filter(|part| !part.is_empty())
+            .all(Self::is_string_literal);
+
+        literal_concat && expr.contains('+')
+    }
+
+    fn is_string_literal(expression: &str) -> bool {
+        let expr = expression.trim();
+        (expr.len() >= 2 && expr.starts_with('"') && expr.ends_with('"'))
+            || (expr.len() >= 2 && expr.starts_with('\'') && expr.ends_with('\''))
+    }
+
+    fn is_safe_static_file_read(expression: &str) -> bool {
+        if !expression.contains("open(") {
+            return false;
+        }
+
+        let Some(start) = expression.find("open(") else {
+            return false;
+        };
+        let after = expression[start + "open(".len()..].trim_start();
+        let Some(quote) = after.chars().next() else {
+            return false;
+        };
+        if quote != '"' && quote != '\'' {
+            return false;
+        }
+
+        let rest = &after[quote.len_utf8()..];
+        let Some(end) = rest.find(quote) else {
+            return false;
+        };
+        let filename = rest[..end].to_ascii_lowercase();
+
+        filename.contains("config")
+            || filename.contains("template")
+            || filename.ends_with(".json")
+            || filename.ends_with(".yaml")
+            || filename.ends_with(".yml")
+            || filename.ends_with(".toml")
+    }
+
+    fn extract_env_key(expression: &str) -> Option<String> {
+        let patterns = [
+            "os.environ.get(",
+            "os.getenv(",
+            "os.environ.setdefault(",
+            "os.environ[",
+        ];
+
+        for pattern in patterns {
+            if let Some(start) = expression.find(pattern) {
+                let after = &expression[start + pattern.len()..];
+                let after = after.trim_start();
+                let quote = after.chars().next()?;
+                if quote != '"' && quote != '\'' {
+                    return None;
+                }
+                let rest = &after[quote.len_utf8()..];
+                if let Some(end) = rest.find(quote) {
+                    return Some(rest[..end].to_ascii_uppercase());
+                }
+            }
+        }
+
+        None
+    }
+
+    fn is_user_controlled_env_key(key: &str) -> bool {
+        let key = key.to_ascii_uppercase();
+        key == "USER_COMMAND"
+            || key == "USER_INPUT_FILE"
+            || key == "REQUEST_DATA"
+            || key.starts_with("REQUEST_")
+            || key.starts_with("USER_INPUT")
+            || key.ends_with("_INPUT")
+            || key.ends_with("_COMMAND")
+            || key.ends_with("_PAYLOAD")
+    }
+
+    fn is_config_env_key(key: &str) -> bool {
+        let key = key.to_ascii_uppercase();
+        key.starts_with("APP_")
+            || key.starts_with("DJANGO_")
+            || key.starts_with("FLASK_")
+            || key.ends_with("_MODE")
+            || key.ends_with("_VERSION")
+            || key == "DEBUG"
+            || key == "LOG_LEVEL"
+            || key == "SECRET_KEY"
+    }
+
     fn trace_local_assignment_taint(
         &mut self,
         file_path: &str,
@@ -5142,6 +5630,47 @@ impl DataFlowTracer {
             file_path,
             function_name
         );
+
+        match self.classify_value_source(source_expression, rule_deduplicator) {
+            ValueSourceClassification::Safe(reason) => {
+                log::debug!("[TRACE_LOCAL] Proven-safe expression: {}", reason);
+                return AnalysisResult::DefinitelySafe;
+            }
+            ValueSourceClassification::Tainted(source_pattern) => {
+                log::debug!(
+                    "[TRACE_LOCAL] Classified direct taint source: '{}'",
+                    source_pattern
+                );
+
+                let flow = VerifiedTaintFlow {
+                    source_file: file_path.to_string(),
+                    source_function: function_name.to_string(),
+                    source_pattern: source_pattern.clone(),
+                    source_line: assignment_line,
+
+                    sink_file: file_path.to_string(),
+                    sink_function: function_name.to_string(),
+                    sink_pattern: sink_pattern.to_string(),
+                    sink_line,
+                    sink_variable: sink_variable.to_string(),
+
+                    call_chain: Vec::new(),
+                    data_flow_evidence: DataFlowEvidence {
+                        variable_assignments: vec![(
+                            sink_variable.to_string(),
+                            source_expression.to_string(),
+                            assignment_line,
+                        )],
+                        function_calls: Vec::new(),
+                        return_statements: Vec::new(),
+                    },
+                };
+
+                self.verified_flows.push(flow.clone());
+                return AnalysisResult::DefinitelyTainted { flow };
+            }
+            ValueSourceClassification::Unknown => {}
+        }
 
         // Check if the source expression is a direct taint source
         if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(source_expression) {
@@ -5184,17 +5713,36 @@ impl DataFlowTracer {
             log::debug!("[TRACE_LOCAL] Source is function call: '{}'", function_name);
 
             // Find the source file for this function
-            if let Some(source_file) = self.find_function_source_file(&function_name, file_path) {
+            let resolved_function = if let Some(source_file) =
+                self.find_function_source_file(&function_name, file_path)
+            {
+                Some((function_name.clone(), source_file))
+            } else if let Some(method_name) = function_name.rsplit('.').next() {
+                if method_name != function_name {
+                    self.find_function_source_file(method_name, file_path)
+                        .or_else(|| {
+                            self.file_contains_function(file_path, method_name)
+                                .then(|| file_path.to_string())
+                        })
+                        .map(|source_file| (method_name.to_string(), source_file))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            if let Some((resolved_function_name, source_file)) = resolved_function {
                 log::debug!(
                     "[TRACE_LOCAL] Found function '{}' in '{}'",
-                    function_name,
+                    resolved_function_name,
                     source_file
                 );
 
                 // Analyze the function to see if it returns tainted data
                 match self.analyze_function_taint_behavior(
                     &source_file,
-                    &function_name,
+                    &resolved_function_name,
                     rule_deduplicator,
                 ) {
                     AnalysisResult::DefinitelyTainted { flow } => {
@@ -5214,7 +5762,7 @@ impl DataFlowTracer {
                             sink_variable: sink_variable.to_string(),
 
                             call_chain: vec![FunctionCallNode {
-                                function_name: function_name.clone(),
+                                function_name: resolved_function_name.clone(),
                                 file_path: source_file,
                                 line: assignment_line,
                                 arguments: Vec::new(),
@@ -5259,10 +5807,63 @@ impl DataFlowTracer {
             return AnalysisResult::DefinitelySafe;
         }
 
+        if CommonUtils::is_valid_variable_name(source_expression)
+            && source_expression != sink_variable
+            && !CommonUtils::is_keyword_or_builtin(source_expression)
+        {
+            log::debug!(
+                "[TRACE_LOCAL] Source is variable alias '{}', tracing dependency",
+                source_expression
+            );
+            return self.analyze_sink_variable(
+                file_path,
+                function_name,
+                source_expression,
+                sink_pattern,
+                sink_line,
+                rule_deduplicator,
+            );
+        }
+
         // If it's an f-string or complex expression, we need more analysis
         if source_expression.starts_with("f\"") || source_expression.contains('{') {
             log::debug!("[TRACE_LOCAL] Complex expression - requires variable dependency analysis");
-            // TODO: Implement variable dependency tracking for complex expressions
+            for variable in CommonUtils::extract_all_variables(source_expression) {
+                if variable == sink_variable
+                    || CommonUtils::is_keyword_or_builtin(&variable)
+                    || variable == "f"
+                {
+                    continue;
+                }
+
+                match self.analyze_sink_variable(
+                    file_path,
+                    function_name,
+                    &variable,
+                    sink_pattern,
+                    sink_line,
+                    rule_deduplicator,
+                ) {
+                    AnalysisResult::DefinitelyTainted { flow } => {
+                        let derived_flow = VerifiedTaintFlow {
+                            source_file: flow.source_file,
+                            source_function: flow.source_function,
+                            source_pattern: flow.source_pattern,
+                            source_line: flow.source_line,
+                            sink_file: file_path.to_string(),
+                            sink_function: function_name.to_string(),
+                            sink_pattern: sink_pattern.to_string(),
+                            sink_line,
+                            sink_variable: sink_variable.to_string(),
+                            call_chain: flow.call_chain,
+                            data_flow_evidence: flow.data_flow_evidence,
+                        };
+                        self.verified_flows.push(derived_flow.clone());
+                        return AnalysisResult::DefinitelyTainted { flow: derived_flow };
+                    }
+                    AnalysisResult::DefinitelySafe | AnalysisResult::Unknown { .. } => {}
+                }
+            }
         }
 
         log::debug!("[TRACE_LOCAL] Could not determine taint status of assignment");
@@ -5394,8 +5995,74 @@ impl DataFlowTracer {
         if let Some(function_body) = self.extract_function_body(&source_text, function_name) {
             log::debug!("[ANALYZE_FUNCTION] Function body found, analyzing...");
 
+            let mut tainted_locals: std::collections::BTreeMap<String, VerifiedTaintFlow> =
+                std::collections::BTreeMap::new();
+            let mut ambient_taint: Option<VerifiedTaintFlow> = None;
+
             for (line_num, line) in function_body.lines().enumerate() {
                 let line = line.trim();
+
+                if ambient_taint.is_none() {
+                    if let ValueSourceClassification::Tainted(source_pattern) =
+                        self.classify_value_source(line, rule_deduplicator)
+                    {
+                        ambient_taint = Some(VerifiedTaintFlow {
+                            source_file: file_path.to_string(),
+                            source_function: function_name.to_string(),
+                            source_line: line_num + 1,
+                            source_pattern,
+                            sink_file: file_path.to_string(),
+                            sink_function: function_name.to_string(),
+                            sink_line: line_num + 1,
+                            sink_variable: "return_value".to_string(),
+                            sink_pattern: "function_return".to_string(),
+                            call_chain: Vec::new(),
+                            data_flow_evidence: DataFlowEvidence {
+                                variable_assignments: Vec::new(),
+                                function_calls: Vec::new(),
+                                return_statements: Vec::new(),
+                            },
+                        });
+                    }
+                }
+
+                if CommonUtils::is_valid_assignment_text(line) {
+                    if let Some(eq_pos) = line.find('=') {
+                        let lhs = line[..eq_pos].trim();
+                        let rhs =
+                            TaintExpressionUtils::strip_inline_comment(line[eq_pos + 1..].trim());
+                        if CommonUtils::is_valid_variable_name(lhs) {
+                            match self.trace_local_assignment_taint(
+                                file_path,
+                                function_name,
+                                rhs,
+                                line_num + 1,
+                                "function_return",
+                                line_num + 1,
+                                lhs,
+                                rule_deduplicator,
+                            ) {
+                                AnalysisResult::DefinitelyTainted { flow } => {
+                                    tainted_locals.insert(lhs.to_string(), flow);
+                                }
+                                AnalysisResult::DefinitelySafe => {
+                                    tainted_locals.remove(lhs);
+                                }
+                                AnalysisResult::Unknown { .. } => {
+                                    for (tainted_var, flow) in &tainted_locals {
+                                        if TaintExpressionUtils::expression_references_variable(
+                                            rhs,
+                                            tainted_var,
+                                        ) {
+                                            tainted_locals.insert(lhs.to_string(), flow.clone());
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 if line.starts_with("return ") {
                     let return_expr = line.strip_prefix("return ").unwrap_or("").trim();
@@ -5403,6 +6070,65 @@ impl DataFlowTracer {
                         "[ANALYZE_FUNCTION] Found return statement: \"{}\"",
                         return_expr
                     );
+
+                    match self.classify_value_source(return_expr, rule_deduplicator) {
+                        ValueSourceClassification::Safe(reason) => {
+                            log::debug!(
+                                "[ANALYZE_FUNCTION] Function return is proven safe: {}",
+                                reason
+                            );
+                            continue;
+                        }
+                        ValueSourceClassification::Tainted(source_pattern) => {
+                            log::debug!(
+                                "[ANALYZE_FUNCTION] Function returns direct taint source: \"{}\"",
+                                source_pattern
+                            );
+
+                            let flow = VerifiedTaintFlow {
+                                source_file: file_path.to_string(),
+                                source_function: function_name.to_string(),
+                                source_line: line_num + 1,
+                                source_pattern: source_pattern.clone(),
+                                sink_file: file_path.to_string(),
+                                sink_function: function_name.to_string(),
+                                sink_line: line_num + 1,
+                                sink_variable: "return_value".to_string(),
+                                sink_pattern: "function_return".to_string(),
+                                call_chain: Vec::new(),
+                                data_flow_evidence: DataFlowEvidence {
+                                    variable_assignments: Vec::new(),
+                                    function_calls: Vec::new(),
+                                    return_statements: vec![(
+                                        return_expr.to_string(),
+                                        line_num + 1,
+                                    )],
+                                },
+                            };
+                            return AnalysisResult::DefinitelyTainted { flow };
+                        }
+                        ValueSourceClassification::Unknown => {}
+                    }
+
+                    for (var_name, flow) in &tainted_locals {
+                        if TaintExpressionUtils::expression_references_variable(
+                            return_expr,
+                            var_name,
+                        ) {
+                            log::debug!(
+                                "[ANALYZE_FUNCTION] Return expression references tainted local '{}'",
+                                var_name
+                            );
+                            return AnalysisResult::DefinitelyTainted { flow: flow.clone() };
+                        }
+                    }
+
+                    if let Some(flow) = ambient_taint.clone() {
+                        log::debug!(
+                            "[ANALYZE_FUNCTION] Return expression follows earlier source access"
+                        );
+                        return AnalysisResult::DefinitelyTainted { flow };
+                    }
 
                     // Check if return expression is a direct taint source
                     if let Some(source_pattern) =

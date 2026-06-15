@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use sighthound::scanner::core::{print_findings_csv, print_findings_json, print_findings_text};
 use sighthound::{
     run_auto_detection_scan, run_explicit_scan, run_taint_analysis,
@@ -23,12 +23,15 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Check if root_dir is provided (required for actual scanning)
-    let root_dir = cli.root_dir.as_ref().ok_or_else(|| {
-        anyhow::anyhow!(
-            "Root directory is required for scanning. Use --help for usage information."
-        )
-    })?;
+    // Show help when invoked without a scan target.
+    let root_dir = match cli.root_dir.as_ref() {
+        Some(root_dir) => root_dir,
+        None => {
+            Cli::command().print_help()?;
+            println!();
+            return Ok(());
+        }
+    };
 
     // Initialize logger (respect RUST_LOG or --verbose flag)
     env_logger::Builder::from_env(
@@ -97,6 +100,7 @@ fn main() -> Result<()> {
 
         // Combine findings
         simple_findings.append(&mut taint_findings);
+        deduplicate_findings(&mut simple_findings);
         simple_findings
     };
 
@@ -110,4 +114,17 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn deduplicate_findings(findings: &mut Vec<sighthound::Finding>) {
+    let mut seen = std::collections::BTreeSet::new();
+    findings.retain(|finding| {
+        seen.insert((
+            finding.file.clone(),
+            finding.line,
+            finding.end_line,
+            finding.finding_type.clone(),
+            finding.snippet.clone(),
+        ))
+    });
 }

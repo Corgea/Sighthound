@@ -1,0 +1,31 @@
+(
+    rules: [
+        (
+            id: Some("strictness-accuracy-taint"),
+            name: Some("Accuracy Taint (strictness fixtures)"),
+            mode: "taint",
+            sources: Some([
+                "input(",
+                "os.environ.get",
+                "os.environ",
+                "sys.argv",
+                "os.getenv",
+                "open(",
+            ]),
+            sinks: Some([
+                "os.system",
+                "eval(",
+                "exec(",
+                "compile(",
+                "subprocess.call",
+                "subprocess.run",
+            ]),
+            finding_type: Some("Command Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            file_types: Some((
+                extensions: Some([".py"])
+            )),
+        ),
+    ]
+)

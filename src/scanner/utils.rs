@@ -21,34 +21,49 @@ pub fn matches_glob_pattern(pattern: &str, file_path: &str) -> bool {
 }
 
 pub fn is_git_ignored(path: &Path) -> bool {
+    let target_path = normalize_for_ignore_check(path);
     {
         // Try to get from cache first
         let cache = GIT_IGNORE_CACHE.lock().unwrap();
-        if let Some(cached) = cache.get(path) {
+        if let Some(cached) = cache.get(&target_path) {
             return *cached;
         }
     }
 
     // Compute the result
-    let result = if !is_within_git_repo(path) {
+    let result = if !is_within_git_repo(&target_path) {
         false
-    } else if let Some(repo_root) = find_git_repo_root(path) {
+    } else if let Some(repo_root) = find_git_repo_root(&target_path) {
         let mut walker = WalkBuilder::new(&repo_root)
             .git_ignore(true)
             .git_global(false)
             .git_exclude(false)
             .build();
 
-        !walker.any(|entry| entry.map(|e| e.path() == path).unwrap_or(false))
+        !walker.any(|entry| {
+            entry
+                .map(|e| normalize_for_ignore_check(e.path()) == target_path)
+                .unwrap_or(false)
+        })
     } else {
         false
     };
 
     // Store the result in the cache
     let mut cache = GIT_IGNORE_CACHE.lock().unwrap();
-    cache.insert(path.to_path_buf(), result);
+    cache.insert(target_path, result);
 
     result
+}
+
+fn normalize_for_ignore_check(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else if let Ok(cwd) = std::env::current_dir() {
+        cwd.join(path)
+    } else {
+        path.to_path_buf()
+    }
 }
 
 /// Check if a path is within a Git repository
@@ -206,7 +221,7 @@ pub fn discover_files_by_language(
     root_dir: &str,
     parallel: bool,
 ) -> Result<BTreeMap<String, Vec<PathBuf>>> {
-    discover_files_by_language_with_progress(root_dir, parallel, true)
+    discover_files_by_language_with_progress_and_options(root_dir, parallel, true, false)
 }
 
 pub fn discover_files_by_language_with_progress(
@@ -214,12 +229,31 @@ pub fn discover_files_by_language_with_progress(
     parallel: bool,
     show_progress: bool,
 ) -> Result<BTreeMap<String, Vec<PathBuf>>> {
+    discover_files_by_language_with_progress_and_options(root_dir, parallel, show_progress, false)
+}
+
+pub fn discover_files_by_language_with_progress_and_options(
+    root_dir: &str,
+    parallel: bool,
+    show_progress: bool,
+    include_test_fixtures: bool,
+) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     let estimated_languages = crate::config::ScanDefaults::ESTIMATED_LANGUAGES;
 
     if parallel {
-        discover_files_parallel(root_dir, estimated_languages, show_progress)
+        discover_files_parallel(
+            root_dir,
+            estimated_languages,
+            show_progress,
+            include_test_fixtures,
+        )
     } else {
-        discover_files_sequential(root_dir, estimated_languages, show_progress)
+        discover_files_sequential(
+            root_dir,
+            estimated_languages,
+            show_progress,
+            include_test_fixtures,
+        )
     }
 }
 
@@ -228,6 +262,7 @@ fn discover_files_parallel(
     root_dir: &str,
     estimated_languages: usize,
     _show_progress: bool,
+    include_test_fixtures: bool,
 ) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     let all_paths: Vec<PathBuf> = WalkDir::new(root_dir)
         .follow_links(false)
@@ -235,7 +270,7 @@ fn discover_files_parallel(
         .filter_entry(|e| {
             if e.file_type().is_dir() {
                 if let Some(name) = e.file_name().to_str() {
-                    return !SKIP_DIRS.contains(&name);
+                    return !should_skip_dir(name, include_test_fixtures);
                 }
             }
             true
@@ -286,6 +321,7 @@ fn discover_files_sequential(
     root_dir: &str,
     _estimated_languages: usize,
     _show_progress: bool,
+    include_test_fixtures: bool,
 ) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     let mut files_by_language = BTreeMap::new();
 
@@ -295,7 +331,7 @@ fn discover_files_sequential(
         .filter_entry(|e| {
             if e.file_type().is_dir() {
                 if let Some(name) = e.file_name().to_str() {
-                    return !SKIP_DIRS.contains(&name);
+                    return !should_skip_dir(name, include_test_fixtures);
                 }
             }
             true
@@ -341,7 +377,7 @@ pub fn discover_files_by_language_parallel_with_progress(
     root_dir: &str,
     show_progress: bool,
 ) -> Result<BTreeMap<String, Vec<PathBuf>>> {
-    discover_files_by_language_with_progress(root_dir, true, show_progress)
+    discover_files_by_language_with_progress_and_options(root_dir, true, show_progress, false)
 }
 
 /// Sequential file discovery with progress control
@@ -349,7 +385,14 @@ pub fn discover_files_by_language_sequential_with_progress(
     root_dir: &str,
     show_progress: bool,
 ) -> Result<BTreeMap<String, Vec<PathBuf>>> {
-    discover_files_by_language_with_progress(root_dir, false, show_progress)
+    discover_files_by_language_with_progress_and_options(root_dir, false, show_progress, false)
+}
+
+pub fn should_skip_dir(name: &str, include_test_fixtures: bool) -> bool {
+    if include_test_fixtures && (name == "tests" || name == "test") {
+        return false;
+    }
+    SKIP_DIRS.contains(&name)
 }
 
 // =========================================================================

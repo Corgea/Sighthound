@@ -25,11 +25,13 @@ impl ScanContext {
         let discovery_start = std::time::Instant::now();
 
         let parallel = !cli.single_threaded;
-        let files_by_language = crate::scanner::utils::discover_files_by_language_with_progress(
-            root_dir,
-            parallel,
-            show_progress,
-        )?;
+        let files_by_language =
+            crate::scanner::utils::discover_files_by_language_with_progress_and_options(
+                root_dir,
+                parallel,
+                show_progress,
+                cli.include_test_fixtures,
+            )?;
         let discovery_time = discovery_start.elapsed();
 
         if files_by_language.is_empty() {
@@ -225,15 +227,21 @@ pub fn run_explicit_scan(cli: &Cli, root_dir: &str, show_progress: bool) -> Resu
 
     // Use the new filtering method if filters are specified
     if cli.code_type.is_some() || cli.language_filter.is_some() {
-        scanner.find_vulnerabilities_unified_with_filters(
+        scanner.find_vulnerabilities_unified_with_filters_and_options(
             root_dir,
             language,
             show_progress,
             cli.code_type.as_deref(),
             cli.language_filter.as_deref(),
+            cli.include_test_fixtures,
         )
     } else {
-        scanner.find_vulnerabilities_parallel(root_dir, language, show_progress)
+        scanner.find_vulnerabilities_parallel_with_options(
+            root_dir,
+            language,
+            show_progress,
+            cli.include_test_fixtures,
+        )
     }
 }
 
@@ -263,9 +271,19 @@ pub fn run_auto_detection_scan(
 
     // Rediscover files by language for actual processing (context only used for validation)
     let files_by_language = if cli.single_threaded {
-        crate::scanner::utils::discover_files_by_language_sequential_with_progress(root_dir, false)?
+        crate::scanner::utils::discover_files_by_language_with_progress_and_options(
+            root_dir,
+            false,
+            false,
+            cli.include_test_fixtures,
+        )?
     } else {
-        crate::scanner::utils::discover_files_by_language_parallel_with_progress(root_dir, false)?
+        crate::scanner::utils::discover_files_by_language_with_progress_and_options(
+            root_dir,
+            true,
+            false,
+            cli.include_test_fixtures,
+        )?
     };
 
     let total_findings = Arc::new(AtomicUsize::new(0));
@@ -361,15 +379,21 @@ pub fn run_auto_detection_scan(
                     .expect("scanner");
 
             let findings_result = if cli.code_type.is_some() || cli.language_filter.is_some() {
-                scanner.find_vulnerabilities_unified_with_filters(
+                scanner.find_vulnerabilities_unified_with_filters_and_options(
                     root_dir,
                     &language,
                     false, // Never show progress for individual languages in auto-detection
                     cli.code_type.as_deref(),
                     cli.language_filter.as_deref(),
+                    cli.include_test_fixtures,
                 )
             } else {
-                scanner.find_vulnerabilities_parallel(root_dir, &language, false)
+                scanner.find_vulnerabilities_parallel_with_options(
+                    root_dir,
+                    &language,
+                    false,
+                    cli.include_test_fixtures,
+                )
             };
 
             match findings_result {
@@ -457,15 +481,23 @@ pub fn run_taint_analysis_with_verbosity(
     };
 
     let all_findings = if cli.code_type.is_some() || cli.language_filter.is_some() {
-        scanner.find_vulnerabilities_unified_with_filters(
+        scanner.find_vulnerabilities_unified_with_filters_and_options(
             root_dir,
             language,
             report,
             cli.code_type.as_deref(),
             cli.language_filter.as_deref(),
+            cli.include_test_fixtures,
         )?
     } else {
-        scanner.find_vulnerabilities_unified(root_dir, language, report)?
+        scanner.find_vulnerabilities_unified_with_filters_and_options(
+            root_dir,
+            language,
+            report,
+            None,
+            None,
+            cli.include_test_fixtures,
+        )?
     };
 
     if let Some(mut spinner) = spinner.take() {

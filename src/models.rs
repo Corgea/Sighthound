@@ -372,6 +372,13 @@ pub struct Cli {
     #[arg(long, help = "Skip minified JavaScript files during scanning")]
     pub skip_minified: Option<bool>,
 
+    /// Include directories normally skipped for test fixtures
+    #[arg(
+        long,
+        help = "Include test directories (tests/test) during file discovery for fixture validation"
+    )]
+    pub include_test_fixtures: bool,
+
     /// Filter by code type (frontend, backend, or both)
     #[arg(
         long,

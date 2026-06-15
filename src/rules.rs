@@ -73,7 +73,6 @@ const EMBEDDED_GO: &[&str] = &[
     include_str!("../rules/go/deserialization.ron"),
     include_str!("../rules/go/weak_crypto.ron"),
     include_str!("../rules/go/insecure_tls.ron"),
-    include_str!("../rules/go/hardcoded_secrets.ron"),
 ];
 
 const EMBEDDED_RUBY: &[&str] = &[
@@ -87,7 +86,6 @@ const EMBEDDED_RUBY: &[&str] = &[
     include_str!("../rules/ruby/mass_assignment.ron"),
     include_str!("../rules/ruby/open_redirect.ron"),
     include_str!("../rules/ruby/weak_crypto.ron"),
-    include_str!("../rules/ruby/hardcoded_secrets.ron"),
     include_str!("../rules/ruby/redos.ron"),
 ];
 

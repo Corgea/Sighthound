@@ -268,33 +268,5 @@
             )),
             tags: Some(["debug", "rce", "misconfiguration"])
         ),
-
-        // ---- Hardcoded credentials ----
-        // Matches an assignment of a string literal to a credential-named target
-        // (case-insensitive). Requires a quote immediately after `=`, so dynamic
-        // values like `password = request.form[...]` and comparisons (`==`) do not
-        // match. Evaluated against the whole statement by the assignment scanner.
-        (
-            id: Some("python-secret-001"),
-            name: Some("Hardcoded Credentials"),
-            category: Some("secrets"),
-            mode: "search",
-            // Anchored to the start of the statement so credential text inside SQL
-            // strings (`"... password = '%s'"`) and call keyword-arguments
-            // (`User(password='x')`) is not matched - only real top-level
-            // `cred = "literal"` assignments.
-            patterns: Some([
-                "regex:(?i)^\\s*(password|passwd|secret|secret_key|secretkey|api_key|apikey|access_key|aws_secret|aws_secret_access_key|auth_token|access_token|private_key)\\s*=\\s*[\"']",
-            ]),
-            finding_type: Some("Hardcoded Credentials"),
-            severity: Some("High"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-798"),
-            description: Some("A credential is assigned a hardcoded string literal; move secrets to configuration/secret storage"),
-            file_types: Some((
-                extensions: Some([".py"])
-            )),
-            tags: Some(["secret", "credentials", "hardcoded"])
-        ),
     ]
 )

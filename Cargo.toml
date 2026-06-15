@@ -80,6 +80,10 @@ path = "tests/integration/main.rs"
 name = "end_to_end_tests"
 path = "tests/end_to_end/main.rs"
 
+[[test]]
+name = "strictness_tests"
+path = "tests/strictness/main.rs"
+
 [[example]]
 name = "basic_scan"
 path = "examples/basic_scan.rs"

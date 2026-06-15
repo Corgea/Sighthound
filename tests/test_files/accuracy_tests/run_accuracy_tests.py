@@ -1,334 +1,292 @@
 #!/usr/bin/env python3
-"""
-Accuracy Test Runner - Comprehensive analysis of taint analysis accuracy
-"""
+"""Accuracy benchmark for taint analysis strictness."""
 
-import subprocess
+from __future__ import annotations
+
 import json
-import os
+import re
+import subprocess
 import sys
-from typing import Dict, List, Set, Tuple
+import tempfile
+import time
+from pathlib import Path
+from typing import Any
 
 
-class AccuracyTestRunner:
-    def __init__(self):
-        self.test_results = {}
-        self.expected_detections = {}
-        self.setup_expected_results()
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+FIXTURE_ROOT = Path(__file__).resolve().parent
+RULES_PATH = "tests/strictness/fixtures/accuracy_taint.ron"
 
-    def setup_expected_results(self):
-        """Define expected detection results for each test case"""
+REPLACEMENTS: dict[str, list[tuple[str, str]]] = {
+    "edge_cases": [("get_comment_test", "get_comment_case")],
+}
 
-        # TRUE POSITIVES: Should detect these vulnerabilities
-        self.expected_detections["true_positives"] = {
-            "should_detect": {
-                "sink.py": [
-                    "vulnerable_eval",  # TP1: Cross-file eval
-                    "vulnerable_exec",  # TP2: Cross-file exec
-                    "vulnerable_system",  # TP3: Cross-file system
-                    "vulnerable_compile",  # TP4: Cross-file compile
-                    "vulnerable_chain",  # TP5: Chained cross-file
-                    "vulnerable_processed",  # TP6: Processed cross-file
-                    "vulnerable_multiple",  # TP7: Multiple sources
-                    "vulnerable_assignment",  # TP8: Local assignment with cross-file
-                ]
-            },
-            "should_not_detect": {},
-        }
 
-        # TRUE NEGATIVES: Should NOT detect these (safe code)
-        self.expected_detections["true_negatives"] = {
-            "should_detect": {},
-            "should_not_detect": {
-                "safe_sink.py": [
-                    "safe_eval_constant",  # TN1: Safe constant
-                    "safe_exec_computed",  # TN2: Safe computed
-                    "safe_system_version",  # TN3: Safe version
-                    "safe_compile_version",  # TN4: Safe Python version
-                    "safe_eval_hash",  # TN5: Safe hash
-                    "safe_template_usage",  # TN6: Safe template
-                    "safe_app_config",  # TN7: Safe app config
-                    "safe_validated",  # TN8: Safe validated
-                    "safe_literals",  # TN9: Safe literals
-                    "safe_no_input",  # TN10: No user input
-                ]
-            },
-        }
+EXPECTED: dict[str, dict[str, dict[str, list[str]]]] = {
+    "true_positives": {
+        "should_detect": {
+            "sink.py": [
+                "vulnerable_eval",
+                "vulnerable_exec",
+                "vulnerable_system",
+                "vulnerable_compile",
+                "vulnerable_chain",
+                "vulnerable_processed",
+                "vulnerable_multiple",
+                "vulnerable_assignment",
+            ]
+        },
+        "should_not_detect": {},
+    },
+    "true_negatives": {
+        "should_detect": {},
+        "should_not_detect": {
+            "safe_sink.py": [
+                "safe_eval_constant",
+                "safe_exec_computed",
+                "safe_system_version",
+                "safe_compile_version",
+                "safe_eval_hash",
+                "safe_template_usage",
+                "safe_app_config",
+                "safe_validated",
+                "safe_literals",
+                "safe_no_input",
+            ]
+        },
+    },
+    "edge_cases": {
+        "should_detect": {
+            "tricky_sink.py": [
+                "test_variable_scope",
+                "test_conditional",
+                "test_nested",
+                "test_multi_return",
+                "test_reassignment",
+                "test_mixed",
+                "test_aliasing",
+                "test_assignment_chain",
+            ]
+        },
+        "should_not_detect": {
+            "tricky_sink.py": [
+                "test_comments",
+                "test_false_positive",
+                "test_string_literals",
+                "test_name_confusion",
+            ]
+        },
+    },
+    "cross_file": {
+        "should_detect": {
+            "module_c.py": [
+                "test_direct_a_to_c",
+                "test_a_to_b_to_c",
+                "test_combined_sources",
+                "test_class_taint",
+                "test_mixed_flow",
+                "test_local_b_taint",
+                "test_complex_chain",
+                "test_class_instance",
+                "test_multiple_hops",
+                "test_subprocess_taint",
+                "test_multi_import",
+            ]
+        },
+        "should_not_detect": {
+            "module_c.py": [
+                "test_safe_flow",
+                "test_safe_direct",
+                "test_false_positive",
+                "test_string_literals",
+            ]
+        },
+    },
+}
 
-        # EDGE CASES: Complex scenarios
-        self.expected_detections["edge_cases"] = {
-            "should_detect": {
-                "tricky_sink.py": [
-                    "test_variable_scope",  # EC1: Tainted user_data
-                    "test_conditional",  # EC2: Conditional taint
-                    "test_nested",  # EC3: Nested taint
-                    "test_multi_return",  # EC4: Multi return paths
-                    "test_reassignment",  # EC5: Reassigned tainted
-                    "test_mixed",  # EC6: Mixed data
-                    "test_aliasing",  # EC8: Aliased taint
-                    "test_assignment_chain",  # EC12: Assignment chain
-                ]
-            },
-            "should_not_detect": {
-                "tricky_sink.py": [
-                    "test_comments",  # EC7: Comments shouldn't confuse
-                    "test_false_positive",  # EC9: No actual connection
-                    "test_string_literals",  # EC10: String literals
-                    "test_name_confusion",  # EC11: Variable name confusion
-                ]
-            },
-        }
 
-        # CROSS-FILE: Complex multi-file scenarios
-        self.expected_detections["cross_file"] = {
-            "should_detect": {
-                "module_c.py": [
-                    "test_direct_a_to_c",  # CF-C1: Direct A->C
-                    "test_a_to_b_to_c",  # CF-C2: A->B->C
-                    "test_combined_sources",  # CF-C3: Combined sources
-                    "test_class_taint",  # CF-C4: Class-based
-                    "test_mixed_flow",  # CF-C6: Mixed safe/tainted
-                    "test_local_b_taint",  # CF-C7: Local B taint
-                    "test_complex_chain",  # CF-C8: Complex chain
-                    "test_class_instance",  # CF-C9: Class instance
-                    "test_multiple_hops",  # CF-C10: Multiple hops
-                    "test_subprocess_taint",  # CF-C14: Subprocess
-                    "test_multi_import",  # CF-C15: Multi-import
-                ]
-            },
-            "should_not_detect": {
-                "module_c.py": [
-                    "test_safe_flow",  # CF-C5: Safe data flow
-                    "test_safe_direct",  # CF-C11: Safe direct from A
-                    "test_false_positive",  # CF-C12: No connection
-                    "test_string_literals",  # CF-C13: String literals
-                ]
-            },
-        }
+def parse_functions(file_path: Path) -> list[tuple[int, str]]:
+    functions: list[tuple[int, str]] = []
+    for line_number, line in enumerate(file_path.read_text().splitlines(), start=1):
+        match = re.match(r"\s*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", line)
+        if match:
+            functions.append((line_number, match.group(1)))
+    return functions
 
-    def run_test_suite(self, test_dir: str) -> Dict:
-        """Run taint analysis on a test directory"""
-        print(f"\n🧪 Running accuracy tests on: {test_dir}")
 
+def function_for_line(functions: list[tuple[int, str]], line: int) -> str | None:
+    current: str | None = None
+    for function_line, name in functions:
+        if function_line <= line:
+            current = name
+        else:
+            break
+    return current
+
+
+def stage_category(category: str, temp_path: Path) -> dict[str, list[tuple[int, str]]]:
+    function_maps: dict[str, list[tuple[int, str]]] = {}
+    replacements = REPLACEMENTS.get(category, [])
+    for source in (FIXTURE_ROOT / category).glob("*.py"):
+        dest = temp_path / source.name
+        content = source.read_text()
+        for old, new in replacements:
+            content = content.replace(old, new)
+        dest.write_text(content)
+        function_maps[source.name] = parse_functions(dest)
+    return function_maps
+
+
+def parse_findings(output: str) -> list[dict[str, Any]]:
+    output = output.strip()
+    if not output:
+        return []
+    parsed = json.loads(output)
+    if not isinstance(parsed, list):
+        raise ValueError("expected scanner JSON output to be a list of findings")
+    return parsed
+
+
+def run_category(category: str) -> tuple[set[str], float]:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        function_maps = stage_category(category, temp_path)
         cmd = [
             "cargo",
             "run",
+            "--quiet",
             "--",
+            str(temp_path),
+            "python",
+            RULES_PATH,
+            "--use-file-rules",
             "--taint-analysis",
             "--output-format",
             "json",
-            f"tests/test_files/accuracy_tests/{test_dir}",
-            "python",
-            "rules/python/general_security.ron",
         ]
-
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd="../..")
-            if result.returncode != 0:
-                print(f"❌ Error running test: {result.stderr}")
-                return {"vulnerabilities": []}
-
-            # Parse JSON output - find the JSON structure
-            output = result.stdout.strip()
-
-            # Look for the JSON structure (starts with { and contains flows)
-            json_start = output.find("{")
-            if json_start != -1:
-                json_content = output[json_start:]
-                # Clean up any trailing non-JSON content
-                json_end = json_content.rfind("}")
-                if json_end != -1:
-                    json_line = json_content[: json_end + 1]
-                else:
-                    json_line = None
-            else:
-                json_line = None
-
-            if json_line:
-                return json.loads(json_line)
-            else:
-                print(f"❌ No JSON output found")
-                return {"flows": []}
-
-        except Exception as e:
-            print(f"❌ Exception running test: {e}")
-            return {"flows": []}
-
-    def analyze_results(self, test_category: str, results: Dict) -> Dict:
-        """Analyze test results for accuracy"""
-        print(f"\n📊 Analyzing {test_category} results...")
-
-        expected = self.expected_detections.get(test_category, {})
-        should_detect = expected.get("should_detect", {})
-        should_not_detect = expected.get("should_not_detect", {})
-
-        # Extract detected vulnerabilities
-        detected_vulns = set()
-        flows = results.get("flows", [])
-
-        for flow in flows:
-            # Extract sink information from taint flow
-            if "sink" in flow:
-                sink = flow["sink"]
-                sink_file = os.path.basename(sink.get("file", ""))
-                sink_function = sink.get("function", "")
-                detected_vulns.add(f"{sink_file}:{sink_function}")
-
-        print(f"   Detected {len(detected_vulns)} total vulnerabilities")
-
-        # Analyze true positives
-        true_positives = 0
-        false_negatives = 0
-
-        for file, functions in should_detect.items():
-            for func in functions:
-                detection_key = f"{file}:{func}"
-                if any(detection_key in str(vuln) for vuln in detected_vulns):
-                    true_positives += 1
-                    print(f"   ✅ Correctly detected: {func} in {file}")
-                else:
-                    false_negatives += 1
-                    print(f"   ❌ MISSED (False Negative): {func} in {file}")
-
-        # Analyze true negatives
-        true_negatives = 0
-        false_positives = 0
-
-        for file, functions in should_not_detect.items():
-            for func in functions:
-                detection_key = f"{file}:{func}"
-                if any(detection_key in str(vuln) for vuln in detected_vulns):
-                    false_positives += 1
-                    print(
-                        f"   ❌ INCORRECTLY detected (False Positive): {func} in {file}"
-                    )
-                else:
-                    true_negatives += 1
-                    print(f"   ✅ Correctly ignored: {func} in {file}")
-
-        return {
-            "true_positives": true_positives,
-            "false_negatives": false_negatives,
-            "true_negatives": true_negatives,
-            "false_positives": false_positives,
-            "total_detected": len(detected_vulns),
-        }
-
-    def calculate_metrics(self, analysis: Dict) -> Dict:
-        """Calculate accuracy metrics"""
-        tp = analysis["true_positives"]
-        fp = analysis["false_positives"]
-        tn = analysis["true_negatives"]
-        fn = analysis["false_negatives"]
-
-        # Precision = TP / (TP + FP)
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-
-        # Recall = TP / (TP + FN)
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-
-        # F1 Score = 2 * (precision * recall) / (precision + recall)
-        f1_score = (
-            2 * (precision * recall) / (precision + recall)
-            if (precision + recall) > 0
-            else 0
+        start = time.time()
+        result = subprocess.run(
+            cmd,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=45,
         )
+        elapsed = time.time() - start
 
-        # Accuracy = (TP + TN) / (TP + TN + FP + FN)
-        accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"{category} scanner failed with {result.returncode}: {result.stderr}"
+            )
 
-        return {
-            "precision": precision,
-            "recall": recall,
-            "f1_score": f1_score,
-            "accuracy": accuracy,
-        }
+        detected: set[str] = set()
+        for finding in parse_findings(result.stdout):
+            if "taint_analysis" not in finding.get("tags", []):
+                continue
+            file_name = Path(finding.get("file", "")).name
+            line = int(finding.get("line", 0))
+            function = function_for_line(function_maps.get(file_name, []), line)
+            if function:
+                detected.add(f"{file_name}:{function}")
+        return detected, elapsed
 
-    def run_comprehensive_tests(self):
-        """Run all accuracy tests and generate comprehensive report"""
-        print("🚀 Starting Comprehensive Taint Analysis Accuracy Tests")
-        print("=" * 60)
 
-        test_categories = [
-            ("true_positives", "True Positives (Real Vulnerabilities)"),
-            ("true_negatives", "True Negatives (Safe Code)"),
-            ("edge_cases", "Edge Cases (Complex Scenarios)"),
-            ("cross_file", "Cross-File (Multi-Module Flows)"),
-        ]
+def analyze_category(category: str) -> dict[str, int | float]:
+    expected = EXPECTED[category]
+    detected, elapsed = run_category(category)
 
-        overall_results = {
-            "true_positives": 0,
-            "false_negatives": 0,
-            "true_negatives": 0,
-            "false_positives": 0,
-        }
+    tp = fp = tn = fn = 0
+    print(f"\n{category}")
+    print("-" * len(category))
 
-        for test_dir, description in test_categories:
-            print(f"\n{'=' * 20} {description} {'=' * 20}")
+    for file_name, functions in expected["should_detect"].items():
+        for function in functions:
+            key = f"{file_name}:{function}"
+            if key in detected:
+                tp += 1
+                print(f"PASS detect {key}")
+            else:
+                fn += 1
+                print(f"FAIL missed {key}")
 
-            # Run tests
-            results = self.run_test_suite(test_dir)
+    for file_name, functions in expected["should_not_detect"].items():
+        for function in functions:
+            key = f"{file_name}:{function}"
+            if key in detected:
+                fp += 1
+                print(f"FAIL false-positive {key}")
+            else:
+                tn += 1
+                print(f"PASS ignore {key}")
 
-            # Analyze results
-            analysis = self.analyze_results(test_dir, results)
+    expected_keys = {
+        f"{file_name}:{function}"
+        for bucket in ("should_detect", "should_not_detect")
+        for file_name, functions in expected[bucket].items()
+        for function in functions
+    }
+    extra = detected - expected_keys
+    for key in sorted(extra):
+        fp += 1
+        print(f"FAIL unexpected {key}")
 
-            # Calculate metrics
-            metrics = self.calculate_metrics(analysis)
+    return {
+        "true_positives": tp,
+        "false_positives": fp,
+        "true_negatives": tn,
+        "false_negatives": fn,
+        "elapsed": elapsed,
+        "detected": len(detected),
+    }
 
-            # Print metrics
-            print(f"\n📈 {test_dir.upper()} METRICS:")
-            print(f"   Precision: {metrics['precision']:.2%}")
-            print(f"   Recall:    {metrics['recall']:.2%}")
-            print(f"   F1 Score:  {metrics['f1_score']:.2%}")
-            print(f"   Accuracy:  {metrics['accuracy']:.2%}")
 
-            # Add to overall results
-            for key in overall_results:
-                overall_results[key] += analysis[key]
+def ratio(numerator: int, denominator: int) -> float:
+    return numerator / denominator if denominator else 0.0
 
-        # Calculate overall metrics
-        print(f"\n{'=' * 60}")
-        print("🎯 OVERALL ACCURACY RESULTS")
-        print(f"{'=' * 60}")
 
-        overall_metrics = self.calculate_metrics(overall_results)
+def main() -> int:
+    totals = {
+        "true_positives": 0,
+        "false_positives": 0,
+        "true_negatives": 0,
+        "false_negatives": 0,
+    }
+    category_results: dict[str, dict[str, int | float]] = {}
 
-        print(f"True Positives:   {overall_results['true_positives']}")
-        print(f"False Negatives:  {overall_results['false_negatives']}")
-        print(f"True Negatives:   {overall_results['true_negatives']}")
-        print(f"False Positives:  {overall_results['false_positives']}")
-        print()
-        print(f"Overall Precision: {overall_metrics['precision']:.2%}")
-        print(f"Overall Recall:    {overall_metrics['recall']:.2%}")
-        print(f"Overall F1 Score:  {overall_metrics['f1_score']:.2%}")
-        print(f"Overall Accuracy:  {overall_metrics['accuracy']:.2%}")
+    for category in EXPECTED:
+        result = analyze_category(category)
+        category_results[category] = result
+        for key in totals:
+            totals[key] += int(result[key])
 
-        # Quality assessment
-        print(f"\n🏆 QUALITY ASSESSMENT:")
-        if overall_metrics["precision"] >= 0.9:
-            print("✅ EXCELLENT precision - Very low false positive rate")
-        elif overall_metrics["precision"] >= 0.8:
-            print("✅ GOOD precision - Acceptable false positive rate")
-        else:
-            print("❌ POOR precision - High false positive rate")
+    precision = ratio(
+        totals["true_positives"],
+        totals["true_positives"] + totals["false_positives"],
+    )
+    recall = ratio(
+        totals["true_positives"],
+        totals["true_positives"] + totals["false_negatives"],
+    )
+    f1 = ratio(2 * precision * recall, precision + recall)
+    accuracy = ratio(
+        totals["true_positives"] + totals["true_negatives"],
+        sum(totals.values()),
+    )
 
-        if overall_metrics["recall"] >= 0.9:
-            print("✅ EXCELLENT recall - Very low false negative rate")
-        elif overall_metrics["recall"] >= 0.8:
-            print("✅ GOOD recall - Acceptable false negative rate")
-        else:
-            print("❌ POOR recall - High false negative rate")
+    print("\nAccuracy benchmark summary")
+    print("=" * 40)
+    print(f"True positives:  {totals['true_positives']}")
+    print(f"False positives: {totals['false_positives']}")
+    print(f"True negatives:  {totals['true_negatives']}")
+    print(f"False negatives: {totals['false_negatives']}")
+    print(f"Precision:       {precision:.2%}")
+    print(f"Recall:          {recall:.2%}")
+    print(f"F1:              {f1:.2%}")
+    print(f"Accuracy:        {accuracy:.2%}")
 
-        return overall_results, overall_metrics
+    failed = totals["false_positives"] + totals["false_negatives"]
+    return 0 if failed == 0 else 1
 
 
 if __name__ == "__main__":
-    # Change to script directory
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(script_dir)
-
-    runner = AccuracyTestRunner()
-    results, metrics = runner.run_comprehensive_tests()
-
-    print(f"\n🎉 Accuracy testing complete!")
-    print(f"Overall Score: {metrics['f1_score']:.1%} F1")
+    sys.exit(main())
