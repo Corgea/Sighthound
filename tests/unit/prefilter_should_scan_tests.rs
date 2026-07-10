@@ -1,6 +1,6 @@
+use sighthound::UnifiedRule;
 use sighthound::rules::Rules;
 use sighthound::scanner::PreFilter;
-use sighthound::UnifiedRule;
 use std::fs;
 use tempfile::TempDir;
 

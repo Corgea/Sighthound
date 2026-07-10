@@ -1,7 +1,8 @@
 [package]
 name = "sighthound"
 version = "0.1.1"
-edition = "2021"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Corgea Team"]
 description = "A blazing fast vulnerability scanner for source code using tree-sitter"
 repository = "https://github.com/Corgea/Sighthound"
@@ -16,7 +17,6 @@ path = "src/main.rs"
 [[bin]]
 name = "harness"
 path = "harness.rs"
-edition = "2024"
 
 [features]
 default = ["python", "java", "javascript", "tsx", "typescript", "go", "ruby", "csharp", "html", "django", "php"]

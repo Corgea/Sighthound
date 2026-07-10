@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use include_dir::{include_dir, Dir};
+use include_dir::{Dir, include_dir};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -389,10 +389,10 @@ pub fn match_any_pattern(patterns: &[String], text: &str) -> bool {
 }
 
 pub fn rule_matches_pattern_unified(rule: &UnifiedRule, text: &str) -> bool {
-    if let Some(pattern) = &rule.pattern {
-        if match_pattern(pattern, text) {
-            return true;
-        }
+    if let Some(pattern) = &rule.pattern
+        && match_pattern(pattern, text)
+    {
+        return true;
     }
 
     if let Some(patterns) = &rule.patterns {
@@ -408,11 +408,11 @@ pub fn rule_matches_pattern_unified(rule: &UnifiedRule, text: &str) -> bool {
 
 pub fn validate_unified_rule_patterns(rule: &UnifiedRule) -> Result<(), String> {
     if rule.is_search_rule() {
-        if let Some(pattern) = &rule.pattern {
-            if let Some(regex_pattern) = pattern.strip_prefix("regex:") {
-                Regex::new(regex_pattern)
-                    .map_err(|e| format!("Invalid regex pattern '{}': {}", regex_pattern, e))?;
-            }
+        if let Some(pattern) = &rule.pattern
+            && let Some(regex_pattern) = pattern.strip_prefix("regex:")
+        {
+            Regex::new(regex_pattern)
+                .map_err(|e| format!("Invalid regex pattern '{}': {}", regex_pattern, e))?;
         }
 
         if let Some(patterns) = &rule.patterns {

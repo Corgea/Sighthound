@@ -54,10 +54,10 @@ pub fn check_has_argument_condition(
 
         // Otherwise check all arguments
         for i in 0..args_node.named_child_count() {
-            if let Some(arg) = args_node.named_child(i as u32) {
-                if check_argument_matches(arg, source, condition) {
-                    return true;
-                }
+            if let Some(arg) = args_node.named_child(i as u32)
+                && check_argument_matches(arg, source, condition)
+            {
+                return true;
             }
         }
     }
@@ -73,10 +73,10 @@ pub fn check_argument_matches(
     let arg_text = get_node_text(&arg, source);
 
     // Check node type if specified
-    if let Some(expected_type) = &condition.node_type {
-        if arg.kind() != expected_type {
-            return false;
-        }
+    if let Some(expected_type) = &condition.node_type
+        && arg.kind() != expected_type
+    {
+        return false;
     }
 
     // Check pattern(s)
@@ -93,14 +93,14 @@ pub fn check_argument_matches(
 
 /// Check if node is in a specific context (e.g., not in comments/strings)
 pub fn check_in_context_condition(node: &tree_sitter::Node, condition: &Condition) -> bool {
-    if let Some(not_in) = &condition.not_in {
-        if let Some(parent) = node.parent() {
-            if not_in.contains(&"comment".to_string()) && parent.kind() == "comment" {
-                return false;
-            }
-            if not_in.contains(&"string".to_string()) && parent.kind() == "string" {
-                return false;
-            }
+    if let Some(not_in) = &condition.not_in
+        && let Some(parent) = node.parent()
+    {
+        if not_in.contains(&"comment".to_string()) && parent.kind() == "comment" {
+            return false;
+        }
+        if not_in.contains(&"string".to_string()) && parent.kind() == "string" {
+            return false;
         }
     }
     true
@@ -131,10 +131,10 @@ pub fn check_not_literal_condition(
         } else {
             // Check if any argument is not literal
             for i in 0..args_node.named_child_count() {
-                if let Some(arg) = args_node.named_child(i as u32) {
-                    if !is_literal_node(&arg) {
-                        return true;
-                    }
+                if let Some(arg) = args_node.named_child(i as u32)
+                    && !is_literal_node(&arg)
+                {
+                    return true;
                 }
             }
         }
@@ -198,21 +198,21 @@ pub fn check_has_sibling_pattern_condition(
     source: &[u8],
     condition: &Condition,
 ) -> bool {
-    if let Some(patterns) = &condition.patterns {
-        if let Some(parent) = node.parent() {
-            let mut cursor = parent.walk();
-            if cursor.goto_first_child() {
-                loop {
-                    let sibling = cursor.node();
-                    if sibling != *node {
-                        let sibling_text = get_node_text(&sibling, source);
-                        if match_any_pattern(patterns, &sibling_text) {
-                            return true;
-                        }
+    if let Some(patterns) = &condition.patterns
+        && let Some(parent) = node.parent()
+    {
+        let mut cursor = parent.walk();
+        if cursor.goto_first_child() {
+            loop {
+                let sibling = cursor.node();
+                if sibling != *node {
+                    let sibling_text = get_node_text(&sibling, source);
+                    if match_any_pattern(patterns, &sibling_text) {
+                        return true;
                     }
-                    if !cursor.goto_next_sibling() {
-                        break;
-                    }
+                }
+                if !cursor.goto_next_sibling() {
+                    break;
                 }
             }
         }

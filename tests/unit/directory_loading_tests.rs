@@ -165,10 +165,12 @@ mod directory_loading_tests {
 
         let result = Rules::load_from_path(file_path.to_str().unwrap());
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Unsupported file format. Only .ron files are supported"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unsupported file format. Only .ron files are supported")
+        );
     }
 
     #[test]

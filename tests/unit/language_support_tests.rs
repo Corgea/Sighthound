@@ -1,5 +1,5 @@
 use sighthound::language::get_language_support;
-use sighthound::parser::{get_node_text, LanguageParser};
+use sighthound::parser::{LanguageParser, get_node_text};
 use tree_sitter::Node;
 
 #[cfg(test)]

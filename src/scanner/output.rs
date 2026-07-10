@@ -3,8 +3,8 @@ use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{BufWriter, Write};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use syntect::easy::HighlightLines;
@@ -163,7 +163,10 @@ pub fn print_findings_json(findings: &[Finding]) -> Result<()> {
 pub fn print_findings_csv(findings: &[Finding]) -> Result<()> {
     let stdout = std::io::stdout();
     let mut out = BufWriter::new(stdout.lock());
-    writeln!(out, "file,line,function,finding_type,code,severity,confidence,cwe_id,source_type,source_context,sink_type,sink_function,traces")?;
+    writeln!(
+        out,
+        "file,line,function,finding_type,code,severity,confidence,cwe_id,source_type,source_context,sink_type,sink_function,traces"
+    )?;
     for finding in findings {
         let code = finding.snippet.replace('"', "\"\"");
         let source_type =

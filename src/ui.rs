@@ -25,11 +25,7 @@ pub fn color_enabled() -> bool {
 
 /// Wrap `text` in an ANSI code when color is enabled.
 pub fn paint(code: &str, text: &str) -> String {
-    if color_enabled() {
-        format!("{}{}{}", code, text, RESET)
-    } else {
-        text.to_string()
-    }
+    if color_enabled() { format!("{}{}{}", code, text, RESET) } else { text.to_string() }
 }
 
 pub fn bold(t: &str) -> String {

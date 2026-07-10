@@ -1,5 +1,5 @@
-use sighthound::rules::Rules;
 use sighthound::VulnerabilityScanner;
+use sighthound::rules::Rules;
 use std::fs;
 use std::io::Write;
 use tempfile::{NamedTempFile, TempDir};

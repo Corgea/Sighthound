@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::cli::Cli;
 use crate::rules::Rules;
@@ -123,18 +123,15 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
                 }
 
                 // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
-                if matches!(language.as_str(), "javascript" | "tsx") {
-                    if let Some(code_type) = &cli.code_type {
-                        if code_type != "frontend" {
-                            let base_rules_dir = cli.rules_dir.as_deref().unwrap_or("rules");
-                            let backend_rules_file = format!(
-                                "{}/backend_javascript/backend_security.ron",
-                                base_rules_dir
-                            );
-                            if let Ok(backend_rules) = Rules::load_from_file(&backend_rules_file) {
-                                all_rules.push(backend_rules);
-                            }
-                        }
+                if matches!(language.as_str(), "javascript" | "tsx")
+                    && let Some(code_type) = &cli.code_type
+                    && code_type != "frontend"
+                {
+                    let base_rules_dir = cli.rules_dir.as_deref().unwrap_or("rules");
+                    let backend_rules_file =
+                        format!("{}/backend_javascript/backend_security.ron", base_rules_dir);
+                    if let Ok(backend_rules) = Rules::load_from_file(&backend_rules_file) {
+                        all_rules.push(backend_rules);
                     }
                 }
             }
@@ -178,10 +175,10 @@ fn load_explicit_scan_rules(cli: &Cli, language: &str) -> Result<Rules> {
 
     // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
     // (Note: For embedded rules, backend rules are already loaded in load_embedded_rules)
-    if !should_use_embedded_rules(cli) {
-        if let Some(backend_rules) = load_backend_js_rules_if_needed(cli, language) {
-            all_rules.push(backend_rules);
-        }
+    if !should_use_embedded_rules(cli)
+        && let Some(backend_rules) = load_backend_js_rules_if_needed(cli, language)
+    {
+        all_rules.push(backend_rules);
     }
 
     if all_rules.len() == 1 {

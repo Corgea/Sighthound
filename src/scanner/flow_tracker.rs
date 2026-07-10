@@ -36,8 +36,13 @@ impl VariableFlowTracker {
         var_name: String,
         source_info: TaintVariableInfo,
     ) {
-        log::debug!("[RECORD_TAINT] Recording tainted variable: '{}' from pattern '{}' at line {} in function '{}'", 
-            var_name, source_info.source_pattern, source_info.source_line, source_info.source_function);
+        log::debug!(
+            "[RECORD_TAINT] Recording tainted variable: '{}' from pattern '{}' at line {} in function '{}'",
+            var_name,
+            source_info.source_pattern,
+            source_info.source_line,
+            source_info.source_function
+        );
 
         self.tainted_variables.insert(var_name.clone(), source_info.clone());
 
@@ -76,8 +81,12 @@ impl VariableFlowTracker {
                 );
                 return Some(info);
             } else {
-                log::debug!("[CHECK_TAINT] Variable '{}' found but function mismatch: source='{}' vs current='{}'", 
-                    var_name, info.source_function, function);
+                log::debug!(
+                    "[CHECK_TAINT] Variable '{}' found but function mismatch: source='{}' vs current='{}'",
+                    var_name,
+                    info.source_function,
+                    function
+                );
             }
         } else {
             log::debug!("[CHECK_TAINT] Variable '{}' not found in tainted variables", var_name);

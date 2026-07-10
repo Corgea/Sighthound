@@ -1,4 +1,4 @@
-use sighthound::rules::{rule_matches_pattern_unified, validate_unified_rule_patterns, Rules};
+use sighthound::rules::{Rules, rule_matches_pattern_unified, validate_unified_rule_patterns};
 use std::io::Write;
 use tempfile::NamedTempFile;
 

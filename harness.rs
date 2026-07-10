@@ -1368,7 +1368,7 @@ mod tests {
         drop(f);
         fs::write(tmp.join("skip.txt"), "#[allow(ignored)]").unwrap();
 
-        let results = scan_suppressions(&[tmp.clone()]);
+        let results = scan_suppressions(std::slice::from_ref(&tmp));
 
         assert_eq!(results.get("allow"), Some(&vec![vec!["dead_code".to_string()]]));
         assert_eq!(results.get("allow_crate"), Some(&vec![vec!["unused_imports".to_string()]]));

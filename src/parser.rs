@@ -1,4 +1,4 @@
-use crate::language::{get_language_support, LanguageSupport};
+use crate::language::{LanguageSupport, get_language_support};
 use anyhow::{Context, Result};
 use tree_sitter::{Node, Parser as TSParser, Tree};
 

@@ -8,10 +8,10 @@
 use std::fs;
 use std::path::PathBuf;
 
-use cucumber::{given, then, when, World as _};
+use cucumber::{World as _, given, then, when};
+use sighthound::VulnerabilityScanner;
 use sighthound::models::Finding;
 use sighthound::rules::Rules;
-use sighthound::VulnerabilityScanner;
 use tempfile::TempDir;
 
 /// Cucumber `World`: one staging directory per scenario, plus the outcome

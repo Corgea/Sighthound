@@ -1,5 +1,5 @@
-use sighthound::language::{get_language_support, LanguageSupport};
-use sighthound::parser::{get_node_text, LanguageParser};
+use sighthound::language::{LanguageSupport, get_language_support};
+use sighthound::parser::{LanguageParser, get_node_text};
 use sighthound::rules::{check_for_injection_pattern, is_literal_node};
 use sighthound::scanner::ScanningLogic;
 
@@ -193,18 +193,14 @@ def get_user(user_id):
             F: FnMut(bool),
         {
             for call_type in language_support.call_node_types() {
-                if node.kind() == *call_type {
-                    if let Some(func_name) = language_support.get_function_name(node, source) {
-                        if func_name.contains("execute") {
-                            let has_pattern = ScanningLogic::has_injection_pattern(
-                                node,
-                                source,
-                                language_support,
-                            );
-                            callback(has_pattern);
-                            return;
-                        }
-                    }
+                if node.kind() == *call_type
+                    && let Some(func_name) = language_support.get_function_name(node, source)
+                    && func_name.contains("execute")
+                {
+                    let has_pattern =
+                        ScanningLogic::has_injection_pattern(node, source, language_support);
+                    callback(has_pattern);
+                    return;
                 }
             }
 
@@ -251,18 +247,14 @@ def get_all_users():
             F: FnMut(bool),
         {
             for call_type in language_support.call_node_types() {
-                if node.kind() == *call_type {
-                    if let Some(func_name) = language_support.get_function_name(node, source) {
-                        if func_name.contains("execute") {
-                            let has_pattern = ScanningLogic::has_injection_pattern(
-                                node,
-                                source,
-                                language_support,
-                            );
-                            callback(has_pattern);
-                            return;
-                        }
-                    }
+                if node.kind() == *call_type
+                    && let Some(func_name) = language_support.get_function_name(node, source)
+                    && func_name.contains("execute")
+                {
+                    let has_pattern =
+                        ScanningLogic::has_injection_pattern(node, source, language_support);
+                    callback(has_pattern);
+                    return;
                 }
             }
 
@@ -310,18 +302,14 @@ public class TestClass {
             F: FnMut(bool),
         {
             for call_type in language_support.call_node_types() {
-                if node.kind() == *call_type {
-                    if let Some(func_name) = language_support.get_function_name(node, source) {
-                        if func_name.contains("execute") {
-                            let has_pattern = ScanningLogic::has_injection_pattern(
-                                node,
-                                source,
-                                language_support,
-                            );
-                            callback(has_pattern);
-                            return;
-                        }
-                    }
+                if node.kind() == *call_type
+                    && let Some(func_name) = language_support.get_function_name(node, source)
+                    && func_name.contains("execute")
+                {
+                    let has_pattern =
+                        ScanningLogic::has_injection_pattern(node, source, language_support);
+                    callback(has_pattern);
+                    return;
                 }
             }
 
@@ -368,18 +356,14 @@ function getUser(userId) {
             F: FnMut(bool),
         {
             for call_type in language_support.call_node_types() {
-                if node.kind() == *call_type {
-                    if let Some(func_name) = language_support.get_function_name(node, source) {
-                        if func_name.contains("execute") {
-                            let has_pattern = ScanningLogic::has_injection_pattern(
-                                node,
-                                source,
-                                language_support,
-                            );
-                            callback(has_pattern);
-                            return;
-                        }
-                    }
+                if node.kind() == *call_type
+                    && let Some(func_name) = language_support.get_function_name(node, source)
+                    && func_name.contains("execute")
+                {
+                    let has_pattern =
+                        ScanningLogic::has_injection_pattern(node, source, language_support);
+                    callback(has_pattern);
+                    return;
                 }
             }
 
