@@ -15,6 +15,38 @@ use syntect::parsing::SyntaxSet;
 use crate::common::CommonUtils;
 use crate::models::Finding;
 
+/// Rank severities so the worst one per file can be tracked. Unknown -> 0.
+fn severity_rank(severity: &str) -> u8 {
+    match severity {
+        "critical" => 4,
+        "high" => 3,
+        "medium" => 2,
+        "low" => 1,
+        _ => 0,
+    }
+}
+
+/// A left-to-right braille fill bar, `width` cells wide. Each cell packs two
+/// sub-columns of dots, giving 2x the horizontal resolution of block glyphs.
+/// Unfilled cells use blank braille (U+2800) so every bar is exactly `width`
+/// glyphs and columns stay aligned. Dependency-free, like the other `ui` helpers.
+fn braille_bar(frac: f64, width: usize) -> String {
+    const FULL_COL: [u32; 2] = [0x47, 0xB8]; // fully-lit left / right sub-column
+    let frac = frac.clamp(0.0, 1.0);
+    let lit = (frac * (width * 2) as f64).round() as usize;
+    let mut bar = String::with_capacity(width * 3);
+    for cell in 0..width {
+        let mut code = 0u32;
+        for col in 0..2 {
+            if cell * 2 + col < lit {
+                code |= FULL_COL[col];
+            }
+        }
+        bar.push(char::from_u32(0x2800 + code).unwrap_or(' '));
+    }
+    bar
+}
+
 pub fn print_summary(findings: &[Finding], duration: std::time::Duration) {
     crate::ui::section("Summary");
 
@@ -28,11 +60,20 @@ pub fn print_summary(findings: &[Finding], duration: std::time::Duration) {
     let mut severity_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut finding_types: BTreeMap<String, usize> = BTreeMap::new();
     let mut file_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut file_worst: BTreeMap<String, String> = BTreeMap::new();
 
     for finding in findings {
-        *severity_counts.entry(finding.severity.to_lowercase()).or_insert(0) += 1;
+        let sev = finding.severity.to_lowercase();
+        *severity_counts.entry(sev.clone()).or_insert(0) += 1;
         *finding_types.entry(finding.finding_type.clone()).or_insert(0) += 1;
         *file_counts.entry(finding.file.clone()).or_insert(0) += 1;
+        // Track the worst severity seen in each file, for the heat-bar colour.
+        let worst = file_worst
+            .entry(finding.file.clone())
+            .or_insert_with(|| sev.clone());
+        if severity_rank(&sev) > severity_rank(worst) {
+            *worst = sev;
+        }
     }
 
     // Severity breakdown, on a single line in fixed order
@@ -50,6 +91,29 @@ pub fn print_summary(findings: &[Finding], duration: std::time::Duration) {
         println!("  {}", parts.join("   "));
     }
 
+    // Severity mix as a single stacked braille bar (TTY only; piped output
+    // keeps just the line above, unchanged).
+    if crate::ui::color_enabled() {
+        let total: usize = severity_counts.values().sum();
+        if total > 0 {
+            const WIDTH: usize = 24;
+            let mut mix = String::new();
+            for sev in severity_order.iter() {
+                if let Some(&count) = severity_counts.get(*sev) {
+                    if count == 0 {
+                        continue;
+                    }
+                    let cells = ((count * WIDTH) as f64 / total as f64).round().max(1.0) as usize;
+                    mix.push_str(&crate::ui::paint(
+                        crate::ui::severity_code(sev),
+                        &braille_bar(1.0, cells),
+                    ));
+                }
+            }
+            println!("  {}", mix);
+        }
+    }
+
     // Top finding types
     let mut sorted_types: Vec<_> = finding_types.iter().collect();
     sorted_types.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
@@ -58,13 +122,27 @@ pub fn print_summary(findings: &[Finding], duration: std::time::Duration) {
         println!("  {:>4}  {}", count, finding_type);
     }
 
-    // Most affected files
+    // Most affected files. In a TTY this draws a braille heat bar per file
+    // (length = finding count, colour = worst severity in the file); piped or
+    // NO_COLOR output falls back to the original plain list, byte-for-byte.
     let mut sorted_files: Vec<_> = file_counts.iter().collect();
     sorted_files.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
     if sorted_files.len() > 1 {
         crate::ui::section("Most affected files");
-        for (file_path, count) in sorted_files.iter().take(5) {
-            println!("  {:>4}  {}", count, crate::ui::dim(file_path));
+        if crate::ui::color_enabled() {
+            let max = sorted_files.first().map(|(_, c)| **c).unwrap_or(1).max(1);
+            for (file_path, count) in sorted_files.iter().take(8) {
+                let worst = file_worst.get(*file_path).map(String::as_str).unwrap_or("");
+                let heat = crate::ui::paint(
+                    crate::ui::severity_code(worst),
+                    &braille_bar(**count as f64 / max as f64, 10),
+                );
+                println!("  {}  {:>4}  {}", heat, count, crate::ui::dim(file_path));
+            }
+        } else {
+            for (file_path, count) in sorted_files.iter().take(5) {
+                println!("  {:>4}  {}", count, crate::ui::dim(file_path));
+            }
         }
     }
 
@@ -666,4 +744,69 @@ pub fn print_findings_text(
         }
     }
     print_summary(findings, duration);
+}
+
+#[cfg(test)]
+mod visual_tests {
+    use super::*;
+
+    const BLANK: char = '\u{2800}'; // blank braille (unfilled cell)
+    const FULL: char = '\u{28ff}'; // fully-lit braille cell
+
+    #[test]
+    fn severity_rank_orders_all_levels() {
+        assert!(
+            severity_rank("critical") > severity_rank("high")
+                && severity_rank("high") > severity_rank("medium")
+                && severity_rank("medium") > severity_rank("low")
+                && severity_rank("low") > severity_rank("unknown")
+        );
+        assert_eq!(severity_rank("critical"), 4);
+        assert_eq!(severity_rank("low"), 1);
+        assert_eq!(severity_rank("nonsense"), 0);
+    }
+
+    #[test]
+    fn braille_bar_is_always_exactly_width_glyphs() {
+        // The alignment guarantee: char count == width, for any frac.
+        for width in [0usize, 1, 5, 10, 24] {
+            for frac in [-1.0, 0.0, 0.1, 0.25, 0.5, 0.75, 1.0, 2.0] {
+                assert_eq!(
+                    braille_bar(frac, width).chars().count(),
+                    width,
+                    "width={width} frac={frac}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn braille_bar_empty_and_full() {
+        assert_eq!(braille_bar(0.0, 10), BLANK.to_string().repeat(10));
+        assert_eq!(braille_bar(1.0, 10), FULL.to_string().repeat(10));
+    }
+
+    #[test]
+    fn braille_bar_clamps_out_of_range() {
+        assert_eq!(braille_bar(-5.0, 8), braille_bar(0.0, 8));
+        assert_eq!(braille_bar(9.0, 8), braille_bar(1.0, 8));
+    }
+
+    #[test]
+    fn braille_bar_half_fills_left_half() {
+        // frac 0.5 over width 10 => lit = round(0.5*20) = 10 => first 5 cells full.
+        let bar: Vec<char> = braille_bar(0.5, 10).chars().collect();
+        assert!(bar[..5].iter().all(|&c| c == FULL), "left half should be full");
+        assert!(bar[5..].iter().all(|&c| c == BLANK), "right half should be blank");
+    }
+
+    #[test]
+    fn braille_bar_partial_cell_lights_left_subcolumn() {
+        // frac 0.25 over width 10 => lit = 5 => cells 0,1 full, cell 2 left-only.
+        let bar: Vec<char> = braille_bar(0.25, 10).chars().collect();
+        assert_eq!(bar[0], FULL);
+        assert_eq!(bar[1], FULL);
+        assert_eq!(bar[2], '\u{2847}', "partial cell lights the left sub-column");
+        assert!(bar[3..].iter().all(|&c| c == BLANK));
+    }
 }
