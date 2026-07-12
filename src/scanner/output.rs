@@ -47,6 +47,53 @@ fn braille_bar(frac: f64, width: usize) -> String {
     bar
 }
 
+/// Allocate `width` bar cells across severities in proportion to `counts`,
+/// giving every severity with a non-zero count at least one cell while never
+/// exceeding `width` in total. Uses the largest-remainder method: reserving one
+/// cell per present severity keeps a lone critical visible, and sharing the rest
+/// by fractional remainder means independent rounding can't overflow the bar
+/// (e.g. counts 997/1/1/1 stay at `width`, not `width`+3). Absent severities
+/// get zero. Returns one cell count per input index.
+fn severity_mix_cells(counts: &[usize], width: usize) -> Vec<usize> {
+    let total: usize = counts.iter().sum();
+    let mut cells = vec![0usize; counts.len()];
+    if total == 0 || width == 0 {
+        return cells;
+    }
+    let present: Vec<usize> = (0..counts.len()).filter(|&i| counts[i] > 0).collect();
+    // More present severities than cells: give a single cell to the largest few.
+    if present.len() >= width {
+        let mut by_count = present.clone();
+        by_count.sort_by(|&a, &b| counts[b].cmp(&counts[a]).then(a.cmp(&b)));
+        for &i in by_count.iter().take(width) {
+            cells[i] = 1;
+        }
+        return cells;
+    }
+    // Reserve one cell per present severity (minority visibility), share the rest
+    // proportionally, and hand leftover cells to the largest fractional remainders.
+    let discretionary = width - present.len();
+    let mut used = 0;
+    let mut remainders: Vec<(f64, usize)> = Vec::with_capacity(present.len());
+    for &i in &present {
+        let exact = counts[i] as f64 * discretionary as f64 / total as f64;
+        let base = exact.floor() as usize;
+        cells[i] = 1 + base;
+        used += base;
+        remainders.push((exact - base as f64, i));
+    }
+    let mut leftover = discretionary - used;
+    remainders.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    for (_, i) in remainders {
+        if leftover == 0 {
+            break;
+        }
+        cells[i] += 1;
+        leftover -= 1;
+    }
+    cells
+}
+
 pub fn print_summary(findings: &[Finding], duration: std::time::Duration) {
     crate::ui::section("Summary");
 
@@ -94,21 +141,22 @@ pub fn print_summary(findings: &[Finding], duration: std::time::Duration) {
     // Severity mix as a single stacked braille bar (TTY only; piped output
     // keeps just the line above, unchanged).
     if crate::ui::color_enabled() {
-        let total: usize = severity_counts.values().sum();
-        if total > 0 {
-            const WIDTH: usize = 24;
+        const WIDTH: usize = 24;
+        let counts: Vec<usize> = severity_order
+            .iter()
+            .map(|s| severity_counts.get(*s).copied().unwrap_or(0))
+            .collect();
+        if counts.iter().sum::<usize>() > 0 {
+            let cells = severity_mix_cells(&counts, WIDTH);
             let mut mix = String::new();
-            for sev in severity_order.iter() {
-                if let Some(&count) = severity_counts.get(*sev) {
-                    if count == 0 {
-                        continue;
-                    }
-                    let cells = ((count * WIDTH) as f64 / total as f64).round().max(1.0) as usize;
-                    mix.push_str(&crate::ui::paint(
-                        crate::ui::severity_code(sev),
-                        &braille_bar(1.0, cells),
-                    ));
+            for (idx, sev) in severity_order.iter().enumerate() {
+                if cells[idx] == 0 {
+                    continue;
                 }
+                mix.push_str(&crate::ui::paint(
+                    crate::ui::severity_code(sev),
+                    &braille_bar(1.0, cells[idx]),
+                ));
             }
             println!("  {}", mix);
         }
@@ -808,5 +856,51 @@ mod visual_tests {
         assert_eq!(bar[1], FULL);
         assert_eq!(bar[2], '\u{2847}', "partial cell lights the left sub-column");
         assert!(bar[3..].iter().all(|&c| c == BLANK));
+    }
+
+    #[test]
+    fn severity_mix_never_exceeds_width() {
+        // Reported in review: independent rounding + .max(1) put 997/1/1/1 at 27.
+        for counts in [
+            vec![1, 997, 1, 1],
+            vec![1, 1, 1, 1],
+            vec![5, 5, 5, 5],
+            vec![0, 60, 0, 0],
+            vec![3, 0, 0, 0],
+            vec![1, 0, 500, 0],
+            vec![0, 0, 0, 0],
+        ] {
+            let total: usize = severity_mix_cells(&counts, 24).iter().sum();
+            assert!(total <= 24, "counts {counts:?} produced {total} cells");
+        }
+    }
+
+    #[test]
+    fn severity_mix_fills_full_width_when_it_fits() {
+        // With <= width present severities, the bar spans exactly width.
+        for counts in [vec![1, 997, 1, 1], vec![5, 5, 5, 5], vec![0, 60, 0, 0]] {
+            assert_eq!(severity_mix_cells(&counts, 24).iter().sum::<usize>(), 24);
+        }
+    }
+
+    #[test]
+    fn severity_mix_keeps_every_present_severity_visible() {
+        // A lone critical among 997 highs must still get a cell — that sliver is
+        // the entire argument for the bar. Absent severities get none.
+        let counts = [1usize, 997, 1, 1];
+        let cells = severity_mix_cells(&counts, 24);
+        for (i, &c) in counts.iter().enumerate() {
+            if c > 0 {
+                assert!(cells[i] >= 1, "present severity {i} was dropped");
+            } else {
+                assert_eq!(cells[i], 0);
+            }
+        }
+        assert!(cells[1] > cells[0], "dominant severity should be the widest");
+    }
+
+    #[test]
+    fn severity_mix_absent_severities_get_no_cells() {
+        assert_eq!(severity_mix_cells(&[0, 60, 0, 0], 24), vec![0, 24, 0, 0]);
     }
 }
