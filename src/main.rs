@@ -1,6 +1,8 @@
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
-use sighthound::scanner::core::{print_findings_csv, print_findings_json, print_findings_text};
+use sighthound::scanner::core::{
+    print_findings_csv, print_findings_json, print_findings_sarif, print_findings_text,
+};
 use sighthound::{
     Cli, CommonUtils, run_auto_detection_scan, run_explicit_scan, run_taint_analysis,
     run_taint_analysis_with_verbosity,
@@ -127,6 +129,7 @@ fn output_findings(
     match cli.output_format.as_str() {
         "json" => print_findings_json(findings)?,
         "csv" => print_findings_csv(findings)?,
+        "sarif" => print_findings_sarif(findings)?,
         _ => print_findings_text(findings, cli.verbose, cli.summary_only, duration),
     }
     Ok(())
@@ -153,7 +156,7 @@ fn main() -> Result<()> {
     let start_time = std::time::Instant::now();
 
     // Determine if we should show progress (suppress for structured output formats)
-    let show_progress = !matches!(cli.output_format.as_str(), "json" | "csv");
+    let show_progress = !matches!(cli.output_format.as_str(), "json" | "csv" | "sarif");
 
     // Validate CLI parameters
     validate_scan_flags(&cli)?;

@@ -319,8 +319,8 @@ pub struct Cli {
     )]
     pub use_file_rules: bool,
 
-    /// Output format (text, json, csv)
-    #[arg(short, long, default_value = "text", help = "Output format: text, json, or csv")]
+    /// Output format (text, json, csv, sarif)
+    #[arg(short, long, default_value = "text", help = "Output format: text, json, csv, or sarif")]
     pub output_format: String,
 
     /// Verbose output

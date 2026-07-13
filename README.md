@@ -1,10 +1,10 @@
-# Sighthound - Blazing Fast Vulnerability Scanner
+# Sighthound
 
 <div align="center">
 
 ![Sighthound Logo](assets/logo.png)
 
-A high-performance vulnerability scanner for source code using tree-sitter parsing and advanced taint flow analysis.
+Tree-sitter based static vulnerability scanner with pattern matching and taint-flow analysis.
 
 [![Rust](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -12,370 +12,144 @@ A high-performance vulnerability scanner for source code using tree-sitter parsi
 
 </div>
 
-## 🚀 Features
+## What It Does
 
-### Core Capabilities
-- **🔍 Pattern-Based Detection**: Fast regex and glob-based vulnerability scanning
-- **🌊 Taint Flow Analysis**: Advanced data flow tracking from sources to sinks
-- **🔗 Cross-File Analysis**: Multi-file taint propagation and dependency tracking
-- **⚡ Parallel Processing**: Optimized for large codebases with configurable threading
-- **🎯 Smart Filtering**: Reduce false positives with advanced AST-based conditions
-- **📊 Multiple Output Formats**: Text, JSON, and CSV reporting
+- Scans source code for security issues using AST-aware rules.
+- Supports pattern mode and taint mode (source to sink tracking).
+- Handles multi-file projects and parallel execution.
+- Outputs findings as text, JSON, CSV, or SARIF.
+- Loads embedded rule packs by file extension, with optional file-based custom rules.
 
-### Language Support
+## Language Support
 
-| Language | Extensions | Parsing | Bundled Rules |
+| Language | Extensions | Parser | Bundled Rules |
 |---|---|---|---|
-| Python | `.py`, `.pyw`, `.pyi`, `.pyx` | ✅ | ✅ |
-| JavaScript | `.js`, `.mjs`, `.cjs`, `.jsx`, `.vue`, `.svelte` | ✅ | ✅ |
-| TypeScript / TSX | `.ts`, `.tsx`, `.mts`, `.cts` | ✅ | ✅ (reuses JavaScript rules) |
-| Java | `.java` | ✅ | ✅ |
-| PHP | `.php`, `.phtml` | ✅ | ✅ |
-| C# | `.cs`, `.csx` | ✅ | ✅ |
-| Go | `.go` | ✅ | ✅ |
-| Ruby | `.rb` | ✅ | ✅ |
-| HTML | `.html`, `.htm`, `.twig`, `.ejs`, `.hbs`, … | ✅ | ✅ |
-| Django templates | `.html` (Django syntax) | ✅ | ✅ (reuses HTML rules) |
+| Python | `.py`, `.pyw`, `.pyi`, `.pyx` | Yes | Yes |
+| JavaScript | `.js`, `.mjs`, `.cjs`, `.jsx`, `.vue`, `.svelte` | Yes | Yes |
+| TypeScript / TSX | `.ts`, `.tsx`, `.mts`, `.cts` | Yes | Yes (JS rules) |
+| Java | `.java` | Yes | Yes |
+| PHP | `.php`, `.phtml` | Yes | Yes |
+| C# | `.cs`, `.csx` | Yes | Yes |
+| Go | `.go` | Yes | Yes |
+| Ruby | `.rb` | Yes | Yes |
+| HTML | `.html`, `.htm`, `.twig`, `.ejs`, `.hbs`, ... | Yes | Yes |
+| Django templates | `.html` (Django syntax) | Yes | Yes (HTML rules) |
 
-All listed languages ship with curated embedded rule packs and tree-sitter parsers.
-Auto-detection loads the right rules per file extension.
+Not currently supported: Razor (`.cshtml`), C/C++ (`.c`, `.h`).
 
-**Not yet supported**: Razor (`.cshtml`), C/C++ (`.c`, `.h`).
+## Installation
 
-### Scanning Modes
-- **Auto-Detection Mode**: Automatically detects languages and loads appropriate rules
-- **Explicit Mode**: Scan specific languages with custom rule sets
-- **Taint Analysis Mode**: Deep data flow analysis for complex vulnerabilities
-
-## 📦 Installation
-
-### Prerequisites
-- Rust 1.85+ (install from [rustup.rs](https://rustup.rs/))
+Prerequisites:
+- Rust 1.85+
 - Git
 
-### Build from Source
+Build from source:
+
 ```bash
 git clone https://github.com/Corgea/Sighthound.git
 cd Sighthound
 cargo build --release
 ```
 
-The binary will be available at `target/release/sighthound`.
+Binary path: `target/release/sighthound`
 
-In order to build linux container compatible binary,
-Use `build_all_platforms.sh`
+Linux-container-compatible release export:
 
-Docker command to build
 ```bash
 DOCKER_BUILDKIT=1 docker build \
   --target export \
   --output type=local,dest=./sighthound_release \
   .
 ```
-The `sighthound` binary (plus the bundled `rules/`) is exported to `./sighthound_release/`.
 
-## 🎯 Quick Start
+Or run `./build_all_platforms.sh`.
 
-### Basic Usage
-```bash
-# Auto-detect languages and scan with default rules
-cargo run --bin sighthound -- /path/to/your/project
-
-# Scan specific language with custom rules
-cargo run --bin sighthound -- /path/to/project python rules/python/command_injection.ron
-
-# Enable taint analysis for deep vulnerability detection
-cargo run --bin sighthound -- --taint-analysis /path/to/project
-
-# Output results in JSON format
-cargo run --bin sighthound -- --output-format json /path/to/project > results.json
-```
-
-### Example Output
-```
-🚀 Starting Auto-Detection Scan (parallel mode)!
-📂 Target directory: /home/user/myproject
-🔍 Detected languages: python, javascript (in 23.45ms)
-
-🔍 Running scan with 127 rules
-📊 Scanned 1,247 files total with 127 rules across 2 languages
-⚡ File discovery: 23.45ms | Analysis: 1.23s
-
-🚨 Found 3 vulnerabilities:
-
-Critical: Command Injection
-📁 /home/user/myproject/app.py:42:5
-🔧 Function: execute_command
-💡 os.system(user_input)
-🔗 Taint flow: request.args['cmd'] → os.system()
-
-High: SQL Injection  
-📁 /home/user/myproject/db.py:15:12
-🔧 Function: get_user
-💡 cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
-```
-
-## 📋 Configuration
-
-### Command Line Options
-```bash
-USAGE:
-    sighthound [OPTIONS] <ROOT_DIR> [LANGUAGE] [RULES_PATH]
-
-ARGS:
-    <ROOT_DIR>     Root directory to scan for vulnerabilities
-    [LANGUAGE]     Programming language (python, java, javascript, tsx, php, csharp, go, ruby, html, django)
-    [RULES_PATH]   Path to rules file (.ron) or directory containing rules
-
-OPTIONS:
-    -o, --output-format <FORMAT>    Output format: text, json, or csv [default: text]
-    -v, --verbose                   Enable verbose output showing more details
-    -s, --summary-only              Only show vulnerability summary
-        --single-threaded           Disable parallel processing
-        --threads <NUM>             Number of threads for parallel processing
-        --taint-analysis            Run only taint analysis (data flow tracking)
-        --simple-analysis           Run only pattern-based search
-        --skip-minified <BOOL>      Skip minified JavaScript files (default: true)
-        --code-type <TYPE>          Filter by code type: frontend, backend, or both
-        --language-filter <LANG>    Restrict scanning to a single language
-        --rules-dir <PATH>          Custom rules directory (used with --use-file-rules)
-        --use-file-rules            Load rules from files instead of embedded rules
-    -h, --help                      Print help information
-        --version                   Print version, commit hash, and build date
-```
-
-With no analysis flag, Sighthound runs both pattern search and taint analysis.
-
-### Environment Variables
-```bash
-# Control logging level
-export RUST_LOG=debug
-
-# Set number of threads (alternative to --threads)
-export RAYON_NUM_THREADS=8
-```
-
-## 🔧 Rule System
-
-Sighthound uses a unified rule system written in RON (Rusty Object Notation) format that supports both pattern-based detection and taint flow analysis.
-
-### Rule Structure
-```ron
-(
-    rules: [
-        (
-            // Metadata
-            id: Some("python-cmd-injection"),
-            name: Some("Command Injection Detection"),
-            category: Some("injection"),
-            description: Some("User input flows to command execution"),
-            
-            // Analysis mode
-            mode: "taint", // or "search"
-            
-            // Taint analysis (mode: "taint")
-            sources: Some([
-                "request.args",
-                "request.form", 
-                "input(",
-                "sys.argv"
-            ]),
-            sinks: Some([
-                "os.system",
-                "subprocess.call",
-                "os.popen"
-            ]),
-            sanitizers: Some([
-                "shlex.quote",
-                "html.escape"
-            ]),
-            
-            // Pattern matching (mode: "search")
-            patterns: Some([
-                "eval(",
-                "exec(",
-                "regex:os\\.system\\([^)]*\\)"
-            ]),
-            
-            // Metadata
-            finding_type: Some("Command Injection"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            
-            // File filtering
-            file_types: Some((
-                extensions: Some([".py"]),
-                exclude_patterns: Some(["*test*", "*safe*"])
-            )),
-            
-            // Advanced filtering conditions
-            conditions: Some([
-                (
-                    field: "argument",
-                    operator: "not_literal",
-                    value: "",
-                    argument_position: Some(0)
-                )
-            ])
-        )
-    ]
-)
-```
-
-### Built-in Rule Categories
-- **Command Injection**: OS command execution with user input
-- **SQL Injection**: Database query manipulation  
-- **Cross-Site Scripting (XSS)**: DOM and template injection
-- **Path Traversal**: File system access vulnerabilities
-- **Code Injection**: Dynamic code execution risks
-- **Cryptographic Issues**: Weak encryption and key management
-- **Deserialization**: Unsafe object deserialization
-
-### Creating Custom Rules
-See [Rule Writing Guide](rules/RULE_WRITING_GUIDE.md) for detailed instructions on creating effective security rules.
-
-## 🏗️ Architecture
-
-### Core Components
-
-```
-src/
-├── main.rs              # CLI entry point and orchestration
-├── cli.rs               # CLI argument definitions (re-exported from models)
-├── lib.rs               # Library interface and exports
-├── models.rs            # Core data structures (Finding, TaintFlow, etc.)
-├── language.rs          # Language-specific parsers and support
-├── rules.rs             # Rule loading and pattern matching
-├── parser.rs            # Tree-sitter AST parsing utilities
-├── common.rs            # Shared utilities and helpers
-├── config.rs            # Configuration and defaults
-├── code_type_detector.rs  # Frontend/backend code-type detection
-└── scanner/
-    ├── core.rs          # Main scanning engine and algorithms
-    ├── modes.rs         # Scanning mode implementations
-    ├── conditions.rs    # AST condition checking
-    ├── utils.rs         # Scanning utilities
-    └── prefilter.rs     # Performance optimization filters
-```
-
-### Key Design Principles
-
-1. **Performance First**: Parallel processing, memory mapping, and efficient AST traversal
-2. **Accuracy**: Advanced taint analysis with cross-file tracking to minimize false positives
-3. **Extensibility**: Plugin-based language support and flexible rule system
-4. **Usability**: Clear output, progress tracking, and comprehensive error handling
-
-### Data Flow
-
-```mermaid
-graph TD
-    A[Source Code] --> B[File Discovery]
-    B --> C[Language Detection]
-    C --> D[Rule Loading]
-    D --> E[AST Parsing]
-    E --> F[Pattern Matching]
-    E --> G[Taint Analysis]
-    F --> H[Vulnerability Detection]
-    G --> H
-    H --> I[Result Filtering]
-    I --> J[Output Generation]
-```
-
-## 📊 Performance
-
-### Optimization Features
-- **Memory Mapping**: Efficient file reading for large files
-- **Prefiltering**: Skip irrelevant files and functions early
-- **Smart Threading**: Avoid over-subscription and contention
-
-## 🧪 Testing
-
-### Running Tests
+## Quick Start
 
 ```bash
-# Run all tests
-cargo test
+# Auto-detect languages and run embedded rules
+cargo run --bin sighthound -- /path/to/project
 
-# Run specific test suites
-cargo test --test unit_tests
-cargo test --test integration_tests
-cargo test --test end_to_end_tests
+# Explicit language + custom rules path
+cargo run --bin sighthound -- /path/to/project python rules/python
 
-# Test with specific files
-cargo run --bin sighthound -- tests/test_files/python/comprehensive_taint_test.py
+# Taint-only scan and JSON output
+cargo run --bin sighthound -- --taint-analysis --output-format json /path/to/project > findings.json
+
+# SARIF output for GitHub Code Scanning
+cargo run --bin sighthound -- --output-format sarif /path/to/project > results.sarif
 ```
 
-### Test Coverage
-- **Unit Tests**: Individual component functionality
-- **Integration Tests**: Cross-component interactions
-- **End-to-End Tests**: Full scanning workflows
-- **Accuracy Tests**: Vulnerability detection validation
-- **Performance Tests**: Large file handling and scaling
+CLI shape:
 
-### Sample Test Files
-The `tests/test_files/` directory contains comprehensive test cases:
-- **True Positives**: Confirmed vulnerabilities that should be detected
-- **True Negatives**: Safe code that should not trigger alerts
-- **Edge Cases**: Complex scenarios and boundary conditions
-- **Multi-File Tests**: Cross-file dependency and import scenarios
+```bash
+sighthound [OPTIONS] <ROOT_DIR> [LANGUAGE] [RULES_PATH]
+```
 
-## 🤝 Contributing
+Run `sighthound --help` for the full option list.
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+## GitHub Code Scanning
 
-### Development Workflow
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes and add tests
-4. Confirm the build and tests: `cargo build --release && cargo test`
-5. Submit a pull request
+The `sarif` output format writes SARIF 2.1.0, which GitHub Code Scanning
+ingests directly. Upload it from a workflow so findings appear inline on the
+pull request and in the repository's Security tab:
 
-### Areas for Contribution
-- **New Language Support**: Add parsers for additional languages
-- **Rule Development**: Create rules for new vulnerability types
-- **Performance Optimization**: Improve scanning speed and memory usage
-- **Documentation**: Enhance guides and examples
-- **Integration**: IDE plugins, CI/CD integrations
+Run the scan from the repository root and use `.` (or the repository root's
+absolute path) as `<ROOT_DIR>` so SARIF artifact URIs stay repository-relative.
 
-## 📚 Documentation
+```yaml
+- name: Run Sighthound
+  run: sighthound --output-format sarif . > results.sarif
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: results.sarif
+```
 
-- [Rule Writing Guide](rules/RULE_WRITING_GUIDE.md) - Create custom security rules
-- [Language Support](src/language.rs) - Adding new programming languages
+## Rules
 
-## 🐛 Known Issues & Limitations
+Rules are written in RON and support both:
+- `mode: "search"` for pattern matching
+- `mode: "taint"` for source/sink/sanitizer analysis
 
-### Current Limitations
-- **Razor / ASP.NET views**: `.cshtml` files are not detected or scanned.
-- **JavaScript minified files**: May produce false positives (use `--skip-minified`).
-  Detection currently relies on file naming patterns.
-- **Multi-file taint**: Requires more testing.
-- **Dynamic languages**: Runtime-only vulnerabilities may not be detected.
-- **Performance**: Very large files (>10MB) may impact scanning speed.
+Start here:
+- [Rule Writing Guide](rules/RULE_WRITING_GUIDE.md)
+- [Bundled rules directory](rules)
 
+## Development
 
-### Roadmap
-- [ ] **Razor support**: `.cshtml` detection and view-layer XSS/CSRF rules
-- [ ] **C/C++ support**: Parsers and rule packs for `.c` / `.h`
-- [ ] **IDE integration**: VS Code and JetBrains plugins
-- [ ] **CI/CD integration**: GitHub Actions, GitLab CI templates
-- [ ] **Advanced analysis**: Control flow and symbolic execution
-- [ ] **Incremental scanning**: Cache and diff-based analysis
+Core commands:
 
-## 🏢 Credits
+```bash
+make check        # fix + format + lint + test + suppression report
+make pre-commit   # staged Rust files (hook)
+make pre-push     # push gate checks
+make ci           # strict CI pipeline
+```
 
-Developed by the [Corgea Team](https://github.com/corgea) as part of our mission to make application security accessible and automated.
+Additional quality gates:
 
-### Acknowledgments
-- **Tree-sitter**: Excellent parsing library enabling multi-language support
-- **Rust Community**: Amazing ecosystem and tooling
-- **Security Researchers**: Vulnerability patterns and detection techniques
+```bash
+make complexity
+make audit
+make acceptance
+cargo harness coverage --min=0
+cargo harness crap --max=30
+```
 
-Third-party license notices: see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+## Limitations
 
----
+- Runtime-only vulnerabilities in dynamic code paths may be missed.
+- Very large files can increase scan time.
+- Multi-file taint is supported but still an area to harden further.
 
-<div align="center">
+## Contributing
 
-Made with ❤️ by the Corgea Team
+- [Contributing Guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
 
-</div> 
+## License
+
+- [MIT License](LICENSE)
+- [Third-Party Notices](THIRD-PARTY-NOTICES.md)

@@ -3,6 +3,7 @@ use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{BufWriter, Write};
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread::JoinHandle;
@@ -157,6 +158,289 @@ pub fn print_findings_json(findings: &[Finding]) -> Result<()> {
     writeln!(out, "{}", json)?;
     out.flush()?;
     Ok(())
+}
+
+/// Map a finding severity to a SARIF result `level` and the GitHub-recognized
+/// `security-severity` score. GitHub Code Scanning reads `security-severity`
+/// (a CVSS-style number) to bucket alerts; `level` drives the icon/state.
+fn sarif_severity(severity: &str) -> (&'static str, &'static str, u8) {
+    match severity.to_ascii_lowercase().as_str() {
+        "critical" => ("error", "9.5", 4),
+        "high" => ("error", "8.9", 3),
+        "medium" => ("warning", "5.5", 2),
+        "low" => ("note", "2.0", 1),
+        _ => ("warning", "5.5", 2),
+    }
+}
+
+fn sarif_uri(file: &str, repository_root: Option<&Path>) -> String {
+    let path = Path::new(file);
+    let relative_path =
+        repository_root.and_then(|root| path.strip_prefix(root).ok()).unwrap_or(path);
+    let relative_path = relative_path.strip_prefix(".").unwrap_or(relative_path);
+    relative_path.to_string_lossy().replace('\\', "/")
+}
+
+/// Build a SARIF 2.1.0 log for GitHub Code Scanning and other SARIF consumers
+/// (GitLab, Azure DevOps, the VS Code SARIF viewer).
+///
+/// Produces a single run with a deduplicated `rules` array (one reporting
+/// descriptor per finding type / CWE) and one `results` entry per finding.
+fn build_sarif_log(findings: &[Finding]) -> serde_json::Value {
+    let repository_root = std::env::current_dir().ok();
+
+    // Stable rule id: prefer the CWE id, fall back to a slug of the finding type.
+    let rule_id_for = |f: &Finding| -> String {
+        match &f.cwe_id {
+            Some(cwe) if !cwe.is_empty() => cwe.to_ascii_lowercase(),
+            _ => f
+                .finding_type
+                .to_ascii_lowercase()
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                .collect(),
+        }
+    };
+
+    // Deduplicate rules by id, preserving first-seen order for deterministic output.
+    let mut rule_index: BTreeMap<String, usize> = BTreeMap::new();
+    let mut rules: Vec<serde_json::Value> = Vec::new();
+    let mut rule_severity_ranks = Vec::new();
+    for finding in findings {
+        let id = rule_id_for(finding);
+        let (_, security_severity, severity_rank) = sarif_severity(&finding.severity);
+        if let Some(&index) = rule_index.get(&id) {
+            if severity_rank > rule_severity_ranks[index] {
+                rules[index]["properties"]["security-severity"] =
+                    serde_json::json!(security_severity);
+                rule_severity_ranks[index] = severity_rank;
+            }
+            continue;
+        }
+        rule_index.insert(id.clone(), rules.len());
+        rule_severity_ranks.push(severity_rank);
+
+        let mut tags = vec![serde_json::json!("security")];
+        let mut rule = serde_json::json!({
+            "id": id,
+            "name": finding.finding_type,
+            "shortDescription": { "text": finding.finding_type },
+            "fullDescription": {
+                "text": finding.description.clone().unwrap_or_else(|| finding.finding_type.clone())
+            },
+        });
+        if let Some(cwe) = &finding.cwe_id {
+            if !cwe.is_empty() {
+                tags.push(serde_json::json!(format!("external/cwe/{}", id)));
+                // cwe ids look like "cwe-78"; derive the numeric part for the help URI.
+                if let Some(num) = cwe.rsplit('-').next() {
+                    if num.chars().all(|c| c.is_ascii_digit()) && !num.is_empty() {
+                        rule["helpUri"] = serde_json::json!(format!(
+                            "https://cwe.mitre.org/data/definitions/{}.html",
+                            num
+                        ));
+                    }
+                }
+            }
+        }
+        rule["properties"] = serde_json::json!({
+            "tags": tags,
+            "security-severity": security_severity,
+        });
+        rules.push(rule);
+    }
+
+    // One SARIF result per finding.
+    let results: Vec<serde_json::Value> = findings
+        .iter()
+        .map(|finding| {
+            let rule_id = rule_id_for(finding);
+            let rule_index = rule_index[&rule_id];
+            let (level, _, _) = sarif_severity(&finding.severity);
+            // SARIF regions are 1-based; clamp so a 0 line never emits invalid output.
+            let start_line = finding.line.max(1);
+            let end_line = finding.end_line.max(start_line);
+            let start_column = finding.column.max(1);
+            let end_column = finding.end_column.max(start_column);
+            serde_json::json!({
+                "ruleId": rule_id,
+                "ruleIndex": rule_index,
+                "level": level,
+                "message": {
+                    "text": finding.description.clone().unwrap_or_else(|| finding.finding_type.clone())
+                },
+                "locations": [{
+                    "physicalLocation": {
+                        "artifactLocation": {
+                            "uri": sarif_uri(&finding.file, repository_root.as_deref())
+                        },
+                        "region": {
+                            "startLine": start_line,
+                            "startColumn": start_column,
+                            "endLine": end_line,
+                            "endColumn": end_column,
+                            "snippet": { "text": finding.snippet }
+                        }
+                    }
+                }]
+            })
+        })
+        .collect();
+
+    serde_json::json!({
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/sarif-2.1/schema/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "Sighthound",
+                    "informationUri": "https://github.com/Corgea/Sighthound",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "rules": rules
+                }
+            },
+            "results": results
+        }]
+    })
+}
+
+/// Print findings as a SARIF 2.1.0 log to stdout.
+pub fn print_findings_sarif(findings: &[Finding]) -> Result<()> {
+    let json = serde_json::to_string_pretty(&build_sarif_log(findings))?;
+    let stdout = std::io::stdout();
+    let mut out = BufWriter::new(stdout.lock());
+    writeln!(out, "{}", json)?;
+    out.flush()?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod sarif_tests {
+    use super::{build_sarif_log, sarif_uri};
+    use crate::models::Finding;
+    use std::path::Path;
+
+    fn finding(finding_type: &str, severity: &str, cwe: Option<&str>, line: usize) -> Finding {
+        Finding {
+            file: "src/app.py".to_string(),
+            line,
+            column: 5,
+            end_line: line,
+            end_column: 30,
+            function: "os.system".to_string(),
+            finding_type: finding_type.to_string(),
+            snippet: "os.system(cmd)".to_string(),
+            severity: severity.to_string(),
+            confidence: "Medium".to_string(),
+            description: Some("OS command execution sink".to_string()),
+            cwe_id: cwe.map(str::to_string),
+            source_info: None,
+            sink_info: None,
+            traces: None,
+            tags: None,
+        }
+    }
+
+    #[test]
+    fn emits_valid_sarif_shape() {
+        let findings = vec![
+            finding("Command Injection", "High", Some("cwe-78"), 6),
+            finding("Command Injection", "High", Some("cwe-78"), 15),
+            finding("SQL Injection", "Medium", Some("cwe-89"), 9),
+        ];
+        let log = build_sarif_log(&findings);
+
+        assert_eq!(log["version"], "2.1.0");
+        assert!(log["$schema"].as_str().unwrap().contains("sarif-schema-2.1.0"));
+
+        let run = &log["runs"][0];
+        assert_eq!(run["tool"]["driver"]["name"], "Sighthound");
+
+        // One result per finding.
+        assert_eq!(run["results"].as_array().unwrap().len(), 3);
+
+        // Rules are deduplicated by CWE: two distinct rules for three findings.
+        let rules = run["tool"]["driver"]["rules"].as_array().unwrap();
+        assert_eq!(rules.len(), 2);
+
+        // First result maps severity, region, and location correctly.
+        let first = &run["results"][0];
+        assert_eq!(first["ruleId"], "cwe-78");
+        assert_eq!(first["ruleIndex"], 0);
+        assert_eq!(first["level"], "error");
+        let region = &first["locations"][0]["physicalLocation"]["region"];
+        assert_eq!(region["startLine"], 6);
+        assert_eq!(region["startColumn"], 5);
+        assert_eq!(
+            first["locations"][0]["physicalLocation"]["artifactLocation"]["uri"],
+            "src/app.py"
+        );
+
+        // CWE rule carries the GitHub security-severity property and cwe tag.
+        let cwe_rule = rules.iter().find(|r| r["id"] == "cwe-78").expect("cwe-78 rule present");
+        assert_eq!(cwe_rule["properties"]["security-severity"], "8.9");
+        let tags = cwe_rule["properties"]["tags"].as_array().unwrap();
+        assert!(tags.iter().any(|t| t == "external/cwe/cwe-78"));
+    }
+
+    #[test]
+    fn clamps_zero_line_to_valid_region() {
+        let findings = vec![Finding {
+            line: 0,
+            column: 0,
+            end_line: 0,
+            end_column: 0,
+            ..finding("Unknown", "Low", None, 0)
+        }];
+        let log = build_sarif_log(&findings);
+        let region = &log["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
+        // SARIF requires startLine >= 1; a 0-line finding must still be valid.
+        assert_eq!(region["startLine"], 1);
+        assert_eq!(region["startColumn"], 1);
+    }
+
+    #[test]
+    fn normalizes_cwe_ids_and_assigns_deduplicated_rule_indexes() {
+        let findings = vec![
+            finding("Command Injection", "High", Some("CWE-78"), 6),
+            finding("Command Injection", "High", Some("cwe-78"), 15),
+            finding("SQL Injection", "Medium", Some("CWE-89"), 9),
+        ];
+        let log = build_sarif_log(&findings);
+        let run = &log["runs"][0];
+        let rules = run["tool"]["driver"]["rules"].as_array().unwrap();
+
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[0]["id"], "cwe-78");
+        assert_eq!(run["results"][0]["ruleId"], "cwe-78");
+        assert_eq!(run["results"][0]["ruleIndex"], 0);
+        assert_eq!(run["results"][1]["ruleId"], "cwe-78");
+        assert_eq!(run["results"][1]["ruleIndex"], 0);
+        assert_eq!(run["results"][2]["ruleIndex"], 1);
+    }
+
+    #[test]
+    fn uses_maximum_security_severity_for_a_shared_rule() {
+        for (first, second) in [("Low", "Critical"), ("Critical", "Low")] {
+            let findings = vec![
+                finding("Cross-site Scripting", first, Some("cwe-79"), 6),
+                finding("Cross-site Scripting", second, Some("cwe-79"), 15),
+            ];
+            let log = build_sarif_log(&findings);
+            let rule = &log["runs"][0]["tool"]["driver"]["rules"][0];
+
+            assert_eq!(rule["properties"]["security-severity"], "9.5");
+        }
+    }
+
+    #[test]
+    fn emits_repository_relative_uris() {
+        let repository_root = Path::new("/repo");
+
+        assert_eq!(sarif_uri("./src/app.py", Some(repository_root)), "src/app.py");
+        assert_eq!(sarif_uri("/repo/src/app.py", Some(repository_root)), "src/app.py");
+        assert_eq!(sarif_uri("backend/src/app.py", Some(repository_root)), "backend/src/app.py");
+    }
 }
 
 /// Print findings in CSV format
