@@ -6,7 +6,7 @@
 
 Tree-sitter based static vulnerability scanner with pattern matching and taint-flow analysis.
 
-[![Rust](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.88+-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/Corgea/Sighthound/actions/workflows/ci.yml/badge.svg)](https://github.com/Corgea/Sighthound/actions/workflows/ci.yml)
 
@@ -40,7 +40,7 @@ Not currently supported: Razor (`.cshtml`), C/C++ (`.c`, `.h`).
 ## Installation
 
 Prerequisites:
-- Rust 1.85+
+- Rust 1.88+
 - Git
 
 Build from source:
