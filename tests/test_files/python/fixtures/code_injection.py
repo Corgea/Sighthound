@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
-"""
-Debug string matching test
-"""
 
 import os
 
-# Test 1: Simple eval
 user_input = os.environ.get("USER_DATA")
+
 eval(user_input)
+eval("print('hello')")
 
-# Test 2: Simple exec
 exec(user_input)
+exec("print('hello')")
 
-# Test 3: Simple os.system
 os.system(user_input)

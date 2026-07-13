@@ -7,7 +7,7 @@ use super::helpers::*;
 fn django_views_fixture_detects_known_vulnerabilities() {
     let staging = stage_dir();
 
-    stage_file(staging.path(), "tests/test_files/python/django/django_views.py", "views.py", &[]);
+    stage_file(staging.path(), "tests/test_files/django/fixtures/views.py", "views.py", &[]);
 
     let findings = scan_python_simple_with_rules(staging.path(), load_production_python_rules());
     let types: std::collections::BTreeSet<_> =

@@ -104,7 +104,7 @@ mod django_xss_tests {
                     VulnerabilityScanner::new("python", rules).expect("Failed to create scanner");
                 let results = scanner
                     .find_vulnerabilities_single_threaded(
-                        "tests/test_files/python/django",
+                        "tests/test_files/django/fixtures",
                         "python",
                     )
                     .expect("Failed to scan directory");
@@ -121,10 +121,10 @@ mod django_xss_tests {
 
     #[test]
     fn test_django_scanner_output() {
-        // Skip if django directory doesn't exist
-        let django_dir = Path::new("tests/test_files/python/django");
+        // Skip if django fixtures directory doesn't exist
+        let django_dir = Path::new("tests/test_files/django/fixtures");
         if !django_dir.exists() {
-            println!("Skipping Django test because tests/test_files/python/django directory doesn't exist");
+            println!("Skipping Django test because tests/test_files/django/fixtures directory doesn't exist");
             return;
         }
     }

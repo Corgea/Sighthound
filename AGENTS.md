@@ -21,3 +21,22 @@ flags (`--min`, `--max`, `--enforce`) by invoking the runner directly, e.g.
 - Sync: `make sync-agents-md` — rewrite the git-ignored CLAUDE.md mirror from AGENTS.md
 - Setup: `make setup-hooks` to install git pre-commit + pre-push hooks and materialize the git-ignored agent files (CLAUDE.md mirror plus the `.claude/` + `.codex/` Stop hook wiring)
 - Stop hook: auto-formats/fixes changed files, then runs complexity and CRAP (`make stop-hook`)
+
+## Python / Django test naming
+
+Pytest and scan fixtures both live under these trees — do not put Python/Django pytest elsewhere (e.g. not `tmp_tests/`):
+
+- `tests/test_files/python/`
+- `tests/test_files/django/`
+
+1. **Pytest** (executable checks at the tree root): use pytest throughout.
+   - Files: `test_*.py`
+   - Functions: `test_*`
+   - Classes: `Test*`
+   - Do not use `*_test.py` — both work with pytest, but this repo standardizes on the prefix form.
+
+2. **Scan fixtures** (vulnerable/safe sample code scanned by Rust tests — not pytest):
+   - Live under `fixtures/` only: `tests/test_files/python/fixtures/`, `tests/test_files/django/fixtures/`
+   - Name by topic: `sql_injection.py`, `command_injection.py`, `views.py`
+   - Avoid `test_*.py` / `*_test.py` and `def test_*` so fixtures are not collected by pytest and do not collide with scanner test-skip patterns.
+   - Django app samples use app-like names (`views.py`, `migration_sample.py`).

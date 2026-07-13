@@ -19,7 +19,7 @@ app = Flask(__name__)
 # ============================
 
 
-def test_all_weak_crypto_patterns():
+def scenario_all_weak_crypto_patterns():
     """Test all weak cryptography patterns that should be detected"""
 
     # Hashlib weak algorithms
@@ -39,7 +39,7 @@ def test_all_weak_crypto_patterns():
     return "All weak crypto patterns tested"
 
 
-def test_sql_execution_patterns():
+def scenario_sql_execution_patterns():
     """Test SQL execution patterns that should be detected"""
 
     conn = sqlite3.connect(":memory:")
@@ -62,7 +62,7 @@ def test_sql_execution_patterns():
 # ============================
 
 
-def test_all_source_patterns():
+def scenario_all_source_patterns():
     """Test all taint source patterns"""
 
     # Request sources
@@ -79,7 +79,7 @@ def test_all_source_patterns():
     return [arg_data, form_data, json_data, user_input, env_data]
 
 
-def test_all_sink_patterns():
+def scenario_all_sink_patterns():
     """Test all taint sink patterns"""
     data = "test_data"
 
@@ -100,7 +100,7 @@ def test_all_sink_patterns():
     return "All sink patterns tested"
 
 
-def test_complex_taint_flows():
+def scenario_complex_taint_flows():
     """Test complex taint propagation scenarios"""
 
     # Multi-source flow
@@ -119,7 +119,7 @@ def test_complex_taint_flows():
     return "Complex taint flows tested"
 
 
-def test_sanitization_scenarios():
+def scenario_sanitization_scenarios():
     """Test various sanitization scenarios"""
 
     # Sanitized flow 1
@@ -140,7 +140,7 @@ def test_sanitization_scenarios():
 # ============================
 
 
-def test_crypto_plus_injection():
+def scenario_crypto_plus_injection():
     """Test weak crypto combined with injection vulnerabilities"""
 
     # Source: user password
@@ -156,7 +156,7 @@ def test_crypto_plus_injection():
     return "Crypto + injection tested"
 
 
-def test_sql_search_and_taint():
+def scenario_sql_search_and_taint():
     """Test SQL vulnerabilities detected by both search and taint"""
 
     # User input (taint source)
@@ -174,7 +174,7 @@ def test_sql_search_and_taint():
     return "SQL search + taint tested"
 
 
-def test_nested_function_calls():
+def scenario_nested_function_calls():
     """Test nested function calls with taint"""
 
     def process_input(data):
@@ -191,7 +191,7 @@ def test_nested_function_calls():
     return result
 
 
-def test_conditional_flows():
+def scenario_conditional_flows():
     """Test taint flows through conditional statements"""
 
     user_input = request.args.get("action")
@@ -206,7 +206,7 @@ def test_conditional_flows():
     return "Conditional flows tested"
 
 
-def test_loop_propagation():
+def scenario_loop_propagation():
     """Test taint propagation through loops"""
 
     commands = request.args.getlist("commands")
@@ -223,7 +223,7 @@ def test_loop_propagation():
 # ============================
 
 
-def test_multiple_assignments():
+def scenario_multiple_assignments():
     """Test multiple assignments in taint flow"""
 
     source = request.args.get("data")
@@ -237,7 +237,7 @@ def test_multiple_assignments():
     return "Multiple assignments tested"
 
 
-def test_string_operations():
+def scenario_string_operations():
     """Test taint through string operations"""
 
     base_cmd = request.args.get("base")
@@ -259,7 +259,7 @@ def test_string_operations():
     return "String operations tested"
 
 
-def test_mixed_sources_single_sink():
+def scenario_mixed_sources_single_sink():
     """Test multiple sources flowing to single sink"""
 
     arg_data = request.args.get("arg")
@@ -280,8 +280,8 @@ if __name__ == "__main__":
     print("Run with Flask to test web-based patterns")
 
     # Test non-web patterns
-    test_all_weak_crypto_patterns()
-    test_sql_execution_patterns()
-    test_all_sink_patterns()
+    scenario_all_weak_crypto_patterns()
+    scenario_sql_execution_patterns()
+    scenario_all_sink_patterns()
 
     print("Non-web patterns tested successfully")

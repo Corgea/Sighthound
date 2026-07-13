@@ -8,37 +8,37 @@ import sys
 import subprocess
 
 
-def test_direct_variable_usage():
+def scenario_direct_variable_usage():
     """Test 1: Direct variable usage - should work"""
     user_input = os.environ.get("USER_DATA")
     eval(user_input)  # Direct usage
 
 
-def test_f_string_formatting():
+def scenario_f_string_formatting():
     """Test 2: F-string formatting - currently fails"""
     user_input = os.environ.get("USER_DATA")
     eval(f"print({user_input})")  # F-string
 
 
-def test_string_format_method():
+def scenario_string_format_method():
     """Test 3: String format method - currently fails"""
     user_input = os.environ.get("USER_DATA")
     eval("print({})".format(user_input))  # Format method
 
 
-def test_string_concatenation():
+def scenario_string_concatenation():
     """Test 4: String concatenation - currently fails"""
     user_input = os.environ.get("USER_DATA")
     eval("print(" + user_input + ")")  # Concatenation
 
 
-def test_percent_formatting():
+def scenario_percent_formatting():
     """Test 5: Percent formatting - currently fails"""
     user_input = os.environ.get("USER_DATA")
     eval("print(%s)" % user_input)  # Percent formatting
 
 
-def test_multiple_variables():
+def scenario_multiple_variables():
     """Test 6: Multiple variables in one sink"""
     user_input = os.environ.get("USER_DATA")
     db_config = os.environ.get("DB_CONFIG")
@@ -46,7 +46,7 @@ def test_multiple_variables():
     eval(db_config)  # Should work
 
 
-def test_nested_function_calls():
+def scenario_nested_function_calls():
     """Test 7: Nested function calls"""
 
     def get_tainted_data():
@@ -56,7 +56,7 @@ def test_nested_function_calls():
     eval(user_input)  # Should work
 
 
-def test_class_methods():
+def scenario_class_methods():
     """Test 8: Class methods"""
 
     class DataProvider:
@@ -68,7 +68,7 @@ def test_class_methods():
     eval(user_input)  # Should work
 
 
-def test_different_sink_types():
+def scenario_different_sink_types():
     """Test 9: Different sink types"""
     user_input = os.environ.get("USER_DATA")
 
@@ -79,21 +79,21 @@ def test_different_sink_types():
     subprocess.call(user_input, shell=True)  # subprocess.call
 
 
-def test_command_line_args():
+def scenario_command_line_args():
     """Test 10: Command line arguments"""
     if len(sys.argv) > 1:
         user_input = sys.argv[1]
         eval(user_input)  # Should work
 
 
-def test_input_function():
+def scenario_input_function():
     """Test 11: Input function"""
     # user_input = input("Enter data: ")  # Commented out to avoid blocking
     user_input = "test_input"  # Simulated input
     eval(user_input)  # Should work
 
 
-def test_safe_vs_unsafe():
+def scenario_safe_vs_unsafe():
     """Test 12: Safe vs unsafe patterns"""
     # Unsafe - should be detected
     user_input = os.environ.get("USER_DATA")
@@ -104,7 +104,7 @@ def test_safe_vs_unsafe():
     eval(safe_data)
 
 
-def test_complex_expressions():
+def scenario_complex_expressions():
     """Test 13: Complex expressions"""
     user_input = os.environ.get("USER_DATA")
 
@@ -116,20 +116,20 @@ def test_complex_expressions():
     result = eval(f"process({user_input})")  # Should fail
 
 
-def test_import_statements():
+def scenario_import_statements():
     """Test 14: Import statements"""
     module_name = os.environ.get("MODULE_NAME")
     __import__(module_name)  # Should work
 
 
-def test_file_operations():
+def scenario_file_operations():
     """Test 15: File operations"""
     filename = os.environ.get("FILENAME")
     with open(filename, "r") as f:  # Should work
         pass
 
 
-def test_sql_operations():
+def scenario_sql_operations():
     """Test 16: SQL operations"""
     import sqlite3
 
@@ -142,19 +142,19 @@ def test_sql_operations():
 
 if __name__ == "__main__":
     # Run all tests
-    test_direct_variable_usage()
-    test_f_string_formatting()
-    test_string_format_method()
-    test_string_concatenation()
-    test_percent_formatting()
-    test_multiple_variables()
-    test_nested_function_calls()
-    test_class_methods()
-    test_different_sink_types()
-    test_command_line_args()
-    test_input_function()
-    test_safe_vs_unsafe()
-    test_complex_expressions()
-    test_import_statements()
-    test_file_operations()
-    test_sql_operations()
+    scenario_direct_variable_usage()
+    scenario_f_string_formatting()
+    scenario_string_format_method()
+    scenario_string_concatenation()
+    scenario_percent_formatting()
+    scenario_multiple_variables()
+    scenario_nested_function_calls()
+    scenario_class_methods()
+    scenario_different_sink_types()
+    scenario_command_line_args()
+    scenario_input_function()
+    scenario_safe_vs_unsafe()
+    scenario_complex_expressions()
+    scenario_import_statements()
+    scenario_file_operations()
+    scenario_sql_operations()

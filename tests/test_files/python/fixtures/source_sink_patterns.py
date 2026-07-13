@@ -11,7 +11,7 @@ from flask import Flask, request
 app = Flask(__name__)
 
 
-def test_sources_with_crypto():
+def scenario_sources_with_crypto():
     """Test cases where sources feed into crypto sinks"""
 
     # Source: user input via request
@@ -23,7 +23,7 @@ def test_sources_with_crypto():
     return weak_hash.hexdigest()
 
 
-def test_sources_with_sql():
+def scenario_sources_with_sql():
     """Test cases where sources feed into SQL sinks"""
 
     # Source: user input via request
@@ -37,7 +37,7 @@ def test_sources_with_sql():
     return cursor.fetchall()
 
 
-def test_environment_source():
+def scenario_environment_source():
     """Test environment variable as source"""
 
     # Source: environment variable
@@ -49,7 +49,7 @@ def test_environment_source():
     return hash_result
 
 
-def test_input_source():
+def scenario_input_source():
     """Test direct input as source"""
 
     # Source: user input
@@ -61,7 +61,7 @@ def test_input_source():
     return result
 
 
-def test_multiple_sources():
+def scenario_multiple_sources():
     """Test multiple sources in same function"""
 
     # Source 1: request parameter
@@ -79,7 +79,7 @@ def test_multiple_sources():
     return final_hash
 
 
-def test_no_source():
+def scenario_no_source():
     """Test sink without obvious source (should only show sink)"""
 
     # No source - just literal data

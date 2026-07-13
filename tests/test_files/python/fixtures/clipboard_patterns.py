@@ -12,14 +12,14 @@ from tkinter import clipboard
 import win32clipboard
 
 
-def test_pyperclip():
+def scenario_pyperclip():
     # Should be detected by patterns: ["pyperclip.paste", "pyperclip.copy"]
     data = pyperclip.paste()
     pyperclip.copy("some data")
     return data
 
 
-def test_pandas_clipboard():
+def scenario_pandas_clipboard():
     # Should be detected by pattern: "pandas.read_clipboard"
     df = pd.read_clipboard()
 
@@ -28,21 +28,21 @@ def test_pandas_clipboard():
     return df
 
 
-def test_tkinter_clipboard():
+def scenario_tkinter_clipboard():
     # Should be detected by pattern: "tkinter.clipboard"
     root = tk.Tk()
     clipboard.get()
     clipboard.append("data")
 
 
-def test_win32_clipboard():
+def scenario_win32_clipboard():
     # Should be detected by pattern: "win32clipboard"
     win32clipboard.OpenClipboard()
     data = win32clipboard.GetClipboardData()
     win32clipboard.CloseClipboard()
 
 
-def test_keyboard_hooks():
+def scenario_keyboard_hooks():
     # These should be detected by the keyboard patterns
     import keyboard
 
@@ -50,7 +50,7 @@ def test_keyboard_hooks():
     keyboard.on_press(lambda x: print(x))
 
 
-def test_suspicious_domains():
+def scenario_suspicious_domains():
     # These should be detected by suspicious domain patterns
     import requests
 
@@ -60,7 +60,7 @@ def test_suspicious_domains():
     requests.get("http://fake.cf/virus")
 
 
-def test_url_shorteners():
+def scenario_url_shorteners():
     # These should be detected by URL shortener patterns
     import urllib.request
 
@@ -70,10 +70,10 @@ def test_url_shorteners():
 
 
 if __name__ == "__main__":
-    test_pyperclip()
-    test_pandas_clipboard()
-    test_tkinter_clipboard()
-    test_win32_clipboard()
-    test_keyboard_hooks()
-    test_suspicious_domains()
-    test_url_shorteners()
+    scenario_pyperclip()
+    scenario_pandas_clipboard()
+    scenario_tkinter_clipboard()
+    scenario_win32_clipboard()
+    scenario_keyboard_hooks()
+    scenario_suspicious_domains()
+    scenario_url_shorteners()
