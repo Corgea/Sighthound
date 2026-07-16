@@ -37,9 +37,9 @@ fn braille_bar(frac: f64, width: usize) -> String {
     let mut bar = String::with_capacity(width * 3);
     for cell in 0..width {
         let mut code = 0u32;
-        for col in 0..2 {
+        for (col, &mask) in FULL_COL.iter().enumerate() {
             if cell * 2 + col < lit {
-                code |= FULL_COL[col];
+                code |= mask;
             }
         }
         bar.push(char::from_u32(0x2800 + code).unwrap_or(' '));
@@ -115,9 +115,7 @@ pub fn print_summary(findings: &[Finding], duration: std::time::Duration) {
         *finding_types.entry(finding.finding_type.clone()).or_insert(0) += 1;
         *file_counts.entry(finding.file.clone()).or_insert(0) += 1;
         // Track the worst severity seen in each file, for the heat-bar colour.
-        let worst = file_worst
-            .entry(finding.file.clone())
-            .or_insert_with(|| sev.clone());
+        let worst = file_worst.entry(finding.file.clone()).or_insert_with(|| sev.clone());
         if severity_rank(&sev) > severity_rank(worst) {
             *worst = sev;
         }
@@ -142,10 +140,8 @@ pub fn print_summary(findings: &[Finding], duration: std::time::Duration) {
     // keeps just the line above, unchanged).
     if crate::ui::color_enabled() {
         const WIDTH: usize = 24;
-        let counts: Vec<usize> = severity_order
-            .iter()
-            .map(|s| severity_counts.get(*s).copied().unwrap_or(0))
-            .collect();
+        let counts: Vec<usize> =
+            severity_order.iter().map(|s| severity_counts.get(*s).copied().unwrap_or(0)).collect();
         if counts.iter().sum::<usize>() > 0 {
             let cells = severity_mix_cells(&counts, WIDTH);
             let mut mix = String::new();
