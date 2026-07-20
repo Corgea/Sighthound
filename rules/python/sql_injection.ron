@@ -10,7 +10,8 @@
             mode: "search",
             patterns: Some([
                 "execute_raw_query(",
-                "*cursor.execute(*%*",
+                // Match the % operator after a complete query expression, not DB-API placeholders.
+                "regex:(?s)cursor\\.execute\\(\\s*\\(*\\s*(?:(?:[rRuUbBfF]{0,2})?(?:\"\"\".*?\"\"\"|'''.*?'''|\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*')|[A-Za-z_][A-Za-z0-9_.]*)\\s*\\)*\\s*%\\s*[^\\s,)]",
                 "*cursor.execute(*.format(*",
                 "*cursor.execute(f\"*",
                 "*cursor.execute(f'*",
