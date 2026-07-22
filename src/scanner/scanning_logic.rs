@@ -881,13 +881,16 @@ impl ScanningLogic {
         (parameter.kind() == "identifier").then_some(parameter)
     }
 
-    fn promise_fulfillment_source<'tree>(
-        node: tree_sitter::Node<'tree>,
+    /// Returns `(parameter_name, source_line, source_pattern, assignment_code)` when `node` is
+    /// a `.then` callback whose receiver chain matches a taint source pattern.
+    fn promise_fulfillment_source(
+        node: tree_sitter::Node,
         ctx: &TaintScanContext,
-    ) -> Option<(String, tree_sitter::Node<'tree>, String)> {
+    ) -> Option<(String, usize, String, String)> {
         if !matches!(node.kind(), "arrow_function" | "function_expression") {
             return None;
         }
+        let parameter = Self::first_callback_parameter(node)?;
         let arguments = node.parent().filter(|parent| parent.kind() == "arguments")?;
         let first_argument = arguments.named_child(0)?;
         if first_argument.start_byte() != node.start_byte()
@@ -902,14 +905,19 @@ impl ScanningLogic {
             return None;
         }
         let source_root = Self::promise_source_root(callee, ctx.source)?;
-        let mut source_chain = crate::parser::get_node_text(&source_root, ctx.source)
+        let assignment_code = crate::parser::get_node_text(&source_root, ctx.source);
+        let mut source_chain = assignment_code
             .chars()
             .filter(|character| !character.is_whitespace())
             .collect::<String>();
         source_chain.push_str(".then");
         let source_pattern = ctx.rule_deduplicator.matches_source_pattern(&source_chain)?;
-        let parameter = Self::first_callback_parameter(node)?;
-        Some((crate::parser::get_node_text(&parameter, ctx.source), source_root, source_pattern))
+        Some((
+            crate::parser::get_node_text(&parameter, ctx.source),
+            source_root.start_position().row + 1,
+            source_pattern,
+            assignment_code,
+        ))
     }
 
     fn track_promise_fulfillment_source(
@@ -918,7 +926,7 @@ impl ScanningLogic {
         func_name: &str,
         flow_tracker: &mut VariableFlowTracker,
     ) {
-        let Some((parameter, source_root, source_pattern)) =
+        let Some((parameter, source_line, source_pattern, assignment_code)) =
             Self::promise_fulfillment_source(*node, ctx)
         else {
             return;
@@ -927,10 +935,10 @@ impl ScanningLogic {
         flow_tracker.record_tainted_variable(
             parameter,
             TaintVariableInfo {
-                source_line: source_root.start_position().row + 1,
+                source_line,
                 source_pattern,
                 source_function: func_name.to_string(),
-                assignment_code: crate::parser::get_node_text(&source_root, ctx.source),
+                assignment_code,
             },
         );
     }
@@ -1284,7 +1292,7 @@ impl ScanningLogic {
                     | "call_expression"
             ) && CommonUtils::matches_taint_pattern(
                 sink_pattern,
-                &crate::parser::get_node_text(&child, source),
+                crate::parser::get_node_text_slice(&child, source),
             ) {
                 return true;
             }
@@ -1303,19 +1311,23 @@ impl ScanningLogic {
         taint_rules: &[&crate::rules::UnifiedRule],
         language_support: &dyn crate::language::LanguageSupport,
     ) -> Vec<crate::models::Finding> {
-        Self::scan_file_with_taint_rules_for_path(
-            filepath,
-            filepath,
-            source,
-            tree,
-            taint_rules,
-            language_support,
-        )
+        Self::scan_taint_rules(filepath, false, source, tree, taint_rules, language_support)
     }
 
-    pub(crate) fn scan_file_with_taint_rules_for_path(
-        reporting_path: &str,
-        applicability_path: &str,
+    /// Scan the JavaScript embedded in an HTML/Django template (parsed via included ranges).
+    pub(crate) fn scan_embedded_javascript_taint_rules(
+        filepath: &str,
+        source: &[u8],
+        tree: &tree_sitter::Tree,
+        taint_rules: &[&crate::rules::UnifiedRule],
+        language_support: &dyn crate::language::LanguageSupport,
+    ) -> Vec<crate::models::Finding> {
+        Self::scan_taint_rules(filepath, true, source, tree, taint_rules, language_support)
+    }
+
+    fn scan_taint_rules(
+        filepath: &str,
+        is_embedded_javascript: bool,
         source: &[u8],
         tree: &tree_sitter::Tree,
         taint_rules: &[&crate::rules::UnifiedRule],
@@ -1323,13 +1335,22 @@ impl ScanningLogic {
     ) -> Vec<crate::models::Finding> {
         let mut findings = Vec::new();
 
+        // Rule applicability is extension-based, so embedded scripts match JavaScript
+        // rules through a synthetic "<file>.embedded.js" name while findings keep
+        // reporting the real template path.
+        let applicability_path: std::borrow::Cow<str> = if is_embedded_javascript {
+            format!("{filepath}.embedded.js").into()
+        } else {
+            filepath.into()
+        };
+
         // Filter out rules that don't apply to this file (same as search rules)
         let applicable_rules: Vec<&crate::rules::UnifiedRule> = taint_rules
             .iter()
             .filter(|rule| {
                 crate::scanner::utils::rule_applies_to_file(
                     rule.file_types.as_ref(),
-                    applicability_path,
+                    &applicability_path,
                 )
             })
             .copied()
@@ -1352,8 +1373,8 @@ impl ScanningLogic {
 
         let ctx = TaintScanContext {
             source,
-            filepath: reporting_path,
-            is_embedded_javascript: reporting_path != applicability_path,
+            filepath,
+            is_embedded_javascript,
             tree,
             language_support,
             applicable_rules: &applicable_rules,

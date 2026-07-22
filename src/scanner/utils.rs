@@ -191,10 +191,7 @@ pub fn rule_applies_to_file(file_types: Option<&FileTypes>, file_path: &str) -> 
 }
 
 pub(crate) fn is_html_dom_xss_fallback(finding: &crate::models::Finding) -> bool {
-    finding
-        .tags
-        .as_ref()
-        .is_some_and(|tags| tags.iter().any(|tag| tag == "html-inline-dom-xss-001"))
+    finding.has_tag("html-inline-dom-xss-001")
 }
 
 /// Prefer a source-to-sink DOM-XSS result over the equivalent legacy HTML fallback.
@@ -209,17 +206,29 @@ pub fn prefer_precise_html_dom_xss(findings: &mut Vec<crate::models::Finding>) {
         .filter(|finding| {
             finding.source_info.is_some()
                 && finding.sink_info.is_some()
-                && finding
-                    .tags
-                    .as_ref()
-                    .is_some_and(|tags| tags.iter().any(|tag| tag == "taint_analysis"))
+                && finding.has_tag("taint_analysis")
         })
-        .map(|finding| (finding.file.clone(), finding.line, finding.cwe_id.clone()))
+        .map(|finding| (finding.file.as_str(), finding.line, finding.cwe_id.as_deref()))
         .collect::<std::collections::BTreeSet<_>>();
 
-    findings.retain(|finding| {
-        !is_html_dom_xss_fallback(finding)
-            || !precise.contains(&(finding.file.clone(), finding.line, finding.cwe_id.clone()))
+    // Keep-mask computed up front: `precise` borrows `findings`, so the decision has to
+    // be made before `retain` takes its mutable borrow.
+    let keep: Vec<bool> = findings
+        .iter()
+        .map(|finding| {
+            !is_html_dom_xss_fallback(finding)
+                || !precise.contains(&(
+                    finding.file.as_str(),
+                    finding.line,
+                    finding.cwe_id.as_deref(),
+                ))
+        })
+        .collect();
+    let mut index = 0;
+    findings.retain(|_| {
+        let kept = keep[index];
+        index += 1;
+        kept
     });
 }
 

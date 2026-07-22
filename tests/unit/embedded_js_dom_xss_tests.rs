@@ -17,10 +17,6 @@ fn fixture_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/test_files/html")
 }
 
-fn has_tag(finding: &sighthound::Finding, expected: &str) -> bool {
-    finding.tags.as_ref().is_some_and(|tags| tags.iter().any(|tag| tag == expected))
-}
-
 fn scan_html_fixtures() -> &'static [sighthound::Finding] {
     static FINDINGS: OnceLock<Vec<sighthound::Finding>> = OnceLock::new();
     FINDINGS.get_or_init(|| {
@@ -75,7 +71,7 @@ fn embedded_js_dom_xss_reports_precise_url_and_remote_flows() {
         .filter(|finding| {
             finding.file.ends_with("embedded_dom_xss_vulnerable.html")
                 && finding.cwe_id.as_deref() == Some("cwe-79")
-                && has_tag(finding, "taint_analysis")
+                && finding.has_tag("taint_analysis")
         })
         .collect::<Vec<_>>();
     assert_eq!(precise.len(), 2, "expected URL and remote flows: {findings:#?}");
@@ -90,7 +86,7 @@ fn embedded_js_dom_xss_reports_precise_url_and_remote_flows() {
     assert!(url_flow.file.ends_with("embedded_dom_xss_vulnerable.html"));
     assert!(url_source.location.ends_with(&format!(":{URL_SOURCE_LINE}")));
     assert!(url_sink.location.ends_with(&format!(":{URL_SINK_LINE}")));
-    assert!(has_tag(url_flow, "data_flow"));
+    assert!(url_flow.has_tag("data_flow"));
 
     let remote_flow = precise
         .iter()
@@ -105,7 +101,7 @@ fn embedded_js_dom_xss_reports_precise_url_and_remote_flows() {
     assert!(remote_sink.location.ends_with(&format!(":{REMOTE_SINK_LINE}")));
     assert!(remote_source.location.contains("embedded_dom_xss_vulnerable.html"));
     assert!(remote_sink.location.contains("embedded_dom_xss_vulnerable.html"));
-    assert!(has_tag(remote_flow, "data_flow"));
+    assert!(remote_flow.has_tag("data_flow"));
 }
 
 #[test]
@@ -115,8 +111,7 @@ fn embedded_js_dom_xss_safe_boundaries_stay_clean() {
         .iter()
         .filter(|finding| {
             finding.file.ends_with("embedded_dom_xss_safe.html")
-                && (has_tag(finding, "taint_analysis")
-                    || has_tag(finding, "html-inline-dom-xss-001"))
+                && (finding.has_tag("taint_analysis") || finding.has_tag("html-inline-dom-xss-001"))
         })
         .collect::<Vec<_>>();
     assert!(unsafe_findings.is_empty(), "safe boundaries produced findings: {unsafe_findings:#?}");
@@ -138,7 +133,7 @@ fn embedded_js_dom_xss_search_only_filters_ineligible_scripts() {
         .iter()
         .filter(|finding| {
             finding.file.ends_with("embedded_dom_xss_safe.html")
-                && has_tag(finding, "html-inline-dom-xss-001")
+                && finding.has_tag("html-inline-dom-xss-001")
         })
         .collect::<Vec<_>>();
     assert!(
@@ -159,7 +154,7 @@ fn embedded_js_dom_xss_prefers_taint_and_retains_unmatched_fallback() {
         })
         .collect::<Vec<_>>();
     assert_eq!(overlap.len(), 1, "overlap should collapse to one finding: {findings:#?}");
-    assert!(has_tag(overlap[0], "taint_analysis"));
+    assert!(overlap[0].has_tag("taint_analysis"));
     assert!(overlap[0].source_info.is_some());
     assert!(overlap[0].sink_info.is_some());
 
@@ -172,7 +167,7 @@ fn embedded_js_dom_xss_prefers_taint_and_retains_unmatched_fallback() {
         })
         .collect::<Vec<_>>();
     assert_eq!(fallback.len(), 1, "unknown source should retain fallback: {findings:#?}");
-    assert!(has_tag(fallback[0], "html-inline-dom-xss-001"));
+    assert!(fallback[0].has_tag("html-inline-dom-xss-001"));
 }
 
 #[test]

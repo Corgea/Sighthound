@@ -505,10 +505,7 @@ fn print_taint_analysis_summary(
     context.print_performance_summary(taint_rules_count, scan_duration);
 
     if !taint_findings.is_empty() {
-        let same_file_count = taint_findings
-            .iter()
-            .filter(|f| f.tags.as_ref().is_some_and(|tags| tags.contains(&"same_file".to_string())))
-            .count();
+        let same_file_count = taint_findings.iter().filter(|f| f.has_tag("same_file")).count();
         let cross_file_count = taint_findings.len() - same_file_count;
 
         crate::ui::note(&format!(
@@ -581,12 +578,8 @@ pub fn run_taint_analysis_with_verbosity(
     }
 
     // Filter to only taint analysis findings
-    let taint_findings: Vec<Finding> = all_findings
-        .into_iter()
-        .filter(|f| {
-            f.tags.as_ref().is_some_and(|tags| tags.contains(&"taint_analysis".to_string()))
-        })
-        .collect();
+    let taint_findings: Vec<Finding> =
+        all_findings.into_iter().filter(|f| f.has_tag("taint_analysis")).collect();
 
     let scan_duration = scan_start.elapsed();
 

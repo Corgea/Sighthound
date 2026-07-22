@@ -11,12 +11,12 @@ use crate::language::LanguageSupport;
 // Re-export for backward compatibility
 pub use crate::models::{Condition, FileTypes, UnifiedRule};
 
+/// The canonical frontend DOM-XSS taint rule, shared between standalone JavaScript
+/// scanning and embedded `<script>` scanning in HTML/Django templates.
+pub(crate) const FRONTEND_DOM_XSS_TAINT_RULE_ID: &str = "js-dom-xss-taint-001";
+
 pub(crate) fn is_frontend_dom_xss_taint_rule(rule: &UnifiedRule) -> bool {
-    let tags = rule.tags.as_deref().unwrap_or_default();
-    rule.is_taint_rule()
-        && rule.category.as_deref() == Some("xss")
-        && tags.iter().any(|tag| tag == "dom")
-        && tags.iter().any(|tag| tag == "frontend")
+    rule.id.as_deref() == Some(FRONTEND_DOM_XSS_TAINT_RULE_ID)
 }
 
 // Embedded rule directories - every `.ron` rule document under each language dir is
@@ -163,18 +163,13 @@ impl Rules {
             "html" | "django" => {
                 all_rules.extend(Self::parse_embedded_dir(&RULES_HTML, "HTML")?);
                 let javascript_rules = Self::parse_embedded_dir(&RULES_JAVASCRIPT, "JavaScript")?;
-                let mut embedded_dom_xss_rules = javascript_rules
+                let embedded_dom_xss_rule = javascript_rules
                     .iter()
                     .flat_map(|rules| rules.rules.iter())
-                    .filter(|rule| is_frontend_dom_xss_taint_rule(rule));
-                let embedded_dom_xss_rule = embedded_dom_xss_rules.next().ok_or_else(|| {
-                    anyhow::anyhow!("Canonical frontend DOM-XSS taint rule is missing")
-                })?;
-                if embedded_dom_xss_rules.next().is_some() {
-                    return Err(anyhow::anyhow!(
-                        "Canonical frontend DOM-XSS taint rule is ambiguous"
-                    ));
-                }
+                    .find(|rule| is_frontend_dom_xss_taint_rule(rule))
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Canonical frontend DOM-XSS taint rule is missing")
+                    })?;
                 all_rules.push(Self { rules: vec![embedded_dom_xss_rule.clone()] });
             }
             "php" => all_rules.extend(Self::parse_embedded_dir(&RULES_PHP, "PHP")?),

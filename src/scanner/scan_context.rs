@@ -18,7 +18,6 @@ pub(crate) type FilesByLanguage = std::collections::BTreeMap<String, Vec<PathBuf
 pub(crate) struct ScanRuleSet<'a> {
     pub(crate) has_search_rules: bool,
     pub(crate) has_taint_rules: bool,
-    pub(crate) has_embedded_dom_xss_rules: bool,
     pub(crate) search_rules: &'a [&'a crate::rules::UnifiedRule],
     pub(crate) taint_rules: &'a [&'a crate::rules::UnifiedRule],
     pub(crate) embedded_dom_xss_rules: &'a [&'a crate::rules::UnifiedRule],
