@@ -1,0 +1,32 @@
+[
+  {
+    "file": "/Users/juan/Code/corgea/lab/fusion-benchmarks/datasets/realvuln-pygoat/introduction/templates/mitre/mitre_lab_17.html",
+    "line": 42,
+    "column": 0,
+    "end_line": 42,
+    "end_column": 0,
+    "function": "result",
+    "finding_type": "DOM-based XSS",
+    "snippet": "output.innerHTML += \"<span>\" + ports[p] + \"</span><br>\"",
+    "severity": "High",
+    "confidence": "High",
+    "description": "User input flows to dangerous DOM manipulation without sanitization",
+    "cwe_id": "cwe-79",
+    "source_info": {
+      "source_type": "fetch(*).then",
+      "location": "/Users/juan/Code/corgea/lab/fusion-benchmarks/datasets/realvuln-pygoat/introduction/templates/mitre/mitre_lab_17.html:36",
+      "context": "fetch(\"/mitre/17/lab/api\",requestOption)"
+    },
+    "sink_info": {
+      "sink_type": "*.innerHTML",
+      "function_name": "result",
+      "location": "/Users/juan/Code/corgea/lab/fusion-benchmarks/datasets/realvuln-pygoat/introduction/templates/mitre/mitre_lab_17.html:42",
+      "variable": "ports"
+    },
+    "tags": [
+      "taint_analysis",
+      "data_flow",
+      "xss"
+    ]
+  }
+]

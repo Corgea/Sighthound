@@ -43,7 +43,15 @@
             file_types: Some((
                 extensions: Some([".html", ".htm", ".twig", ".hbs", ".mustache", ".njk", ".ejs", ".pug"])
             )),
-            tags: Some(["xss", "dom", "frontend", "cwe-79", "cwe-80", "cwe-116"])
+            tags: Some([
+                "html-inline-dom-xss-001",
+                "xss",
+                "dom",
+                "frontend",
+                "cwe-79",
+                "cwe-80",
+                "cwe-116"
+            ])
         )
     ]
 )

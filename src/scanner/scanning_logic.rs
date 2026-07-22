@@ -844,6 +844,97 @@ impl ScanningLogic {
         }
     }
 
+    fn call_callee(node: tree_sitter::Node) -> Option<tree_sitter::Node> {
+        node.child_by_field_name("function").or_else(|| node.child_by_field_name("callee"))
+    }
+
+    fn member_property_is_then(node: tree_sitter::Node, source: &[u8]) -> bool {
+        node.kind() == "member_expression"
+            && node.child_by_field_name("property").is_some_and(|property| {
+                crate::parser::get_node_text_slice(&property, source) == "then"
+            })
+    }
+
+    fn promise_source_root<'tree>(
+        callee: tree_sitter::Node<'tree>,
+        source: &[u8],
+    ) -> Option<tree_sitter::Node<'tree>> {
+        let mut receiver = callee.child_by_field_name("object")?;
+        loop {
+            if receiver.kind() != "call_expression" {
+                return None;
+            }
+            let receiver_callee = Self::call_callee(receiver)?;
+            if !Self::member_property_is_then(receiver_callee, source) {
+                return Some(receiver);
+            }
+            receiver = receiver_callee.child_by_field_name("object")?;
+        }
+    }
+
+    fn first_callback_parameter<'tree>(
+        node: tree_sitter::Node<'tree>,
+    ) -> Option<tree_sitter::Node<'tree>> {
+        let parameter = node.child_by_field_name("parameter").or_else(|| {
+            node.child_by_field_name("parameters").and_then(|parameters| parameters.named_child(0))
+        })?;
+        (parameter.kind() == "identifier").then_some(parameter)
+    }
+
+    fn promise_fulfillment_source<'tree>(
+        node: tree_sitter::Node<'tree>,
+        ctx: &TaintScanContext,
+    ) -> Option<(String, tree_sitter::Node<'tree>, String)> {
+        if !matches!(node.kind(), "arrow_function" | "function_expression") {
+            return None;
+        }
+        let arguments = node.parent().filter(|parent| parent.kind() == "arguments")?;
+        let first_argument = arguments.named_child(0)?;
+        if first_argument.start_byte() != node.start_byte()
+            || first_argument.end_byte() != node.end_byte()
+        {
+            return None;
+        }
+
+        let call = arguments.parent().filter(|parent| parent.kind() == "call_expression")?;
+        let callee = Self::call_callee(call)?;
+        if !Self::member_property_is_then(callee, ctx.source) {
+            return None;
+        }
+        let source_root = Self::promise_source_root(callee, ctx.source)?;
+        let mut source_chain = crate::parser::get_node_text(&source_root, ctx.source)
+            .chars()
+            .filter(|character| !character.is_whitespace())
+            .collect::<String>();
+        source_chain.push_str(".then");
+        let source_pattern = ctx.rule_deduplicator.matches_source_pattern(&source_chain)?;
+        let parameter = Self::first_callback_parameter(node)?;
+        Some((crate::parser::get_node_text(&parameter, ctx.source), source_root, source_pattern))
+    }
+
+    fn track_promise_fulfillment_source(
+        node: &tree_sitter::Node,
+        ctx: &TaintScanContext,
+        func_name: &str,
+        flow_tracker: &mut VariableFlowTracker,
+    ) {
+        let Some((parameter, source_root, source_pattern)) =
+            Self::promise_fulfillment_source(*node, ctx)
+        else {
+            return;
+        };
+
+        flow_tracker.record_tainted_variable(
+            parameter,
+            TaintVariableInfo {
+                source_line: source_root.start_position().row + 1,
+                source_pattern,
+                source_function: func_name.to_string(),
+                assignment_code: crate::parser::get_node_text(&source_root, ctx.source),
+            },
+        );
+    }
+
     /// If `node_text` is an assignment whose value matches a taint source pattern (and isn't
     /// sanitized), mark the assigned variable as tainted.
     fn track_assignment_source(
@@ -944,15 +1035,7 @@ impl ScanningLogic {
                 );
 
                 // Mark target variable as tainted (inheriting from the dependent variable)
-                flow_tracker.record_tainted_variable(
-                    target_var.clone(),
-                    TaintVariableInfo {
-                        source_line: taint_info.source_line,
-                        source_pattern: taint_info.source_pattern.clone(),
-                        source_function: taint_info.source_function.clone(),
-                        assignment_code: format!("Propagated from {} via: {}", dep_var, node_text),
-                    },
-                );
+                flow_tracker.record_tainted_variable(target_var.clone(), taint_info);
                 break; // Only need one tainted dependency to taint the target
             }
         }
@@ -970,8 +1053,16 @@ impl ScanningLogic {
         let func_name = crate::scanner::utils::AstUtils::get_function_context(node, ctx.source);
 
         Self::track_function_parameter_sources(node, ctx, line, &func_name, flow_tracker);
-        Self::track_assignment_source(&node_text, line, &func_name, ctx, flow_tracker);
-        Self::propagate_taint_for_node(&node_text, &func_name, ctx, flow_tracker);
+        Self::track_promise_fulfillment_source(node, ctx, &func_name, flow_tracker);
+        if !ctx.is_embedded_javascript
+            || matches!(
+                node.kind(),
+                "assignment_expression" | "augmented_assignment_expression" | "variable_declarator"
+            )
+        {
+            Self::track_assignment_source(&node_text, line, &func_name, ctx, flow_tracker);
+            Self::propagate_taint_for_node(&node_text, &func_name, ctx, flow_tracker);
+        }
     }
 
     /// Extract the variables referenced in a sink expression: PHP-specific `$var` extraction
@@ -1005,6 +1096,9 @@ impl ScanningLogic {
         else {
             return;
         };
+        if ctx.is_embedded_javascript && source_pattern == site.sink_pattern {
+            return;
+        }
         let Some(rule) =
             ctx.rule_deduplicator.get_rule_for_combination(&source_pattern, site.sink_pattern)
         else {
@@ -1131,6 +1225,11 @@ impl ScanningLogic {
         let Some(sink_pattern) = ctx.rule_deduplicator.matches_sink_pattern(&node_text) else {
             return;
         };
+        if ctx.is_embedded_javascript
+            && Self::has_descendant_sink_operation(*node, ctx.source, &sink_pattern)
+        {
+            return;
+        }
         log::debug!(
             "[SINK_ANALYSIS] Found sink '{}' with pattern '{}' at line {}",
             node_text,
@@ -1168,9 +1267,55 @@ impl ScanningLogic {
         );
     }
 
+    fn has_descendant_sink_operation(
+        node: tree_sitter::Node,
+        source: &[u8],
+        sink_pattern: &str,
+    ) -> bool {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if matches!(
+                child.kind(),
+                "assignment"
+                    | "augmented_assignment"
+                    | "assignment_expression"
+                    | "augmented_assignment_expression"
+                    | "call"
+                    | "call_expression"
+            ) && CommonUtils::matches_taint_pattern(
+                sink_pattern,
+                &crate::parser::get_node_text(&child, source),
+            ) {
+                return true;
+            }
+            if Self::has_descendant_sink_operation(child, source, sink_pattern) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Scan file with taint analysis rules (fixed implementation with proper flow tracking)
     pub fn scan_file_with_taint_rules(
         filepath: &str,
+        source: &[u8],
+        tree: &tree_sitter::Tree,
+        taint_rules: &[&crate::rules::UnifiedRule],
+        language_support: &dyn crate::language::LanguageSupport,
+    ) -> Vec<crate::models::Finding> {
+        Self::scan_file_with_taint_rules_for_path(
+            filepath,
+            filepath,
+            source,
+            tree,
+            taint_rules,
+            language_support,
+        )
+    }
+
+    pub(crate) fn scan_file_with_taint_rules_for_path(
+        reporting_path: &str,
+        applicability_path: &str,
         source: &[u8],
         tree: &tree_sitter::Tree,
         taint_rules: &[&crate::rules::UnifiedRule],
@@ -1182,7 +1327,10 @@ impl ScanningLogic {
         let applicable_rules: Vec<&crate::rules::UnifiedRule> = taint_rules
             .iter()
             .filter(|rule| {
-                crate::scanner::utils::rule_applies_to_file(rule.file_types.as_ref(), filepath)
+                crate::scanner::utils::rule_applies_to_file(
+                    rule.file_types.as_ref(),
+                    applicability_path,
+                )
             })
             .copied()
             .collect();
@@ -1204,7 +1352,8 @@ impl ScanningLogic {
 
         let ctx = TaintScanContext {
             source,
-            filepath,
+            filepath: reporting_path,
+            is_embedded_javascript: reporting_path != applicability_path,
             tree,
             language_support,
             applicable_rules: &applicable_rules,
@@ -1289,6 +1438,7 @@ impl ScanningLogic {
     ) -> Option<(String, Vec<String>)> {
         let target_var = TaintExpressionUtils::normalize_variable(left_side);
         let mut dependent_vars = CommonUtils::extract_all_variables(right_side);
+        dependent_vars.extend(CommonUtils::extract_simple_variables(right_side));
         dependent_vars.extend(TaintExpressionUtils::extract_php_variables(right_side));
         dependent_vars.retain(|var| var != &target_var);
         dependent_vars.sort();
@@ -1528,8 +1678,10 @@ impl ScanningLogic {
             // when source filtering is enabled.
             "assignment"
             | "call"
+            | "call_expression"
             | "expression_statement"
             | "assignment_expression"
+            | "augmented_assignment_expression"
             | "variable_declaration"
             | "lexical_declaration"
             | "variable_declarator"

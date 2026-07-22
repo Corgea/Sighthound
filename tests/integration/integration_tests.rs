@@ -9,6 +9,12 @@ use tempfile::NamedTempFile;
 mod integration_tests {
     use super::*;
 
+    fn sighthound_binary() -> std::path::PathBuf {
+        std::env::var_os("CARGO_BIN_EXE_sighthound")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::path::PathBuf::from("target/debug/sighthound"))
+    }
+
     fn create_test_python_file(content: &str) -> NamedTempFile {
         let mut temp_file = NamedTempFile::with_suffix(".py").expect("Failed to create temp file");
         write!(temp_file, "{}", content).expect("Failed to write to temp file");
@@ -440,11 +446,7 @@ def malicious_functions():
 
     #[test]
     fn test_cli_exit_code_gating() {
-        let bin_path = if let Ok(path) = std::env::var("CARGO_BIN_EXE_sighthound") {
-            std::path::PathBuf::from(path)
-        } else {
-            std::path::PathBuf::from("target/debug/sighthound")
-        };
+        let bin_path = sighthound_binary();
 
         if !bin_path.exists() {
             return;
@@ -532,5 +534,43 @@ def run(data):
         assert!(!output.status.success());
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(stderr.contains("Invalid severity level: 'invalid_level'"), "got: {stderr}");
+    }
+
+    #[test]
+    fn embedded_dom_xss_default_mode_prefers_precise_finding() {
+        let fixture_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/test_files/html/embedded_dom_xss_fallback.html");
+        let output = std::process::Command::new(sighthound_binary())
+            .args([
+                fixture_path.to_str().expect("UTF-8 fixture path"),
+                "html",
+                "--output-format",
+                "json",
+                "--include-test-fixtures",
+            ])
+            .output()
+            .expect("failed to run sighthound");
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+
+        let findings: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid JSON findings");
+        let overlap = findings
+            .as_array()
+            .expect("JSON findings array")
+            .iter()
+            .filter(|finding| {
+                finding["file"]
+                    .as_str()
+                    .is_some_and(|file| file.ends_with("embedded_dom_xss_fallback.html"))
+                    && finding["line"] == 6
+                    && finding["cwe_id"] == "cwe-79"
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(overlap.len(), 1, "expected one overlap result: {findings:#}");
+        assert!(overlap[0]["source_info"].is_object());
+        assert!(overlap[0]["sink_info"].is_object());
+        assert!(overlap[0]["tags"]
+            .as_array()
+            .is_some_and(|tags| tags.iter().any(|tag| tag == "taint_analysis")));
     }
 }

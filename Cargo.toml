@@ -28,8 +28,8 @@ typescript = ["tree-sitter-typescript"]
 go = ["tree-sitter-go"]
 ruby = ["tree-sitter-ruby"]
 csharp = ["tree-sitter-c-sharp"]
-html = ["tree-sitter-html"]
-django = ["tree-sitter-html"]  # Reuse HTML parser for Django templates
+html = ["tree-sitter-html", "javascript"]
+django = ["tree-sitter-html", "javascript"]  # Reuse HTML parser for Django templates
 php = ["tree-sitter-php"]
 objectscript = ["dep:tree-sitter-objectscript", "dep:tree-sitter-objectscript-routine"]
 

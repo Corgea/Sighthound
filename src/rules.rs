@@ -11,6 +11,14 @@ use crate::language::LanguageSupport;
 // Re-export for backward compatibility
 pub use crate::models::{Condition, FileTypes, UnifiedRule};
 
+pub(crate) fn is_frontend_dom_xss_taint_rule(rule: &UnifiedRule) -> bool {
+    let tags = rule.tags.as_deref().unwrap_or_default();
+    rule.is_taint_rule()
+        && rule.category.as_deref() == Some("xss")
+        && tags.iter().any(|tag| tag == "dom")
+        && tags.iter().any(|tag| tag == "frontend")
+}
+
 // Embedded rule directories - every `.ron` rule document under each language dir is
 // embedded at compile time. New rule files auto-wire: drop a `.ron` into the relevant
 // dir and it loads with no edits here. `exclusion_patterns.ron` uses a different RON
@@ -152,7 +160,23 @@ impl Rules {
             "csharp" => all_rules.extend(Self::parse_embedded_dir(&RULES_CSHARP, "C#")?),
             "go" => all_rules.extend(Self::parse_embedded_dir(&RULES_GO, "Go")?),
             "ruby" => all_rules.extend(Self::parse_embedded_dir(&RULES_RUBY, "Ruby")?),
-            "html" | "django" => all_rules.extend(Self::parse_embedded_dir(&RULES_HTML, "HTML")?),
+            "html" | "django" => {
+                all_rules.extend(Self::parse_embedded_dir(&RULES_HTML, "HTML")?);
+                let javascript_rules = Self::parse_embedded_dir(&RULES_JAVASCRIPT, "JavaScript")?;
+                let mut embedded_dom_xss_rules = javascript_rules
+                    .iter()
+                    .flat_map(|rules| rules.rules.iter())
+                    .filter(|rule| is_frontend_dom_xss_taint_rule(rule));
+                let embedded_dom_xss_rule = embedded_dom_xss_rules.next().ok_or_else(|| {
+                    anyhow::anyhow!("Canonical frontend DOM-XSS taint rule is missing")
+                })?;
+                if embedded_dom_xss_rules.next().is_some() {
+                    return Err(anyhow::anyhow!(
+                        "Canonical frontend DOM-XSS taint rule is ambiguous"
+                    ));
+                }
+                all_rules.push(Self { rules: vec![embedded_dom_xss_rule.clone()] });
+            }
             "php" => all_rules.extend(Self::parse_embedded_dir(&RULES_PHP, "PHP")?),
             "objectscript" => {
                 all_rules.extend(Self::parse_embedded_dir(&RULES_OBJECTSCRIPT, "ObjectScript")?)
@@ -192,7 +216,19 @@ impl Rules {
             ));
         }
 
-        Self::merge_rules(all_rules)
+        let mut merged = Self::merge_rules(all_rules)?;
+        let mut retained_dom_xss_rule = false;
+        merged.rules.retain(|rule| {
+            if !is_frontend_dom_xss_taint_rule(rule) {
+                return true;
+            }
+            if retained_dom_xss_rule {
+                return false;
+            }
+            retained_dom_xss_rule = true;
+            true
+        });
+        Ok(merged)
     }
 
     pub fn load_from_file(rules_file: &str) -> Result<Self> {

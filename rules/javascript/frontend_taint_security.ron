@@ -10,7 +10,9 @@
             sources: Some([
                 // External/untrusted sources only - be more specific
                 "window.location.hash",
-                "window.location.search", 
+                "window.location.search",
+                "location.hash",
+                "location.search",
                 "document.URL",
                 "document.documentURI",
                 "document.baseURI",

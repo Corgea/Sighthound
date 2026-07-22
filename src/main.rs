@@ -127,6 +127,7 @@ fn run_selected_analysis(
 
     // Combine findings
     simple_findings.append(&mut taint_findings);
+    sighthound::scanner::utils::prefer_precise_html_dom_xss(&mut simple_findings);
     Ok(simple_findings)
 }
 

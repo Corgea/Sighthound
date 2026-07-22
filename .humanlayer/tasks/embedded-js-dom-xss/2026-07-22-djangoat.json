@@ -1,0 +1,32 @@
+[
+  {
+    "file": "/Users/juan/Code/corgea/lab/fusion-benchmarks/datasets/realvuln-djangoat/template/users/signup.html",
+    "line": 20,
+    "column": 0,
+    "end_line": 20,
+    "end_column": 0,
+    "function": "global",
+    "finding_type": "DOM-based XSS",
+    "snippet": "document.write(\"<OPTION value=3>\" + paramValue + \"</OPTION>\")",
+    "severity": "High",
+    "confidence": "High",
+    "description": "User input flows to dangerous DOM manipulation without sanitization",
+    "cwe_id": "cwe-79",
+    "source_info": {
+      "source_type": "location.hash",
+      "location": "/Users/juan/Code/corgea/lab/fusion-benchmarks/datasets/realvuln-djangoat/template/users/signup.html:15",
+      "context": "hashParam = location.hash.split(\"#\")[1]"
+    },
+    "sink_info": {
+      "sink_type": "document.write",
+      "function_name": "global",
+      "location": "/Users/juan/Code/corgea/lab/fusion-benchmarks/datasets/realvuln-djangoat/template/users/signup.html:20",
+      "variable": "paramValue"
+    },
+    "tags": [
+      "taint_analysis",
+      "data_flow",
+      "xss"
+    ]
+  }
+]

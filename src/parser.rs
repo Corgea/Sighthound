@@ -31,6 +31,28 @@ impl LanguageParser {
         self.parser.parse(source, None).context("Failed to parse file")
     }
 
+    pub fn parse_with_included_ranges(
+        &mut self,
+        source: &[u8],
+        ranges: &[tree_sitter::Range],
+    ) -> Result<Tree> {
+        let parse_result = self
+            .parser
+            .set_included_ranges(ranges)
+            .context("Failed to set included ranges")
+            .and_then(|()| {
+                self.parser.parse(source, None).context("Failed to parse included ranges")
+            });
+
+        let reset_result =
+            self.parser.set_included_ranges(&[]).context("Failed to reset included ranges");
+
+        match (parse_result, reset_result) {
+            (_, Err(reset_error)) => Err(reset_error),
+            (result, Ok(())) => result,
+        }
+    }
+
     pub fn file_extension(&self) -> &str {
         self.language_support.file_extension()
     }
