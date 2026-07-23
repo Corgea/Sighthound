@@ -328,7 +328,7 @@ impl CodeTypeDetector {
             vec!["useState", "useEffect", "useContext", "useReducer", "useMemo", "useCallback"];
 
         // Check for call expressions
-        self.walk_tree(&root_node, &mut |node| {
+        Self::walk_tree(&root_node, &mut |node| {
             if node.kind() == "call_expression" {
                 let text = parser::get_node_text(&node, source);
 
@@ -384,7 +384,7 @@ impl CodeTypeDetector {
         // Server methods
         let server_methods = vec!["get", "post", "put", "delete", "patch", "use", "listen"];
 
-        self.walk_tree(&root_node, &mut |node| {
+        Self::walk_tree(&root_node, &mut |node| {
             if node.kind() == "call_expression" {
                 let text = parser::get_node_text(&node, source);
 
@@ -442,7 +442,7 @@ impl CodeTypeDetector {
         }
     }
 
-    fn walk_tree<F>(&self, node: &Node, callback: &mut F)
+    fn walk_tree<F>(node: &Node, callback: &mut F)
     where
         F: FnMut(Node),
     {
@@ -450,7 +450,7 @@ impl CodeTypeDetector {
 
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            self.walk_tree(&child, callback);
+            Self::walk_tree(&child, callback);
         }
     }
 }
