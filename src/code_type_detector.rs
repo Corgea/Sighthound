@@ -497,4 +497,20 @@ mod tests {
         let imports = vec!["totally-unrelated-package".to_string()];
         assert_eq!(detector.detect_from_imports(&imports), CodeType::Unknown);
     }
+
+    #[test]
+    fn detect_from_ast_finds_nested_backend_signal() {
+        let source = br#"
+            function loadConfig() {
+                if (process.env.NODE_ENV) {
+                    return require("fs").readFileSync("config.json");
+                }
+            }
+        "#;
+        let mut parser = crate::parser::LanguageParser::new("javascript").unwrap();
+        let tree = parser.parse(source).unwrap();
+        let detector = CodeTypeDetector::new();
+
+        assert_eq!(detector.detect_from_ast(&tree, source), CodeType::Backend);
+    }
 }

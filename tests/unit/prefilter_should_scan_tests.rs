@@ -81,10 +81,10 @@ mod prefilter_should_scan_tests {
     }
 
     #[test]
-    fn test_file_with_test_imports_is_skipped() {
+    fn file_with_nested_test_import_is_skipped() {
         let dir = TempDir::new().unwrap();
-        let path = dir.path().join("test_something.py");
-        fs::write(&path, "import pytest\n\ndef test_ok():\n    assert True\n").unwrap();
+        let path = dir.path().join("plugin.py");
+        fs::write(&path, "def register_plugin():\n    import pytest\n    return pytest\n").unwrap();
 
         let filter = PreFilter::new(&empty_rules(), "python");
         assert!(!filter.should_scan_file(path.to_str().unwrap()));
