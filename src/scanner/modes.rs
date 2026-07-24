@@ -122,12 +122,9 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
                     all_rules.push(rules);
                 }
 
-                // HTML/Django embedded-script scanning needs the JavaScript DOM-XSS
-                // taint rule, mirroring the embedded-rules loader.
-                if matches!(language.as_str(), "html" | "django") {
-                    if let Some(dom_xss_rules) = load_file_dom_xss_taint_rule(base_rules_dir) {
-                        all_rules.push(dom_xss_rules);
-                    }
+                if let Some(dom_xss_rules) = load_file_dom_xss_taint_rule(language, base_rules_dir)
+                {
+                    all_rules.push(dom_xss_rules);
                 }
 
                 // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
@@ -159,13 +156,15 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
     }
 }
 
-/// Load the canonical frontend DOM-XSS taint rule from the file rules tree, so
-/// HTML/Django embedded-script scanning has parity with embedded-rules mode.
-fn load_file_dom_xss_taint_rule(base_rules_dir: &str) -> Option<Rules> {
+/// For HTML/Django, load the canonical frontend DOM-XSS taint rule from the file rules
+/// tree so embedded-script scanning has parity with embedded-rules mode. Returns `None`
+/// for other languages.
+fn load_file_dom_xss_taint_rule(language: &str, base_rules_dir: &str) -> Option<Rules> {
+    if !matches!(language, "html" | "django") {
+        return None;
+    }
     let javascript_rules_dir = format!("{}/javascript", base_rules_dir);
-    let rules = Rules::load_from_directory(&javascript_rules_dir).ok()?;
-    let rule = rules.rules.into_iter().find(crate::rules::is_frontend_dom_xss_taint_rule)?;
-    Some(Rules { rules: vec![rule] })
+    Rules::load_from_directory(&javascript_rules_dir).ok()?.frontend_dom_xss_rule_only()
 }
 
 /// Load the backend-only security rules for JS/TS when `code_type` requires backend coverage.
@@ -325,12 +324,8 @@ fn load_rules_for_detected_language(cli: &Cli, language: &str) -> Result<Option<
             all_rules.push(base_rules);
         }
 
-        // HTML/Django embedded-script scanning needs the JavaScript DOM-XSS taint
-        // rule, mirroring the embedded-rules loader.
-        if matches!(language, "html" | "django") {
-            if let Some(dom_xss_rules) = load_file_dom_xss_taint_rule(base_rules_dir) {
-                all_rules.push(dom_xss_rules);
-            }
+        if let Some(dom_xss_rules) = load_file_dom_xss_taint_rule(language, base_rules_dir) {
+            all_rules.push(dom_xss_rules);
         }
 
         // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
@@ -730,38 +725,33 @@ mod tests {
         assert!(!rules.rules.is_empty());
     }
 
-    #[test]
-    fn load_rules_file_mode_includes_dom_xss_taint_rule_for_html() {
+    fn file_mode_dom_xss_taint_rule_count(languages: &[&str]) -> usize {
         let mut cli = base_cli();
         cli.use_file_rules = true;
         cli.language = None;
         cli.rules_path = None;
-        let context = base_context(&["html"]);
+        let context = base_context(languages);
 
-        let rules = load_rules(&cli, &context).expect("html file rules should load");
-        let taint_rule_count = rules
-            .rules
-            .iter()
-            .filter(|rule| crate::rules::is_frontend_dom_xss_taint_rule(rule))
-            .count();
-        assert_eq!(taint_rule_count, 1, "html file rules must carry the DOM-XSS taint rule");
+        let rules = load_rules(&cli, &context).expect("file rules should load");
+        rules.rules.iter().filter(|rule| crate::rules::is_frontend_dom_xss_taint_rule(rule)).count()
+    }
+
+    #[test]
+    fn load_rules_file_mode_includes_dom_xss_taint_rule_for_html() {
+        assert_eq!(
+            file_mode_dom_xss_taint_rule_count(&["html"]),
+            1,
+            "html file rules must carry the DOM-XSS taint rule"
+        );
     }
 
     #[test]
     fn load_rules_file_mode_keeps_one_dom_xss_taint_rule_for_html_plus_javascript() {
-        let mut cli = base_cli();
-        cli.use_file_rules = true;
-        cli.language = None;
-        cli.rules_path = None;
-        let context = base_context(&["html", "javascript"]);
-
-        let rules = load_rules(&cli, &context).expect("mixed file rules should load");
-        let taint_rule_count = rules
-            .rules
-            .iter()
-            .filter(|rule| crate::rules::is_frontend_dom_xss_taint_rule(rule))
-            .count();
-        assert_eq!(taint_rule_count, 1, "canonical DOM-XSS taint rule must not duplicate");
+        assert_eq!(
+            file_mode_dom_xss_taint_rule_count(&["html", "javascript"]),
+            1,
+            "canonical DOM-XSS taint rule must not duplicate"
+        );
     }
 
     #[test]

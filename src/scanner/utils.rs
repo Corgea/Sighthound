@@ -201,6 +201,7 @@ pub fn prefer_precise_html_dom_xss(findings: &mut Vec<crate::models::Finding>) {
         return;
     }
 
+    // Owned keys so the set doesn't borrow `findings` during `retain`.
     let precise = findings
         .iter()
         .filter(|finding| {
@@ -208,27 +209,12 @@ pub fn prefer_precise_html_dom_xss(findings: &mut Vec<crate::models::Finding>) {
                 && finding.sink_info.is_some()
                 && finding.has_tag("taint_analysis")
         })
-        .map(|finding| (finding.file.as_str(), finding.line, finding.cwe_id.as_deref()))
+        .map(|finding| (finding.file.clone(), finding.line, finding.cwe_id.clone()))
         .collect::<std::collections::BTreeSet<_>>();
 
-    // Keep-mask computed up front: `precise` borrows `findings`, so the decision has to
-    // be made before `retain` takes its mutable borrow.
-    let keep: Vec<bool> = findings
-        .iter()
-        .map(|finding| {
-            !is_html_dom_xss_fallback(finding)
-                || !precise.contains(&(
-                    finding.file.as_str(),
-                    finding.line,
-                    finding.cwe_id.as_deref(),
-                ))
-        })
-        .collect();
-    let mut index = 0;
-    findings.retain(|_| {
-        let kept = keep[index];
-        index += 1;
-        kept
+    findings.retain(|finding| {
+        !is_html_dom_xss_fallback(finding)
+            || !precise.contains(&(finding.file.clone(), finding.line, finding.cwe_id.clone()))
     });
 }
 

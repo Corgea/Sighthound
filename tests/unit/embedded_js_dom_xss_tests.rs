@@ -113,19 +113,21 @@ fn embedded_js_dom_xss_reports_precise_url_and_remote_flows() {
     assert!(remote_flow.has_tag("data_flow"));
 }
 
+fn vulnerable_taint_flows_at(findings: &[sighthound::Finding], line: usize) -> usize {
+    findings
+        .iter()
+        .filter(|finding| {
+            finding.file.ends_with("embedded_dom_xss_vulnerable.html")
+                && finding.line == line
+                && finding.has_tag("taint_analysis")
+        })
+        .count()
+}
+
 #[test]
 fn embedded_js_dom_xss_flags_direct_assignment_sources() {
     let findings = scan_html_fixtures();
-    let flow_lines = |line: usize| {
-        findings
-            .iter()
-            .filter(|finding| {
-                finding.file.ends_with("embedded_dom_xss_vulnerable.html")
-                    && finding.line == line
-                    && finding.has_tag("taint_analysis")
-            })
-            .count()
-    };
+    let flow_lines = |line: usize| vulnerable_taint_flows_at(findings, line);
     assert_eq!(flow_lines(DIRECT_INNERHTML_LINE), 1, "innerHTML = location.hash: {findings:#?}");
     assert_eq!(flow_lines(DIRECT_OUTERHTML_LINE), 1, "outerHTML = document.URL: {findings:#?}");
     assert_eq!(flow_lines(DIRECT_APPEND_LINE), 1, "innerHTML += location.search: {findings:#?}");
@@ -134,19 +136,13 @@ fn embedded_js_dom_xss_flags_direct_assignment_sources() {
 #[test]
 fn embedded_js_dom_xss_scopes_reused_callback_parameters() {
     let findings = scan_html_fixtures();
-    let flow_lines = |line: usize| {
-        findings
-            .iter()
-            .filter(|finding| {
-                finding.file.ends_with("embedded_dom_xss_vulnerable.html")
-                    && finding.line == line
-                    && finding.has_tag("taint_analysis")
-            })
-            .count()
-    };
-    assert_eq!(flow_lines(REUSED_TAINTED_LINE), 1, "fetch callback should flag: {findings:#?}");
     assert_eq!(
-        flow_lines(REUSED_TRUSTED_LINE),
+        vulnerable_taint_flows_at(findings, REUSED_TAINTED_LINE),
+        1,
+        "fetch callback should flag: {findings:#?}"
+    );
+    assert_eq!(
+        vulnerable_taint_flows_at(findings, REUSED_TRUSTED_LINE),
         0,
         "trusted callback reusing the parameter name must stay clean: {findings:#?}"
     );

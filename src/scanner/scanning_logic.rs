@@ -1089,7 +1089,6 @@ impl ScanningLogic {
         ctx: &TaintScanContext,
         flow_tracker: &mut VariableFlowTracker,
     ) {
-        let node_text = crate::parser::get_node_text(node, ctx.source);
         let line = node.start_position().row + 1;
         let func_name = Self::taint_function_context(node, ctx);
 
@@ -1101,6 +1100,7 @@ impl ScanningLogic {
                 "assignment_expression" | "augmented_assignment_expression" | "variable_declarator"
             )
         {
+            let node_text = crate::parser::get_node_text(node, ctx.source);
             Self::track_assignment_source(&node_text, line, &func_name, ctx, flow_tracker);
             Self::propagate_taint_for_node(&node_text, &func_name, ctx, flow_tracker);
         }
@@ -1139,11 +1139,11 @@ impl ScanningLogic {
         }
         // For assignments, match sources against the assigned value only, so the sink's
         // own property access (e.g. `element.innerHTML = ...`) cannot match as the source.
-        let source_text = if is_assignment {
-            site.node_text.split_once('=').map_or(site.node_text, |(_, value)| value.trim())
-        } else {
-            site.node_text
-        };
+        let assigned_value = is_assignment
+            .then(|| node.child_by_field_name("right"))
+            .flatten()
+            .map(|value| crate::parser::get_node_text_slice(&value, ctx.source));
+        let source_text = assigned_value.unwrap_or(site.node_text);
         let Some(source_pattern) = ctx.rule_deduplicator.matches_source_pattern(source_text) else {
             return;
         };
@@ -1270,7 +1270,6 @@ impl ScanningLogic {
     ) {
         let node_text = crate::parser::get_node_text(node, ctx.source);
         let line = node.start_position().row + 1;
-        let func_name = Self::taint_function_context(node, ctx);
 
         // Check if this node matches any sink pattern
         let Some(sink_pattern) = ctx.rule_deduplicator.matches_sink_pattern(&node_text) else {
@@ -1281,6 +1280,7 @@ impl ScanningLogic {
         {
             return;
         }
+        let func_name = Self::taint_function_context(node, ctx);
         log::debug!(
             "[SINK_ANALYSIS] Found sink '{}' with pattern '{}' at line {}",
             node_text,

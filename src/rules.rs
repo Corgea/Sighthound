@@ -162,15 +162,13 @@ impl Rules {
             "ruby" => all_rules.extend(Self::parse_embedded_dir(&RULES_RUBY, "Ruby")?),
             "html" | "django" => {
                 all_rules.extend(Self::parse_embedded_dir(&RULES_HTML, "HTML")?);
-                let javascript_rules = Self::parse_embedded_dir(&RULES_JAVASCRIPT, "JavaScript")?;
-                let embedded_dom_xss_rule = javascript_rules
-                    .iter()
-                    .flat_map(|rules| rules.rules.iter())
-                    .find(|rule| is_frontend_dom_xss_taint_rule(rule))
-                    .ok_or_else(|| {
+                let javascript_rules =
+                    Self::merge_rules(Self::parse_embedded_dir(&RULES_JAVASCRIPT, "JavaScript")?)?;
+                let embedded_dom_xss_rule =
+                    javascript_rules.frontend_dom_xss_rule_only().ok_or_else(|| {
                         anyhow::anyhow!("Canonical frontend DOM-XSS taint rule is missing")
                     })?;
-                all_rules.push(Self { rules: vec![embedded_dom_xss_rule.clone()] });
+                all_rules.push(embedded_dom_xss_rule);
             }
             "php" => all_rules.extend(Self::parse_embedded_dir(&RULES_PHP, "PHP")?),
             "objectscript" => {
@@ -219,17 +217,23 @@ impl Rules {
     /// Keep at most one copy of the canonical frontend DOM-XSS taint rule, which can be
     /// loaded both for JavaScript and for HTML/Django embedded-script scanning.
     pub fn dedupe_frontend_dom_xss_rule(&mut self) {
-        let mut retained_dom_xss_rule = false;
+        let mut seen = false;
         self.rules.retain(|rule| {
             if !is_frontend_dom_xss_taint_rule(rule) {
                 return true;
             }
-            if retained_dom_xss_rule {
-                return false;
-            }
-            retained_dom_xss_rule = true;
-            true
+            let keep = !seen;
+            seen = true;
+            keep
         });
+    }
+
+    /// Extract the canonical frontend DOM-XSS taint rule as a single-rule set.
+    pub fn frontend_dom_xss_rule_only(&self) -> Option<Self> {
+        self.rules
+            .iter()
+            .find(|rule| is_frontend_dom_xss_taint_rule(rule))
+            .map(|rule| Self { rules: vec![rule.clone()] })
     }
 
     pub fn load_from_file(rules_file: &str) -> Result<Self> {
