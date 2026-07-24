@@ -1037,6 +1037,12 @@ impl ScanningLogic {
         );
         flow_tracker.record_taint_propagation(&target_var, &dependent_vars);
 
+        // A direct source match on the target (recorded by track_assignment_source) is
+        // more precise than inherited taint; don't clobber it with a dependency's info.
+        if flow_tracker.is_variable_tainted(&target_var, func_name).is_some() {
+            return;
+        }
+
         // Check if any dependent variables are tainted and propagate to target
         for dep_var in &dependent_vars {
             if let Some(taint_info) = flow_tracker.is_variable_tainted(dep_var, func_name).cloned()
