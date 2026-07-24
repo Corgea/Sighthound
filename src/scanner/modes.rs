@@ -122,6 +122,14 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
                     all_rules.push(rules);
                 }
 
+                // HTML/Django embedded-script scanning needs the JavaScript DOM-XSS
+                // taint rule, mirroring the embedded-rules loader.
+                if matches!(language.as_str(), "html" | "django") {
+                    if let Some(dom_xss_rules) = load_file_dom_xss_taint_rule(base_rules_dir) {
+                        all_rules.push(dom_xss_rules);
+                    }
+                }
+
                 // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
                 if matches!(language.as_str(), "javascript" | "tsx") {
                     if let Some(code_type) = &cli.code_type {
@@ -143,10 +151,21 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
                 return Err(anyhow::anyhow!("No rules found for detected languages"));
             }
 
-            Rules::merge_rules(all_rules)
+            let mut merged = Rules::merge_rules(all_rules)?;
+            merged.dedupe_frontend_dom_xss_rule();
+            Ok(merged)
         }
         _ => Err(anyhow::anyhow!("Invalid CLI configuration")),
     }
+}
+
+/// Load the canonical frontend DOM-XSS taint rule from the file rules tree, so
+/// HTML/Django embedded-script scanning has parity with embedded-rules mode.
+fn load_file_dom_xss_taint_rule(base_rules_dir: &str) -> Option<Rules> {
+    let javascript_rules_dir = format!("{}/javascript", base_rules_dir);
+    let rules = Rules::load_from_directory(&javascript_rules_dir).ok()?;
+    let rule = rules.rules.into_iter().find(crate::rules::is_frontend_dom_xss_taint_rule)?;
+    Some(Rules { rules: vec![rule] })
 }
 
 /// Load the backend-only security rules for JS/TS when `code_type` requires backend coverage.
@@ -304,6 +323,14 @@ fn load_rules_for_detected_language(cli: &Cli, language: &str) -> Result<Option<
         if let Ok(base_rules) = Rules::load_from_directory_with_exclusions(&rules_dir, pattern_type)
         {
             all_rules.push(base_rules);
+        }
+
+        // HTML/Django embedded-script scanning needs the JavaScript DOM-XSS taint
+        // rule, mirroring the embedded-rules loader.
+        if matches!(language, "html" | "django") {
+            if let Some(dom_xss_rules) = load_file_dom_xss_taint_rule(base_rules_dir) {
+                all_rules.push(dom_xss_rules);
+            }
         }
 
         // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
@@ -701,6 +728,40 @@ mod tests {
 
         let rules = load_rules(&cli, &context).expect("auto-detected rules should load");
         assert!(!rules.rules.is_empty());
+    }
+
+    #[test]
+    fn load_rules_file_mode_includes_dom_xss_taint_rule_for_html() {
+        let mut cli = base_cli();
+        cli.use_file_rules = true;
+        cli.language = None;
+        cli.rules_path = None;
+        let context = base_context(&["html"]);
+
+        let rules = load_rules(&cli, &context).expect("html file rules should load");
+        let taint_rule_count = rules
+            .rules
+            .iter()
+            .filter(|rule| crate::rules::is_frontend_dom_xss_taint_rule(rule))
+            .count();
+        assert_eq!(taint_rule_count, 1, "html file rules must carry the DOM-XSS taint rule");
+    }
+
+    #[test]
+    fn load_rules_file_mode_keeps_one_dom_xss_taint_rule_for_html_plus_javascript() {
+        let mut cli = base_cli();
+        cli.use_file_rules = true;
+        cli.language = None;
+        cli.rules_path = None;
+        let context = base_context(&["html", "javascript"]);
+
+        let rules = load_rules(&cli, &context).expect("mixed file rules should load");
+        let taint_rule_count = rules
+            .rules
+            .iter()
+            .filter(|rule| crate::rules::is_frontend_dom_xss_taint_rule(rule))
+            .count();
+        assert_eq!(taint_rule_count, 1, "canonical DOM-XSS taint rule must not duplicate");
     }
 
     #[test]

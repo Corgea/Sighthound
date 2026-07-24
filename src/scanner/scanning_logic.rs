@@ -906,6 +906,12 @@ impl ScanningLogic {
         }
         let source_root = Self::promise_source_root(callee, ctx.source)?;
         let assignment_code = crate::parser::get_node_text(&source_root, ctx.source);
+        if TaintExpressionUtils::expression_has_any_sanitizer(
+            ctx.applicable_rules,
+            &assignment_code,
+        ) {
+            return None;
+        }
         let mut source_chain = assignment_code
             .chars()
             .filter(|character| !character.is_whitespace())
@@ -1049,6 +1055,33 @@ impl ScanningLogic {
         }
     }
 
+    /// Function context used for taint scoping. For embedded JavaScript, anonymous
+    /// enclosing functions get a positional `closure@line:column` identity instead of
+    /// collapsing into "global", so taint recorded for one callback's parameter cannot
+    /// leak into another callback that reuses the same parameter name.
+    fn taint_function_context(node: &tree_sitter::Node, ctx: &TaintScanContext) -> String {
+        if !ctx.is_embedded_javascript {
+            return crate::scanner::utils::AstUtils::get_function_context(node, ctx.source);
+        }
+        let mut current = *node;
+        loop {
+            if crate::scanner::utils::AstUtils::is_function_node(&current) {
+                // Only a real `name` field counts: the loose identifier fallback in
+                // `extract_function_name` would report an arrow function's parameter
+                // as its name, recreating the cross-callback collision.
+                if let Some(name) = current.child_by_field_name("name") {
+                    return crate::parser::get_node_text(&name, ctx.source);
+                }
+                let position = current.start_position();
+                return format!("closure@{}:{}", position.row + 1, position.column + 1);
+            }
+            match current.parent() {
+                Some(parent) => current = parent,
+                None => return "global".to_string(),
+            }
+        }
+    }
+
     /// Phase 1 per-node step: track function-parameter and assignment taint sources, and
     /// propagate taint through detected dependency operations, for a single AST node.
     fn track_taint_sources_for_node(
@@ -1058,7 +1091,7 @@ impl ScanningLogic {
     ) {
         let node_text = crate::parser::get_node_text(node, ctx.source);
         let line = node.start_position().row + 1;
-        let func_name = crate::scanner::utils::AstUtils::get_function_context(node, ctx.source);
+        let func_name = Self::taint_function_context(node, ctx);
 
         Self::track_function_parameter_sources(node, ctx, line, &func_name, flow_tracker);
         Self::track_promise_fulfillment_source(node, ctx, &func_name, flow_tracker);
@@ -1097,11 +1130,21 @@ impl ScanningLogic {
         used_variables: &[String],
         findings: &mut Vec<crate::models::Finding>,
     ) {
-        if used_variables.is_empty() || !Self::is_actionable_sink_node(node.kind()) {
+        let is_assignment = ctx.is_embedded_javascript
+            && matches!(node.kind(), "assignment_expression" | "augmented_assignment_expression");
+        if used_variables.is_empty()
+            || !(Self::is_actionable_sink_node(node.kind()) || is_assignment)
+        {
             return;
         }
-        let Some(source_pattern) = ctx.rule_deduplicator.matches_source_pattern(site.node_text)
-        else {
+        // For assignments, match sources against the assigned value only, so the sink's
+        // own property access (e.g. `element.innerHTML = ...`) cannot match as the source.
+        let source_text = if is_assignment {
+            site.node_text.split_once('=').map_or(site.node_text, |(_, value)| value.trim())
+        } else {
+            site.node_text
+        };
+        let Some(source_pattern) = ctx.rule_deduplicator.matches_source_pattern(source_text) else {
             return;
         };
         if ctx.is_embedded_javascript && source_pattern == site.sink_pattern {
@@ -1227,7 +1270,7 @@ impl ScanningLogic {
     ) {
         let node_text = crate::parser::get_node_text(node, ctx.source);
         let line = node.start_position().row + 1;
-        let func_name = crate::scanner::utils::AstUtils::get_function_context(node, ctx.source);
+        let func_name = Self::taint_function_context(node, ctx);
 
         // Check if this node matches any sink pattern
         let Some(sink_pattern) = ctx.rule_deduplicator.matches_sink_pattern(&node_text) else {

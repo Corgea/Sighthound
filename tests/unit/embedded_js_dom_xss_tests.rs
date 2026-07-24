@@ -12,6 +12,11 @@ const REMOTE_SOURCE_LINE: usize = 17;
 const REMOTE_SINK_LINE: usize = 25;
 const OVERLAP_LINE: usize = 6;
 const FALLBACK_LINE: usize = 11;
+const DIRECT_INNERHTML_LINE: usize = 32;
+const DIRECT_OUTERHTML_LINE: usize = 33;
+const DIRECT_APPEND_LINE: usize = 34;
+const REUSED_TAINTED_LINE: usize = 38;
+const REUSED_TRUSTED_LINE: usize = 39;
 
 fn fixture_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/test_files/html")
@@ -74,7 +79,11 @@ fn embedded_js_dom_xss_reports_precise_url_and_remote_flows() {
                 && finding.has_tag("taint_analysis")
         })
         .collect::<Vec<_>>();
-    assert_eq!(precise.len(), 2, "expected URL and remote flows: {findings:#?}");
+    assert_eq!(
+        precise.len(),
+        6,
+        "expected URL, remote, direct-assignment, and reused-callback flows: {findings:#?}"
+    );
 
     let url_flow = precise
         .iter()
@@ -102,6 +111,45 @@ fn embedded_js_dom_xss_reports_precise_url_and_remote_flows() {
     assert!(remote_source.location.contains("embedded_dom_xss_vulnerable.html"));
     assert!(remote_sink.location.contains("embedded_dom_xss_vulnerable.html"));
     assert!(remote_flow.has_tag("data_flow"));
+}
+
+#[test]
+fn embedded_js_dom_xss_flags_direct_assignment_sources() {
+    let findings = scan_html_fixtures();
+    let flow_lines = |line: usize| {
+        findings
+            .iter()
+            .filter(|finding| {
+                finding.file.ends_with("embedded_dom_xss_vulnerable.html")
+                    && finding.line == line
+                    && finding.has_tag("taint_analysis")
+            })
+            .count()
+    };
+    assert_eq!(flow_lines(DIRECT_INNERHTML_LINE), 1, "innerHTML = location.hash: {findings:#?}");
+    assert_eq!(flow_lines(DIRECT_OUTERHTML_LINE), 1, "outerHTML = document.URL: {findings:#?}");
+    assert_eq!(flow_lines(DIRECT_APPEND_LINE), 1, "innerHTML += location.search: {findings:#?}");
+}
+
+#[test]
+fn embedded_js_dom_xss_scopes_reused_callback_parameters() {
+    let findings = scan_html_fixtures();
+    let flow_lines = |line: usize| {
+        findings
+            .iter()
+            .filter(|finding| {
+                finding.file.ends_with("embedded_dom_xss_vulnerable.html")
+                    && finding.line == line
+                    && finding.has_tag("taint_analysis")
+            })
+            .count()
+    };
+    assert_eq!(flow_lines(REUSED_TAINTED_LINE), 1, "fetch callback should flag: {findings:#?}");
+    assert_eq!(
+        flow_lines(REUSED_TRUSTED_LINE),
+        0,
+        "trusted callback reusing the parameter name must stay clean: {findings:#?}"
+    );
 }
 
 #[test]

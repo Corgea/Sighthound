@@ -26,5 +26,17 @@
             }
         });
 </script>
+
+<script>
+    const element = document.getElementById("direct");
+    element.innerHTML = location.hash;
+    element.outerHTML = document.URL;
+    element.innerHTML += location.search;
+</script>
+
+<script>
+    fetch("/reused").then(result => document.write(result));
+    Promise.resolve("trusted").then(result => document.write(result));
+</script>
 </body>
 </html>

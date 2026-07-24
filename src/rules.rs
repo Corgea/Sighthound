@@ -212,8 +212,15 @@ impl Rules {
         }
 
         let mut merged = Self::merge_rules(all_rules)?;
+        merged.dedupe_frontend_dom_xss_rule();
+        Ok(merged)
+    }
+
+    /// Keep at most one copy of the canonical frontend DOM-XSS taint rule, which can be
+    /// loaded both for JavaScript and for HTML/Django embedded-script scanning.
+    pub fn dedupe_frontend_dom_xss_rule(&mut self) {
         let mut retained_dom_xss_rule = false;
-        merged.rules.retain(|rule| {
+        self.rules.retain(|rule| {
             if !is_frontend_dom_xss_taint_rule(rule) {
                 return true;
             }
@@ -223,7 +230,6 @@ impl Rules {
             retained_dom_xss_rule = true;
             true
         });
-        Ok(merged)
     }
 
     pub fn load_from_file(rules_file: &str) -> Result<Self> {

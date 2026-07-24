@@ -77,5 +77,10 @@
         document.getElementById("remote-sanitized").innerHTML = sanitized;
     });
 </script>
+<script>
+    Promise.resolve(DOMPurify.sanitize(location.hash)).then(cleanValue => {
+        document.getElementById("promise-presanitized").innerHTML = cleanValue;
+    });
+</script>
 </body>
 </html>
