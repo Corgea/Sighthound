@@ -1913,15 +1913,7 @@ impl ScanningLogic {
     /// Enhanced rule checking that leverages taint context for more accurate analysis
     /// Whether the rule's `patterns`/`pattern` match `node_text`.
     fn rule_pattern_matches_node(rule: &crate::rules::UnifiedRule, node_text: &str) -> bool {
-        if let Some(patterns) = &rule.patterns {
-            return patterns
-                .iter()
-                .any(|pattern| CommonUtils::matches_rule_pattern(pattern, node_text));
-        }
-        if let Some(pattern) = &rule.pattern {
-            return CommonUtils::matches_rule_pattern(pattern, node_text);
-        }
-        false
+        crate::rules::rule_matches_pattern_unified(rule, node_text)
     }
 
     /// The first tainted variable (if any) among `used_variables`, with its taint info.

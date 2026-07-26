@@ -22,6 +22,7 @@ mod prefilter_should_scan_tests {
                 mode: "search".to_string(),
                 pattern: None,
                 patterns: None,
+                unless: None,
                 sources: None,
                 sinks: None,
                 propagators: None,

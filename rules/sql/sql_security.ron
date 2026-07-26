@@ -6,10 +6,10 @@
             category: Some("sql-injection"),
             mode: "search",
             patterns: Some([
-                "CONCAT(*",
+                "CONCAT(",
                 "||",
-                "SELECT * WHERE",
-                "SELECT * FROM * WHERE",
+                "regex:(?i)SELECT\\s+\\*\\s+WHERE\\b",
+                "regex:(?i)SELECT\\s+\\*\\s+FROM\\s+.+?\\s+WHERE\\b",
             ]),
             finding_type: Some("SQL Injection"),
             severity: Some("Critical"),
@@ -26,8 +26,8 @@
             mode: "search",
             patterns: Some([
                 "EXECUTE IMMEDIATE",
-                "EXEC(*",
-                "EXECUTE(*",
+                "EXEC(",
+                "EXECUTE(",
                 "sp_executesql",
             ]),
             finding_type: Some("SQL Injection"),
@@ -122,7 +122,7 @@
             category: Some("best-practice"),
             mode: "search",
             patterns: Some([
-                "SELECT *",
+                "regex:(?i)SELECT\\s+\\*",
             ]),
             finding_type: Some("Performance Issue"),
             severity: Some("Low"),

@@ -13,6 +13,7 @@ fn make_rule(pattern: &str, finding_type: &str) -> UnifiedRule {
         mode: "search".to_string(),
         pattern: Some(pattern.to_string()),
         patterns: None,
+        unless: None,
         sources: None,
         sinks: None,
         propagators: None,

@@ -1,6 +1,7 @@
 use sighthound::models::UnifiedRule;
 use sighthound::rules::{
     match_any_pattern, match_pattern, rule_matches_pattern_unified, validate_unified_rule_patterns,
+    Rules,
 };
 
 // Build a search-mode UnifiedRule carrying the given pattern/patterns.
@@ -14,6 +15,7 @@ fn make_rule(pattern: Option<&str>, patterns: Option<Vec<&str>>) -> UnifiedRule 
         mode: "search".to_string(),
         pattern: pattern.map(|s| s.to_string()),
         patterns: patterns.map(|v| v.into_iter().map(|s| s.to_string()).collect()),
+        unless: None,
         sources: None,
         sinks: None,
         propagators: None,
@@ -141,6 +143,60 @@ mod pattern_matching_tests {
         // Test non-matching
         assert!(!rule_matches_pattern_unified(&rule, "clipboard.get"));
         assert!(!rule_matches_pattern_unified(&rule, "print"));
+    }
+
+    #[test]
+    fn test_unless_patterns_suppress_matching_rules() {
+        let mut rule = make_rule(Some("http://"), None);
+        rule.unless =
+            Some(vec!["http://localhost".to_string(), "regex:http://127\\.0\\.0\\.1".to_string()]);
+
+        assert!(rule_matches_pattern_unified(&rule, "http://example.com"));
+        assert!(!rule_matches_pattern_unified(&rule, "http://localhost:8080"));
+        assert!(!rule_matches_pattern_unified(&rule, "http://127.0.0.1/admin"));
+    }
+
+    #[test]
+    fn embedded_text_rules_match_normal_source_text() {
+        let xml_rules = Rules::load_embedded_rules("xml", None).unwrap();
+        let xxe_rule =
+            xml_rules.rules.iter().find(|rule| rule.id.as_deref() == Some("xml-xxe-001")).unwrap();
+        assert!(rule_matches_pattern_unified(
+            xxe_rule,
+            "<!DOCTYPE root [\n<!ENTITY secret SYSTEM \"file:///etc/passwd\">\n]>"
+        ));
+
+        let insecure_xml_rule = xml_rules
+            .rules
+            .iter()
+            .find(|rule| rule.id.as_deref() == Some("xml-insecure-001"))
+            .unwrap();
+        assert!(!rule_matches_pattern_unified(
+            insecure_xml_rule,
+            "<root xmlns=\"http://www.w3.org/2001/XMLSchema\" />"
+        ));
+
+        let html_rules = Rules::load_embedded_rules("html", None).unwrap();
+        let event_eval_rule = html_rules
+            .rules
+            .iter()
+            .find(|rule| rule.id.as_deref() == Some("html-xss-004"))
+            .unwrap();
+        assert!(rule_matches_pattern_unified(
+            event_eval_rule,
+            "<button onclick=\"eval(userInput)\">Run</button>"
+        ));
+
+        let sql_rules = Rules::load_embedded_rules("sql", None).unwrap();
+        let sql_injection_rule = sql_rules
+            .rules
+            .iter()
+            .find(|rule| rule.id.as_deref() == Some("sql-injection-001"))
+            .unwrap();
+        assert!(rule_matches_pattern_unified(
+            sql_injection_rule,
+            "SELECT * FROM users WHERE id = user_input"
+        ));
     }
 
     #[test]

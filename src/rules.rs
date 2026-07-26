@@ -406,6 +406,10 @@ pub fn match_any_pattern(patterns: &[String], text: &str) -> bool {
 }
 
 pub fn rule_matches_pattern_unified(rule: &UnifiedRule, text: &str) -> bool {
+    if rule.unless.as_ref().is_some_and(|patterns| match_any_pattern(patterns, text)) {
+        return false;
+    }
+
     if let Some(pattern) = &rule.pattern {
         if match_pattern(pattern, text) {
             return true;
@@ -437,6 +441,15 @@ pub fn validate_unified_rule_patterns(rule: &UnifiedRule) -> Result<(), String> 
                 if let Some(regex_pattern) = pattern.strip_prefix("regex:") {
                     Regex::new(regex_pattern)
                         .map_err(|e| format!("Invalid regex pattern '{}': {}", regex_pattern, e))?;
+                }
+            }
+        }
+
+        if let Some(patterns) = &rule.unless {
+            for pattern in patterns {
+                if let Some(regex_pattern) = pattern.strip_prefix("regex:") {
+                    Regex::new(regex_pattern)
+                        .map_err(|e| format!("Invalid unless regex '{}': {}", regex_pattern, e))?;
                 }
             }
         }
