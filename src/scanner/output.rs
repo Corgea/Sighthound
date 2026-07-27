@@ -314,135 +314,6 @@ pub fn print_findings_sarif(findings: &[Finding]) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod sarif_tests {
-    use super::{build_sarif_log, sarif_uri};
-    use crate::models::Finding;
-    use std::path::Path;
-
-    fn finding(finding_type: &str, severity: &str, cwe: Option<&str>, line: usize) -> Finding {
-        Finding {
-            file: "src/app.py".to_string(),
-            line,
-            column: 5,
-            end_line: line,
-            end_column: 30,
-            function: "os.system".to_string(),
-            finding_type: finding_type.to_string(),
-            snippet: "os.system(cmd)".to_string(),
-            severity: severity.to_string(),
-            confidence: "Medium".to_string(),
-            description: Some("OS command execution sink".to_string()),
-            cwe_id: cwe.map(str::to_string),
-            source_info: None,
-            sink_info: None,
-            traces: None,
-            tags: None,
-        }
-    }
-
-    #[test]
-    fn emits_valid_sarif_shape() {
-        let findings = vec![
-            finding("Command Injection", "High", Some("cwe-78"), 6),
-            finding("Command Injection", "High", Some("cwe-78"), 15),
-            finding("SQL Injection", "Medium", Some("cwe-89"), 9),
-        ];
-        let log = build_sarif_log(&findings);
-
-        assert_eq!(log["version"], "2.1.0");
-        assert!(log["$schema"].as_str().unwrap().contains("sarif-schema-2.1.0"));
-
-        let run = &log["runs"][0];
-        assert_eq!(run["tool"]["driver"]["name"], "Sighthound");
-
-        // One result per finding.
-        assert_eq!(run["results"].as_array().unwrap().len(), 3);
-
-        // Rules are deduplicated by CWE: two distinct rules for three findings.
-        let rules = run["tool"]["driver"]["rules"].as_array().unwrap();
-        assert_eq!(rules.len(), 2);
-
-        // First result maps severity, region, and location correctly.
-        let first = &run["results"][0];
-        assert_eq!(first["ruleId"], "cwe-78");
-        assert_eq!(first["ruleIndex"], 0);
-        assert_eq!(first["level"], "error");
-        let region = &first["locations"][0]["physicalLocation"]["region"];
-        assert_eq!(region["startLine"], 6);
-        assert_eq!(region["startColumn"], 5);
-        assert_eq!(
-            first["locations"][0]["physicalLocation"]["artifactLocation"]["uri"],
-            "src/app.py"
-        );
-
-        // CWE rule carries the GitHub security-severity property and cwe tag.
-        let cwe_rule = rules.iter().find(|r| r["id"] == "cwe-78").expect("cwe-78 rule present");
-        assert_eq!(cwe_rule["properties"]["security-severity"], "8.9");
-        let tags = cwe_rule["properties"]["tags"].as_array().unwrap();
-        assert!(tags.iter().any(|t| t == "external/cwe/cwe-78"));
-    }
-
-    #[test]
-    fn clamps_zero_line_to_valid_region() {
-        let findings = vec![Finding {
-            line: 0,
-            column: 0,
-            end_line: 0,
-            end_column: 0,
-            ..finding("Unknown", "Low", None, 0)
-        }];
-        let log = build_sarif_log(&findings);
-        let region = &log["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
-        // SARIF requires startLine >= 1; a 0-line finding must still be valid.
-        assert_eq!(region["startLine"], 1);
-        assert_eq!(region["startColumn"], 1);
-    }
-
-    #[test]
-    fn normalizes_cwe_ids_and_assigns_deduplicated_rule_indexes() {
-        let findings = vec![
-            finding("Command Injection", "High", Some("CWE-78"), 6),
-            finding("Command Injection", "High", Some("cwe-78"), 15),
-            finding("SQL Injection", "Medium", Some("CWE-89"), 9),
-        ];
-        let log = build_sarif_log(&findings);
-        let run = &log["runs"][0];
-        let rules = run["tool"]["driver"]["rules"].as_array().unwrap();
-
-        assert_eq!(rules.len(), 2);
-        assert_eq!(rules[0]["id"], "cwe-78");
-        assert_eq!(run["results"][0]["ruleId"], "cwe-78");
-        assert_eq!(run["results"][0]["ruleIndex"], 0);
-        assert_eq!(run["results"][1]["ruleId"], "cwe-78");
-        assert_eq!(run["results"][1]["ruleIndex"], 0);
-        assert_eq!(run["results"][2]["ruleIndex"], 1);
-    }
-
-    #[test]
-    fn uses_maximum_security_severity_for_a_shared_rule() {
-        for (first, second) in [("Low", "Critical"), ("Critical", "Low")] {
-            let findings = vec![
-                finding("Cross-site Scripting", first, Some("cwe-79"), 6),
-                finding("Cross-site Scripting", second, Some("cwe-79"), 15),
-            ];
-            let log = build_sarif_log(&findings);
-            let rule = &log["runs"][0]["tool"]["driver"]["rules"][0];
-
-            assert_eq!(rule["properties"]["security-severity"], "9.5");
-        }
-    }
-
-    #[test]
-    fn emits_repository_relative_uris() {
-        let repository_root = Path::new("/repo");
-
-        assert_eq!(sarif_uri("./src/app.py", Some(repository_root)), "src/app.py");
-        assert_eq!(sarif_uri("/repo/src/app.py", Some(repository_root)), "src/app.py");
-        assert_eq!(sarif_uri("backend/src/app.py", Some(repository_root)), "backend/src/app.py");
-    }
-}
-
 /// Print findings in CSV format
 pub fn print_findings_csv(findings: &[Finding]) -> Result<()> {
     let stdout = std::io::stdout();
@@ -666,4 +537,133 @@ pub fn print_findings_text(
         }
     }
     print_summary(findings, duration);
+}
+
+#[cfg(test)]
+mod sarif_tests {
+    use super::{build_sarif_log, sarif_uri};
+    use crate::models::Finding;
+    use std::path::Path;
+
+    fn finding(finding_type: &str, severity: &str, cwe: Option<&str>, line: usize) -> Finding {
+        Finding {
+            file: "src/app.py".to_string(),
+            line,
+            column: 5,
+            end_line: line,
+            end_column: 30,
+            function: "os.system".to_string(),
+            finding_type: finding_type.to_string(),
+            snippet: "os.system(cmd)".to_string(),
+            severity: severity.to_string(),
+            confidence: "Medium".to_string(),
+            description: Some("OS command execution sink".to_string()),
+            cwe_id: cwe.map(str::to_string),
+            source_info: None,
+            sink_info: None,
+            traces: None,
+            tags: None,
+        }
+    }
+
+    #[test]
+    fn emits_valid_sarif_shape() {
+        let findings = vec![
+            finding("Command Injection", "High", Some("cwe-78"), 6),
+            finding("Command Injection", "High", Some("cwe-78"), 15),
+            finding("SQL Injection", "Medium", Some("cwe-89"), 9),
+        ];
+        let log = build_sarif_log(&findings);
+
+        assert_eq!(log["version"], "2.1.0");
+        assert!(log["$schema"].as_str().unwrap().contains("sarif-schema-2.1.0"));
+
+        let run = &log["runs"][0];
+        assert_eq!(run["tool"]["driver"]["name"], "Sighthound");
+
+        // One result per finding.
+        assert_eq!(run["results"].as_array().unwrap().len(), 3);
+
+        // Rules are deduplicated by CWE: two distinct rules for three findings.
+        let rules = run["tool"]["driver"]["rules"].as_array().unwrap();
+        assert_eq!(rules.len(), 2);
+
+        // First result maps severity, region, and location correctly.
+        let first = &run["results"][0];
+        assert_eq!(first["ruleId"], "cwe-78");
+        assert_eq!(first["ruleIndex"], 0);
+        assert_eq!(first["level"], "error");
+        let region = &first["locations"][0]["physicalLocation"]["region"];
+        assert_eq!(region["startLine"], 6);
+        assert_eq!(region["startColumn"], 5);
+        assert_eq!(
+            first["locations"][0]["physicalLocation"]["artifactLocation"]["uri"],
+            "src/app.py"
+        );
+
+        // CWE rule carries the GitHub security-severity property and cwe tag.
+        let cwe_rule = rules.iter().find(|r| r["id"] == "cwe-78").expect("cwe-78 rule present");
+        assert_eq!(cwe_rule["properties"]["security-severity"], "8.9");
+        let tags = cwe_rule["properties"]["tags"].as_array().unwrap();
+        assert!(tags.iter().any(|t| t == "external/cwe/cwe-78"));
+    }
+
+    #[test]
+    fn clamps_zero_line_to_valid_region() {
+        let findings = vec![Finding {
+            line: 0,
+            column: 0,
+            end_line: 0,
+            end_column: 0,
+            ..finding("Unknown", "Low", None, 0)
+        }];
+        let log = build_sarif_log(&findings);
+        let region = &log["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
+        // SARIF requires startLine >= 1; a 0-line finding must still be valid.
+        assert_eq!(region["startLine"], 1);
+        assert_eq!(region["startColumn"], 1);
+    }
+
+    #[test]
+    fn normalizes_cwe_ids_and_assigns_deduplicated_rule_indexes() {
+        let findings = vec![
+            finding("Command Injection", "High", Some("CWE-78"), 6),
+            finding("Command Injection", "High", Some("cwe-78"), 15),
+            finding("SQL Injection", "Medium", Some("CWE-89"), 9),
+        ];
+        let log = build_sarif_log(&findings);
+        let run = &log["runs"][0];
+        let rules = run["tool"]["driver"]["rules"].as_array().unwrap();
+
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[0]["id"], "cwe-78");
+        assert_eq!(run["results"][0]["ruleId"], "cwe-78");
+        assert_eq!(run["results"][0]["ruleIndex"], 0);
+        assert_eq!(run["results"][1]["ruleId"], "cwe-78");
+        assert_eq!(run["results"][1]["ruleIndex"], 0);
+        assert_eq!(run["results"][2]["ruleIndex"], 1);
+    }
+
+    #[test]
+    fn uses_maximum_security_severity_for_a_shared_rule() {
+        for (first, second) in [("Low", "Critical"), ("Critical", "Low")] {
+            let findings = vec![
+                finding("Cross-site Scripting", first, Some("cwe-79"), 6),
+                finding("Cross-site Scripting", second, Some("cwe-79"), 15),
+            ];
+            let log = build_sarif_log(&findings);
+            let rule = &log["runs"][0]["tool"]["driver"]["rules"][0];
+
+            assert_eq!(rule["properties"]["security-severity"], "9.5");
+        }
+    }
+
+    #[test]
+    fn emits_repository_relative_uris() {
+        let repository_root = Path::new("/repo");
+
+        assert_eq!(sarif_uri("./src/app.py", Some(repository_root)), "src/app.py");
+        assert_eq!(sarif_uri("/repo/src/app.py", Some(repository_root)), "src/app.py");
+        assert_eq!(sarif_uri("backend/src/app.py", Some(repository_root)), "backend/src/app.py");
+    }
 }
