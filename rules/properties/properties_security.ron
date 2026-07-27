@@ -6,19 +6,31 @@
             category: Some("cryptography"),
             mode: "search",
             patterns: Some([
-                "encryption=false",
-                "ssl=false",
-                "tls=false",
-                "verify=false",
-                "secure=false",
+                "regex:(?i)^\\s*(?:encryption|ssl|tls)\\s*=\\s*false\\s*$",
             ]),
-            finding_type: Some("Insecure Configuration"),
+            finding_type: Some("Insecure Communication"),
             severity: Some("High"),
             confidence: Some("High"),
-            cwe_id: Some("cwe-327"),
-            description: Some("Encryption or verification disabled in configuration - enable secure communication"),
+            cwe_id: Some("cwe-319"),
+            description: Some("Transport encryption is disabled in configuration"),
             file_types: Some((extensions: Some([".properties", ".props", ".config", ".conf", ".cfg", ".ini", ".env"]))),
-            tags: Some(["cryptography", "configuration", "cwe-327"])
+            tags: Some(["cryptography", "configuration", "cwe-319"])
+        ),
+        (
+            id: Some("props-verification-001"),
+            name: Some("TLS Certificate Verification Disabled"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "regex:(?i)^\\s*(?:verify|ssl\\.verify|tls\\.verify)\\s*=\\s*false\\s*$",
+            ]),
+            finding_type: Some("Improper Certificate Validation"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-295"),
+            description: Some("TLS certificate verification is disabled in configuration"),
+            file_types: Some((extensions: Some([".properties", ".props", ".config", ".conf", ".cfg", ".ini", ".env"]))),
+            tags: Some(["cryptography", "configuration", "cwe-295"])
         ),
         (
             id: Some("props-debug-001"),
@@ -26,10 +38,7 @@
             category: Some("configuration"),
             mode: "search",
             patterns: Some([
-                "debug=true",
-                "debug_mode=true",
-                "debugMode=true",
-                "DEBUG=true",
+                "regex:(?i)^\\s*(?:debug|debug_mode|debugMode)\\s*=\\s*true\\s*$",
             ]),
             finding_type: Some("Insecure Configuration"),
             severity: Some("Medium"),

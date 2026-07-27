@@ -20,7 +20,9 @@ impl LanguageParser {
     }
 
     fn with_support(language_support: Box<dyn LanguageSupport>) -> Result<Self> {
-        let language = language_support.tree_sitter_language();
+        let language = language_support
+            .tree_sitter_language()
+            .context("Text-based languages do not use a tree-sitter parser")?;
         let mut parser = TSParser::new();
         parser.set_language(&language).context("Failed to set language")?;
 

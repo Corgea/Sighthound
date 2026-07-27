@@ -10,6 +10,7 @@ mod cross_file_taint;
 mod django_security;
 mod false_positive_regressions;
 mod language_coverage;
+mod markup_config_languages;
 mod sanitizer_and_scope;
 mod search_conditions;
 mod taint_true_negatives;

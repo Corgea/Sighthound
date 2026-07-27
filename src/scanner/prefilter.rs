@@ -1,4 +1,5 @@
 use crate::config::filters::SKIP_MINIFIED_PATTERNS;
+use crate::language::{get_language_support, SearchSemantics};
 use crate::parser::{get_node_text, LanguageParser};
 use crate::rules::Rules;
 use crate::scanner::utils::matches_glob_pattern;
@@ -82,6 +83,11 @@ impl PreFilter {
     /// Simple text/doc file detection
     fn is_text_or_doc_file(&self, file_path: &str) -> bool {
         let path_lower = file_path.to_lowercase();
+        if path_lower.ends_with(".svg")
+            && crate::scanner::utils::detect_language_from_path(Path::new(file_path)) == Some("xml")
+        {
+            return false;
+        }
 
         // File extensions
         let skip_extensions = [
@@ -174,6 +180,11 @@ impl PreFilter {
 
     /// Use tree-sitter to check if file is test or migration
     fn is_test_or_migration_file(&self, file_path: &str) -> bool {
+        if get_language_support(&self.language)
+            .is_ok_and(|support| support.search_semantics() == SearchSemantics::Text)
+        {
+            return false;
+        }
         match self.extract_imports(file_path) {
             Ok(imports_text) => {
                 self.has_test_patterns(&imports_text) || self.has_migration_patterns(&imports_text)

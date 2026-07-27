@@ -30,6 +30,7 @@ def named_placeholder(cursor, params):
 
 # sqlite3 qmark placeholders
 
+
 def sqlite_safe(user_id):
     conn = sqlite3.connect(":memory:")
     cursor = conn.cursor()
@@ -74,4 +75,3 @@ def get_user_keyword(cursor, username, password):
 
 def safe_parameterized_with_fstring(cursor, uid):
     cursor.execute("SELECT * FROM users WHERE id = %s", [f"user_{uid}"])
-

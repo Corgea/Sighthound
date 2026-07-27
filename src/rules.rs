@@ -405,11 +405,7 @@ pub fn match_any_pattern(patterns: &[String], text: &str) -> bool {
     CommonUtils::matches_any_pattern(patterns, text)
 }
 
-pub fn rule_matches_pattern_unified(rule: &UnifiedRule, text: &str) -> bool {
-    if rule.unless.as_ref().is_some_and(|patterns| match_any_pattern(patterns, text)) {
-        return false;
-    }
-
+pub fn rule_positive_matches(rule: &UnifiedRule, text: &str) -> bool {
     if let Some(pattern) = &rule.pattern {
         if match_pattern(pattern, text) {
             return true;
@@ -425,6 +421,43 @@ pub fn rule_matches_pattern_unified(rule: &UnifiedRule, text: &str) -> bool {
     }
 
     false
+}
+
+pub fn rule_matches_pattern_scoped(
+    rule: &UnifiedRule,
+    match_text: &str,
+    unless_scope: &str,
+) -> bool {
+    if rule.unless.as_ref().is_some_and(|patterns| match_any_pattern(patterns, unless_scope)) {
+        return false;
+    }
+    rule_positive_matches(rule, match_text)
+}
+
+pub fn rule_matches_pattern_unified(rule: &UnifiedRule, text: &str) -> bool {
+    rule_matches_pattern_scoped(rule, text, text)
+}
+
+fn pattern_match_range(pattern: &str, text: &str) -> Option<std::ops::Range<usize>> {
+    if let Some(regex_pattern) = pattern.strip_prefix("regex:") {
+        return Regex::new(regex_pattern).ok()?.find(text).map(|matched| matched.range());
+    }
+    if pattern.contains("\\\\") || pattern.contains("\\.") {
+        return Regex::new(pattern).ok()?.find(text).map(|matched| matched.range());
+    }
+    if pattern.contains('\\') || pattern.contains('*') {
+        return match_pattern(pattern, text).then_some(0..text.len());
+    }
+    text.find(pattern).map(|start| start..start + pattern.len())
+}
+
+pub fn first_positive_match_range(
+    rule: &UnifiedRule,
+    text: &str,
+) -> Option<std::ops::Range<usize>> {
+    rule.pattern.as_deref().and_then(|pattern| pattern_match_range(pattern, text)).or_else(|| {
+        rule.patterns.as_ref()?.iter().find_map(|pattern| pattern_match_range(pattern, text))
+    })
 }
 
 pub fn validate_unified_rule_patterns(rule: &UnifiedRule) -> Result<(), String> {

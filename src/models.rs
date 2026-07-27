@@ -298,7 +298,7 @@ pub struct Cli {
 
     /// Language to scan (optional - triggers explicit mode when used with rules_path)
     #[arg(
-        help = "Programming language to scan (python, java, javascript, tsx, html, django, objectscript)"
+        help = "Language to scan (python, java, javascript, tsx, html, django, sql, xml, properties, config, objectscript)"
     )]
     pub language: Option<String>,
 

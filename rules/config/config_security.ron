@@ -28,11 +28,7 @@
             category: Some("security-misconfiguration"),
             mode: "search",
             patterns: Some([
-                "Access-Control-Allow-Origin: *",
-                "\"allow_origin\": \"*\"",
-                "'allow_origin': '*'",
-                "allow_origin: \"*\"",
-                "allowOrigin: \"*\"",
+                "regex:(?i)(?:Access-Control-Allow-Origin|allow_origin|allowOrigin)[\"']?\\s*[:=]\\s*[\"']?\\*[\"']?",
             ]),
             finding_type: Some("Security Misconfiguration"),
             severity: Some("Medium"),
@@ -85,12 +81,10 @@
         (
             id: Some("config-http-001"),
             name: Some("HTTP URL in Config"),
-            category: Some("cryptography"),
+            category: Some("insecure-communication"),
             mode: "search",
             patterns: Some([
-                "\"http://",
-                "'http://",
-                "http://",
+                "regex:(?i)(?:url|endpoint|host|base_url|api_url)[\"']?\\s*[:=]\\s*[\"']http://",
             ]),
             unless: Some([
                 "localhost",

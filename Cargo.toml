@@ -32,10 +32,10 @@ html = ["tree-sitter-html"]
 django = ["tree-sitter-html"]  # Reuse HTML parser for Django templates
 php = ["tree-sitter-php"]
 objectscript = ["dep:tree-sitter-objectscript", "dep:tree-sitter-objectscript-routine"]
-sql = ["tree-sitter-javascript"]
-xml = ["tree-sitter-javascript"]
-properties = ["tree-sitter-javascript"]
-config = ["tree-sitter-javascript"]
+sql = []
+xml = []
+properties = []
+config = []
 
 [dependencies]
 tree-sitter = "0.26"

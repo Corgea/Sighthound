@@ -61,6 +61,7 @@ pub fn check_single_condition(
             check_argument_not_sanitized_condition(node, source, condition, language_support)
         }
         "has_sibling_pattern" => check_has_sibling_pattern_condition(node, source, condition),
+        "node_kind" => condition.node_type.as_deref() == Some(node.kind()),
         _ => false,
     }
 }

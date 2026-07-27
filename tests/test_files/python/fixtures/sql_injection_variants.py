@@ -3,7 +3,7 @@ def percent_spaced(cursor, user_id):
 
 
 def percent_unspaced(cursor, user_id):
-    cursor.execute("SELECT * FROM users WHERE id = %s"%user_id)
+    cursor.execute("SELECT * FROM users WHERE id = %s" % user_id)
 
 
 def percent_variable(cursor, query, user_id):

@@ -37,26 +37,6 @@
             tags: Some(["xss", "html", "javascript-url", "cwe-79"])
         ),
         (
-            id: Some("html-xss-003"),
-            name: Some("Inline onclick Event Handler"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "onclick=",
-            ]),
-            unless: Some([
-                "onclick=\"\"",
-                "onclick=''",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("Medium"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-79"),
-            description: Some("Inline onclick handlers can execute arbitrary JavaScript, especially if they process user input"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "inline-event", "cwe-79"])
-        ),
-        (
             id: Some("html-xss-004"),
             name: Some("Inline Event Handler with eval()"),
             category: Some("xss"),
@@ -77,67 +57,7 @@
             cwe_id: Some("cwe-95"),
             description: Some("Using eval() in inline event handlers can execute arbitrary code, especially with user-controlled input"),
             file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "code-injection", "eval", "cwe-79", "cwe-95"])
-        ),
-        (
-            id: Some("html-xss-005"),
-            name: Some("Inline onmouseover Event Handler"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "onmouseover=",
-            ]),
-            unless: Some([
-                "onmouseover=\"\"",
-                "onmouseover=''",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("Medium"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-79"),
-            description: Some("Inline onmouseover handlers can execute arbitrary JavaScript when the user hovers over an element"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "inline-event", "cwe-79"])
-        ),
-        (
-            id: Some("html-xss-006"),
-            name: Some("Inline onerror Event Handler"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "onerror=",
-            ]),
-            unless: Some([
-                "onerror=\"\"",
-                "onerror=''",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("High"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-79"),
-            description: Some("onerror handlers on img/script tags are commonly exploited for XSS attacks"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "inline-event", "cwe-79"])
-        ),
-        (
-            id: Some("html-xss-007"),
-            name: Some("Inline onload Event Handler"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "onload=",
-            ]),
-            unless: Some([
-                "onload=\"\"",
-                "onload=''",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("Medium"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-79"),
-            description: Some("Inline onload handlers execute JavaScript when an element loads"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "inline-event", "cwe-79"])
+            tags: Some(["html", "code-injection", "eval", "cwe-95"])
         ),
         (
             id: Some("html-xss-008"),
@@ -145,7 +65,7 @@
             category: Some("xss"),
             mode: "search",
             patterns: Some([
-                "srcdoc=",
+                "regex:srcdoc\\s*=\\s*[\"'][^\"']*(?:<script|\\$\\{|\\{\\{)",
             ]),
             finding_type: Some("Cross-Site Scripting (XSS)"),
             severity: Some("High"),
@@ -154,24 +74,6 @@
             description: Some("The srcdoc attribute can inject HTML/JavaScript into an iframe, creating XSS vulnerabilities"),
             file_types: Some((extensions: Some([".html", ".htm"]))),
             tags: Some(["xss", "html", "iframe", "cwe-79"])
-        ),
-        (
-            id: Some("html-xss-009"),
-            name: Some("Data URL in src Attribute"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "src=\"data:",
-                "src='data:",
-                "src=data:text/html",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("High"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-79"),
-            description: Some("Data URLs can contain executable JavaScript, leading to XSS vulnerabilities"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "data-url", "cwe-79"])
         ),
         (
             id: Some("html-xss-010"),
@@ -211,9 +113,15 @@
             category: Some("xss"),
             mode: "search",
             patterns: Some([
-                "document.write(",
-                "document.writeln(",
+                "regex:document\\.write(?:ln)?\\s*\\([^)]*(?:user|input|data|param|location|\\$\\{)",
             ]),
+            conditions: Some([(
+                field: "",
+                operator: "",
+                value: "",
+                condition_type: Some("node_kind"),
+                node_type: Some("script_element"),
+            )]),
             finding_type: Some("DOM XSS"),
             severity: Some("High"),
             confidence: Some("Medium"),
@@ -228,15 +136,22 @@
             category: Some("code-injection"),
             mode: "search",
             patterns: Some([
-                "eval(",
+                "regex:\\beval\\s*\\([^)]*(?:user|input|data|param|location|\\$\\{)",
             ]),
+            conditions: Some([(
+                field: "",
+                operator: "",
+                value: "",
+                condition_type: Some("node_kind"),
+                node_type: Some("script_element"),
+            )]),
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
             cwe_id: Some("cwe-95"),
             description: Some("eval() can execute arbitrary JavaScript code, especially dangerous with user input"),
             file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "code-injection", "eval", "cwe-95"])
+            tags: Some(["html", "code-injection", "eval", "cwe-95"])
         ),
         (
             id: Some("html-sec-001"),
@@ -275,86 +190,6 @@
             tags: Some(["xss", "html", "inline-event", "template-injection", "cwe-79"])
         ),
         (
-            id: Some("html-xss-015"),
-            name: Some("Inline onfocus Event Handler"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "onfocus=",
-            ]),
-            unless: Some([
-                "onfocus=\"\"",
-                "onfocus=''",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("Low"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-79"),
-            description: Some("Inline onfocus handlers can execute JavaScript when an element receives focus"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "inline-event", "cwe-79"])
-        ),
-        (
-            id: Some("html-xss-016"),
-            name: Some("Inline onblur Event Handler"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "onblur=",
-            ]),
-            unless: Some([
-                "onblur=\"\"",
-                "onblur=''",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("Low"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-79"),
-            description: Some("Inline onblur handlers can execute JavaScript when an element loses focus"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "inline-event", "cwe-79"])
-        ),
-        (
-            id: Some("html-xss-017"),
-            name: Some("Inline onchange Event Handler"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "onchange=",
-            ]),
-            unless: Some([
-                "onchange=\"\"",
-                "onchange=''",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("Low"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-79"),
-            description: Some("Inline onchange handlers can execute JavaScript when an element's value changes"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "inline-event", "cwe-79"])
-        ),
-        (
-            id: Some("html-xss-018"),
-            name: Some("Inline onsubmit Event Handler"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "onsubmit=",
-            ]),
-            unless: Some([
-                "onsubmit=\"\"",
-                "onsubmit=''",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("Medium"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-79"),
-            description: Some("Inline onsubmit handlers can execute JavaScript when a form is submitted"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "inline-event", "form", "cwe-79"])
-        ),
-        (
             id: Some("html-xss-019"),
             name: Some("JavaScript URL in src Attribute"),
             category: Some("xss"),
@@ -387,52 +222,6 @@
             description: Some("Data URLs containing script tags can execute arbitrary JavaScript"),
             file_types: Some((extensions: Some([".html", ".htm"]))),
             tags: Some(["xss", "html", "data-url", "script", "cwe-79"])
-        ),
-        (
-            id: Some("html-xss-021"),
-            name: Some("Inline oninput Event Handler"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "oninput=",
-            ]),
-            unless: Some([
-                "oninput=\"\"",
-                "oninput=''",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("Low"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-79"),
-            description: Some("Inline oninput handlers can execute JavaScript on user input"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "inline-event", "cwe-79"])
-        ),
-        (
-            id: Some("html-xss-022"),
-            name: Some("Inline onkeypress Event Handler"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "onkeypress=",
-                "onkeydown=",
-                "onkeyup=",
-            ]),
-            unless: Some([
-                "onkeypress=\"\"",
-                "onkeypress=''",
-                "onkeydown=\"\"",
-                "onkeydown=''",
-                "onkeyup=\"\"",
-                "onkeyup=''",
-            ]),
-            finding_type: Some("Cross-Site Scripting (XSS)"),
-            severity: Some("Low"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-79"),
-            description: Some("Inline keyboard event handlers can execute JavaScript on key events"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["xss", "html", "inline-event", "cwe-79"])
         ),
     ]
 )

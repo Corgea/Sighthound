@@ -1,4 +1,4 @@
-use sighthound::language::get_language_support;
+use sighthound::language::{get_language_support, SearchSemantics};
 use sighthound::parser::{get_node_text, LanguageParser};
 use tree_sitter::Node;
 
@@ -219,5 +219,14 @@ mod language_support_tests {
         let node =
             find_node_of_kind(tree.root_node(), "element").expect("expected an element node");
         assert_eq!(support.get_arguments_node(&node), None);
+    }
+
+    #[test]
+    fn text_languages_do_not_require_tree_sitter_parsers() {
+        for language in ["sql", "xml", "properties", "config"] {
+            let support = get_language_support(language).unwrap();
+            assert_eq!(support.search_semantics(), SearchSemantics::Text);
+            assert!(support.tree_sitter_language().is_none());
+        }
     }
 }

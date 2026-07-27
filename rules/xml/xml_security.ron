@@ -61,24 +61,6 @@
             tags: Some(["insecure", "http", "communication", "cwe-319"])
         ),
         (
-            id: Some("xml-injection-001"),
-            name: Some("LDAP Injection Pattern in XML"),
-            category: Some("injection"),
-            mode: "search",
-            patterns: Some([
-                "ldap://",
-                "<ldapUrl>",
-                "<LdapUrl>",
-            ]),
-            finding_type: Some("LDAP Injection Risk"),
-            severity: Some("Medium"),
-            confidence: Some("Low"),
-            cwe_id: Some("cwe-90"),
-            description: Some("XML contains LDAP references that may be vulnerable to injection if user-controlled"),
-            file_types: Some((extensions: Some([".xml", ".config"]))),
-            tags: Some(["injection", "ldap", "cwe-90"])
-        ),
-        (
             id: Some("xml-ssrf-001"),
             name: Some("SSRF - Remote URL Reference"),
             category: Some("ssrf"),
@@ -135,48 +117,6 @@
             description: Some("SSL/TLS certificate verification is disabled - enables man-in-the-middle attacks"),
             file_types: Some((extensions: Some([".xml", ".config"]))),
             tags: Some(["ssl", "tls", "mitm", "cwe-295"])
-        ),
-        (
-            id: Some("xml-db-001"),
-            name: Some("Database Connection String"),
-            category: Some("sensitive-data"),
-            mode: "search",
-            patterns: Some([
-                "<connectionString>",
-                "connectionString=\"",
-                "jdbc:",
-                "Data Source=",
-            ]),
-            finding_type: Some("Database Credentials"),
-            severity: Some("Medium"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-200"),
-            description: Some("XML contains database connection strings that may expose credentials"),
-            file_types: Some((extensions: Some([".xml", ".config"]))),
-            tags: Some(["database", "credentials", "connection-string", "cwe-200"])
-        ),
-        (
-            id: Some("xml-path-001"),
-            name: Some("Absolute File Path"),
-            category: Some("path-disclosure"),
-            mode: "search",
-            patterns: Some([
-                "<path>/",
-                "path=\"/",
-                "<file>/",
-                "<directory>/",
-            ]),
-            unless: Some([
-                "path=\"/\"",
-                "<path></path>",
-            ]),
-            finding_type: Some("Path Disclosure"),
-            severity: Some("Low"),
-            confidence: Some("Low"),
-            cwe_id: Some("cwe-538"),
-            description: Some("XML contains absolute file paths that may disclose system information"),
-            file_types: Some((extensions: Some([".xml", ".config"]))),
-            tags: Some(["path-disclosure", "information-disclosure", "cwe-538"])
         ),
     ]
 )

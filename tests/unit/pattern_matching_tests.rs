@@ -191,12 +191,29 @@ mod pattern_matching_tests {
         let sql_injection_rule = sql_rules
             .rules
             .iter()
-            .find(|rule| rule.id.as_deref() == Some("sql-injection-001"))
+            .find(|rule| rule.id.as_deref() == Some("sql-unsafe-001"))
             .unwrap();
         assert!(rule_matches_pattern_unified(
             sql_injection_rule,
-            "SELECT * FROM users WHERE id = user_input"
+            "EXECUTE IMMEDIATE 'SELECT * FROM users WHERE id = ' || user_input"
         ));
+    }
+
+    #[test]
+    fn embedded_markup_and_text_rules_are_valid() {
+        for language in ["html", "sql", "xml", "properties", "config"] {
+            let rules = Rules::load_embedded_rules(language, None)
+                .unwrap_or_else(|error| panic!("failed to load {language} rules: {error}"));
+            assert!(!rules.rules.is_empty(), "{language} should have embedded rules");
+            for rule in &rules.rules {
+                validate_unified_rule_patterns(rule).unwrap_or_else(|error| {
+                    panic!(
+                        "invalid {language} rule {}: {error}",
+                        rule.id.as_deref().unwrap_or("<unnamed>")
+                    )
+                });
+            }
+        }
     }
 
     #[test]

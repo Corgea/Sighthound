@@ -3,13 +3,23 @@ use anyhow::Result;
 use std::path::Path;
 use tree_sitter::{Language, Node};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchSemantics {
+    Ast,
+    Markup,
+    Text,
+}
+
 pub trait LanguageSupport: Send + Sync {
     fn name(&self) -> &'static str;
     fn file_extension(&self) -> &'static str;
-    fn tree_sitter_language(&self) -> Language;
+    fn tree_sitter_language(&self) -> Option<Language>;
     fn call_node_types(&self) -> &[&'static str];
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str>;
     fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>>;
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Ast
+    }
 }
 
 pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSupport>> {
@@ -128,8 +138,8 @@ impl LanguageSupport for PythonLanguage {
     fn file_extension(&self) -> &'static str {
         ".py"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_python::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_python::LANGUAGE.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &["call"]
@@ -156,8 +166,8 @@ impl LanguageSupport for JavaLanguage {
     fn file_extension(&self) -> &'static str {
         ".java"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_java::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_java::LANGUAGE.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &["method_invocation", "object_creation_expression"]
@@ -192,8 +202,8 @@ impl LanguageSupport for JavaScriptLanguage {
     fn file_extension(&self) -> &'static str {
         ".js"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_javascript::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_javascript::LANGUAGE.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &["call_expression", "new_expression"]
@@ -228,8 +238,8 @@ impl LanguageSupport for TSXLanguage {
     fn file_extension(&self) -> &'static str {
         ".tsx"
     } // Primary extension, but handles both .ts and .tsx
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_typescript::LANGUAGE_TSX.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_typescript::LANGUAGE_TSX.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &["call_expression", "new_expression", "jsx_expression", "jsx_attribute"]
@@ -267,8 +277,8 @@ impl LanguageSupport for TypeScriptLanguage {
     fn file_extension(&self) -> &'static str {
         ".ts"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &["call_expression", "new_expression"]
@@ -303,8 +313,8 @@ impl LanguageSupport for GoLanguage {
     fn file_extension(&self) -> &'static str {
         ".go"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_go::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_go::LANGUAGE.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &["call_expression"]
@@ -340,8 +350,8 @@ impl LanguageSupport for RubyLanguage {
     fn file_extension(&self) -> &'static str {
         ".rb"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_ruby::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_ruby::LANGUAGE.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &["method_call", "call"]
@@ -373,8 +383,8 @@ impl LanguageSupport for CSharpLanguage {
     fn file_extension(&self) -> &'static str {
         ".cs"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_c_sharp::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_c_sharp::LANGUAGE.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &["invocation_expression", "object_creation_expression"]
@@ -419,8 +429,8 @@ impl LanguageSupport for PHPLanguage {
     fn file_extension(&self) -> &'static str {
         ".php"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_php::LANGUAGE_PHP.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_php::LANGUAGE_PHP.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &[
@@ -486,13 +496,13 @@ impl LanguageSupport for ObjectScriptLanguage {
         ".cls"
     }
 
-    fn tree_sitter_language(&self) -> Language {
-        match self.grammar {
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(match self.grammar {
             ObjectScriptGrammar::Udl => tree_sitter_objectscript::LANGUAGE_OBJECTSCRIPT_UDL.into(),
             ObjectScriptGrammar::Routine => {
                 tree_sitter_objectscript_routine::LANGUAGE_OBJECTSCRIPT_ROUTINE.into()
             }
-        }
+        })
     }
 
     fn call_node_types(&self) -> &[&'static str] {
@@ -551,8 +561,8 @@ impl LanguageSupport for HTMLLanguage {
     fn file_extension(&self) -> &'static str {
         ".html"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_html::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_html::LANGUAGE.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &["attribute", "start_tag", "script_element", "element"]
@@ -603,6 +613,10 @@ impl LanguageSupport for HTMLLanguage {
 
         node.child_by_field_name("value")
     }
+
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Markup
+    }
 }
 
 // Django Template Implementation
@@ -617,8 +631,8 @@ impl LanguageSupport for DjangoTemplateLanguage {
     fn file_extension(&self) -> &'static str {
         ".html"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_html::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        Some(tree_sitter_html::LANGUAGE.into())
     }
     fn call_node_types(&self) -> &[&'static str] {
         &["attribute", "text", "script_element"]
@@ -676,6 +690,10 @@ impl LanguageSupport for DjangoTemplateLanguage {
             _ => node.child_by_field_name("value"),
         }
     }
+
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Markup
+    }
 }
 
 #[cfg(feature = "sql")]
@@ -689,11 +707,11 @@ impl LanguageSupport for SQLLanguage {
     fn file_extension(&self) -> &'static str {
         ".sql"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_javascript::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        None
     }
     fn call_node_types(&self) -> &[&'static str] {
-        &["program"]
+        &[]
     }
 
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
@@ -702,6 +720,10 @@ impl LanguageSupport for SQLLanguage {
 
     fn get_arguments_node<'a>(&self, _node: &'a Node) -> Option<Node<'a>> {
         None
+    }
+
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Text
     }
 }
 
@@ -716,11 +738,11 @@ impl LanguageSupport for XMLLanguage {
     fn file_extension(&self) -> &'static str {
         ".xml"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_javascript::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        None
     }
     fn call_node_types(&self) -> &[&'static str] {
-        &["program"]
+        &[]
     }
 
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
@@ -729,6 +751,10 @@ impl LanguageSupport for XMLLanguage {
 
     fn get_arguments_node<'a>(&self, _node: &'a Node) -> Option<Node<'a>> {
         None
+    }
+
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Text
     }
 }
 
@@ -743,11 +769,11 @@ impl LanguageSupport for PropertiesLanguage {
     fn file_extension(&self) -> &'static str {
         ".properties"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_javascript::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        None
     }
     fn call_node_types(&self) -> &[&'static str] {
-        &["program"]
+        &[]
     }
 
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
@@ -756,6 +782,10 @@ impl LanguageSupport for PropertiesLanguage {
 
     fn get_arguments_node<'a>(&self, _node: &'a Node) -> Option<Node<'a>> {
         None
+    }
+
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Text
     }
 }
 
@@ -770,11 +800,11 @@ impl LanguageSupport for ConfigLanguage {
     fn file_extension(&self) -> &'static str {
         ".config"
     }
-    fn tree_sitter_language(&self) -> Language {
-        tree_sitter_javascript::LANGUAGE.into()
+    fn tree_sitter_language(&self) -> Option<Language> {
+        None
     }
     fn call_node_types(&self) -> &[&'static str] {
-        &["program"]
+        &[]
     }
 
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
@@ -783,5 +813,9 @@ impl LanguageSupport for ConfigLanguage {
 
     fn get_arguments_node<'a>(&self, _node: &'a Node) -> Option<Node<'a>> {
         None
+    }
+
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Text
     }
 }

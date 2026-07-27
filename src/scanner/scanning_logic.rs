@@ -1,13 +1,34 @@
 #![allow(clippy::too_many_arguments, clippy::large_enum_variant, clippy::needless_range_loop)]
 
 use crate::common::CommonUtils;
+use crate::language::SearchSemantics;
 use crate::scanner::flow_tracker::{TaintVariableInfo, VariableFlowTracker};
 use crate::scanner::scan_context::{EnhancedSearchContext, SinkSite, TaintScanContext};
 use crate::scanner::taint_utils::{TaintExpressionUtils, TaintRuleDeduplicator};
 
 pub struct ScanningLogic;
 
+type FindingDedupKey = (usize, String);
+
+struct TextSearchLine {
+    number: usize,
+    original: String,
+    searchable: String,
+}
+
 impl ScanningLogic {
+    fn finding_dedup_key(
+        rule: &crate::rules::UnifiedRule,
+        finding: &crate::models::Finding,
+    ) -> FindingDedupKey {
+        let rule_key = rule
+            .id
+            .clone()
+            .or_else(|| rule.name.clone())
+            .unwrap_or_else(|| finding.finding_type.clone());
+        (finding.line, rule_key)
+    }
+
     pub fn check_rule_against_node(
         rule: &crate::rules::UnifiedRule,
         node: &tree_sitter::Node,
@@ -16,7 +37,9 @@ impl ScanningLogic {
         func_name: &str,
         language_support: &dyn crate::language::LanguageSupport,
     ) -> Option<crate::models::Finding> {
-        let pattern_matches = if Self::rule_needs_full_context(rule) {
+        let pattern_matches = if language_support.search_semantics() == SearchSemantics::Markup
+            || Self::rule_needs_full_context(rule)
+        {
             let node_text = crate::parser::get_node_text(node, source);
             crate::rules::rule_matches_pattern_unified(rule, &node_text)
         } else {
@@ -49,7 +72,8 @@ impl ScanningLogic {
             }
         }
 
-        if Self::should_check_injection_patterns(rule)
+        if language_support.search_semantics() == SearchSemantics::Ast
+            && Self::should_check_injection_patterns(rule)
             && !Self::has_injection_pattern(node, source, language_support)
         {
             return None;
@@ -158,7 +182,9 @@ impl ScanningLogic {
                 let relevant_rules: Vec<(usize, &crate::rules::UnifiedRule)> = rules
                     .iter()
                     .enumerate()
-                    .filter(|(_, rule)| Self::rule_might_match_function(rule, func_name))
+                    .filter(|(_, rule)| {
+                        Self::rule_might_match_site(rule, node, source, func_name, language_support)
+                    })
                     .map(|(idx, rule)| (idx, *rule))
                     .collect();
 
@@ -171,8 +197,7 @@ impl ScanningLogic {
                         func_name,
                         language_support,
                     ) {
-                        let line_key =
-                            (finding.line, finding.function.clone(), finding.finding_type.clone());
+                        let line_key = Self::finding_dedup_key(rule, &finding);
                         if !processed_lines.contains(&line_key) {
                             processed_lines.insert(line_key);
                             findings.push(finding);
@@ -201,6 +226,210 @@ impl ScanningLogic {
         findings
     }
 
+    pub fn scan_text_file_with_rules(
+        filepath: &str,
+        source: &[u8],
+        rules: &[&crate::rules::UnifiedRule],
+        language: &str,
+    ) -> Vec<crate::models::Finding> {
+        let text = String::from_utf8_lossy(source);
+        let lines = Self::text_search_lines(&text, language);
+        let searchable_file =
+            lines.iter().map(|line| line.searchable.as_str()).collect::<Vec<_>>().join("\n");
+        let mut findings = Vec::new();
+        let mut processed = std::collections::HashSet::new();
+
+        for rule in rules {
+            if !crate::scanner::utils::rule_applies_to_file(rule.file_types.as_ref(), filepath) {
+                continue;
+            }
+            if Self::has_multiline_pattern(rule) {
+                Self::scan_multiline_text_rule(
+                    filepath,
+                    rule,
+                    &lines,
+                    &searchable_file,
+                    &mut findings,
+                    &mut processed,
+                );
+            } else {
+                Self::scan_text_lines_for_rule(
+                    filepath,
+                    rule,
+                    &lines,
+                    &mut findings,
+                    &mut processed,
+                );
+            }
+        }
+        findings
+    }
+
+    fn scan_text_lines_for_rule(
+        filepath: &str,
+        rule: &crate::rules::UnifiedRule,
+        lines: &[TextSearchLine],
+        findings: &mut Vec<crate::models::Finding>,
+        processed: &mut std::collections::HashSet<FindingDedupKey>,
+    ) {
+        for line in lines {
+            if line.searchable.trim().is_empty()
+                || !crate::rules::rule_matches_pattern_scoped(
+                    rule,
+                    &line.searchable,
+                    &line.searchable,
+                )
+            {
+                continue;
+            }
+            let Some(range) = crate::rules::first_positive_match_range(rule, &line.searchable)
+            else {
+                continue;
+            };
+            let finding =
+                Self::create_text_finding(filepath, rule, line, range.start.saturating_add(1));
+            let key = Self::finding_dedup_key(rule, &finding);
+            if processed.insert(key) {
+                findings.push(finding);
+            }
+        }
+    }
+
+    fn scan_multiline_text_rule(
+        filepath: &str,
+        rule: &crate::rules::UnifiedRule,
+        lines: &[TextSearchLine],
+        searchable_file: &str,
+        findings: &mut Vec<crate::models::Finding>,
+        processed: &mut std::collections::HashSet<FindingDedupKey>,
+    ) {
+        let Some(range) = crate::rules::first_positive_match_range(rule, searchable_file) else {
+            return;
+        };
+        let unless_scope = &searchable_file[range.clone()];
+        if !crate::rules::rule_matches_pattern_scoped(rule, searchable_file, unless_scope) {
+            return;
+        }
+        let line_number =
+            searchable_file[..range.start].bytes().filter(|byte| *byte == b'\n').count() + 1;
+        let Some(line) = lines.get(line_number - 1) else {
+            return;
+        };
+        let finding = Self::create_text_finding(filepath, rule, line, 1);
+        let key = Self::finding_dedup_key(rule, &finding);
+        if processed.insert(key) {
+            findings.push(finding);
+        }
+    }
+
+    fn has_multiline_pattern(rule: &crate::rules::UnifiedRule) -> bool {
+        rule.pattern.as_deref().is_some_and(|pattern| pattern.starts_with("regex:(?s)"))
+            || rule.patterns.as_ref().is_some_and(|patterns| {
+                patterns.iter().any(|pattern| pattern.starts_with("regex:(?s)"))
+            })
+    }
+
+    fn create_text_finding(
+        filepath: &str,
+        rule: &crate::rules::UnifiedRule,
+        line: &TextSearchLine,
+        column: usize,
+    ) -> crate::models::Finding {
+        crate::models::Finding {
+            file: filepath.to_string(),
+            line: line.number,
+            column,
+            end_line: line.number,
+            end_column: line.original.len().saturating_add(1),
+            function: "text".to_string(),
+            finding_type: rule.get_finding_type().to_string(),
+            snippet: line.original.clone(),
+            severity: rule.get_severity().to_string(),
+            confidence: rule.get_confidence().to_string(),
+            description: rule.description.clone(),
+            cwe_id: rule.cwe_id.clone(),
+            source_info: None,
+            sink_info: None,
+            traces: None,
+            tags: rule.tags.clone(),
+        }
+    }
+
+    fn text_search_lines(text: &str, language: &str) -> Vec<TextSearchLine> {
+        let block_delimiters = match language {
+            "sql" => Some(("/*", "*/")),
+            "xml" => Some(("<!--", "-->")),
+            _ => None,
+        };
+        let mut in_block_comment = false;
+
+        text.lines()
+            .enumerate()
+            .map(|(index, original)| {
+                let mut searchable = if let Some((start, end)) = block_delimiters {
+                    Self::strip_block_comments(original, start, end, &mut in_block_comment)
+                } else {
+                    original.to_string()
+                };
+                if Self::is_text_comment_line(&searchable, language) {
+                    searchable = " ".repeat(searchable.len());
+                }
+                TextSearchLine { number: index + 1, original: original.to_string(), searchable }
+            })
+            .collect()
+    }
+
+    fn strip_block_comments(
+        line: &str,
+        start_marker: &str,
+        end_marker: &str,
+        in_block_comment: &mut bool,
+    ) -> String {
+        let mut searchable = line.to_string();
+        let mut cursor = 0;
+
+        while cursor < line.len() {
+            if *in_block_comment {
+                let Some(relative_end) = line[cursor..].find(end_marker) else {
+                    searchable.replace_range(cursor.., &" ".repeat(line.len() - cursor));
+                    break;
+                };
+                let end = cursor + relative_end + end_marker.len();
+                searchable.replace_range(cursor..end, &" ".repeat(end - cursor));
+                *in_block_comment = false;
+                cursor = end;
+                continue;
+            }
+
+            let Some(relative_start) = line[cursor..].find(start_marker) else {
+                break;
+            };
+            let start = cursor + relative_start;
+            if let Some(relative_end) = line[start + start_marker.len()..].find(end_marker) {
+                let end = start + start_marker.len() + relative_end + end_marker.len();
+                searchable.replace_range(start..end, &" ".repeat(end - start));
+                cursor = end;
+            } else {
+                searchable.replace_range(start.., &" ".repeat(line.len() - start));
+                *in_block_comment = true;
+                break;
+            }
+        }
+        searchable
+    }
+
+    fn is_text_comment_line(line: &str, language: &str) -> bool {
+        let trimmed = line.trim_start();
+        match language {
+            "sql" => trimmed.starts_with("--") || trimmed.starts_with('#'),
+            "properties" => trimmed.starts_with('#') || trimmed.starts_with('!'),
+            "config" => {
+                trimmed.starts_with('#') || trimmed.starts_with(';') || trimmed.starts_with("//")
+            }
+            _ => false,
+        }
+    }
+
     fn scan_assignments(
         node: tree_sitter::Node,
         source: &[u8],
@@ -208,7 +437,7 @@ impl ScanningLogic {
         rules: &[&crate::rules::UnifiedRule],
         language_support: &dyn crate::language::LanguageSupport,
         findings: &mut Vec<crate::models::Finding>,
-        processed_lines: &mut std::collections::HashSet<(usize, String, String)>,
+        processed_lines: &mut std::collections::HashSet<FindingDedupKey>,
     ) {
         let assignment_rules: Vec<&crate::rules::UnifiedRule> =
             rules.iter().filter(|rule| Self::rule_has_assignment_patterns(rule)).copied().collect();
@@ -233,7 +462,7 @@ impl ScanningLogic {
         assignment_rules: &[&crate::rules::UnifiedRule],
         language_support: &dyn crate::language::LanguageSupport,
         findings: &mut Vec<crate::models::Finding>,
-        processed_lines: &mut std::collections::HashSet<(usize, String, String)>,
+        processed_lines: &mut std::collections::HashSet<FindingDedupKey>,
     ) {
         // Python represents assignments as `assignment` / `augmented_assignment`
         // nodes; matching them directly avoids the comparison-operator heuristic
@@ -267,15 +496,9 @@ impl ScanningLogic {
                             &assignment_target,
                             language_support,
                         ) {
-                            let line_key = (
-                                finding.line,
-                                finding.function.clone(),
-                                finding.finding_type.clone(),
-                            );
+                            let line_key = Self::finding_dedup_key(rule, &finding);
                             // A call-shaped sink (e.g. subprocess.Popen(shell=True)) can be
-                            // matched both by the call pass and here via its `=`-bearing
-                            // pattern; the call pass records a different `function`, so also
-                            // guard on (line, finding_type) to avoid a duplicate finding.
+                            // matched both by the call pass and here via its `=`-bearing pattern.
                             let already = processed_lines.contains(&line_key)
                                 || findings.iter().any(|f| {
                                     f.line == finding.line && f.finding_type == finding.finding_type
@@ -490,6 +713,20 @@ impl ScanningLogic {
         } else {
             true
         }
+    }
+
+    fn rule_might_match_site(
+        rule: &crate::rules::UnifiedRule,
+        node: &tree_sitter::Node,
+        source: &[u8],
+        func_name: &str,
+        language_support: &dyn crate::language::LanguageSupport,
+    ) -> bool {
+        if language_support.search_semantics() == SearchSemantics::Markup {
+            let node_text = crate::parser::get_node_text(node, source);
+            return crate::rules::rule_positive_matches(rule, &node_text);
+        }
+        Self::rule_might_match_function(rule, func_name)
     }
 
     /// Check if a rule might match the function name (optimized pattern-based pre-filter)
@@ -790,6 +1027,13 @@ impl ScanningLogic {
         let node_text = crate::parser::get_node_text(node, source);
         let lines: Vec<&str> = node_text.lines().collect();
         let start_line = node.start_position().row + 1;
+
+        if let Some(range) =
+            rule.and_then(|rule| crate::rules::first_positive_match_range(rule, &node_text))
+        {
+            return start_line
+                + node_text[..range.start].bytes().filter(|byte| *byte == b'\n').count();
+        }
 
         let sink_patterns = Self::sink_patterns_for_finding(finding_type, rule);
 
@@ -1794,7 +2038,7 @@ impl ScanningLogic {
         node: &tree_sitter::Node,
         ctx: &EnhancedSearchContext,
         flow_tracker: &VariableFlowTracker,
-        processed_lines: &mut std::collections::HashSet<(usize, String, String)>,
+        processed_lines: &mut std::collections::HashSet<FindingDedupKey>,
         findings: &mut Vec<crate::models::Finding>,
     ) {
         let Some(func_name) = ctx.language_support.get_function_name(node, ctx.source) else {
@@ -1803,7 +2047,15 @@ impl ScanningLogic {
         let relevant_rules: Vec<&crate::rules::UnifiedRule> = ctx
             .applicable_search_rules
             .iter()
-            .filter(|rule| ScanningLogic::rule_might_match_function(rule, func_name))
+            .filter(|rule| {
+                ScanningLogic::rule_might_match_site(
+                    rule,
+                    node,
+                    ctx.source,
+                    func_name,
+                    ctx.language_support,
+                )
+            })
             .copied()
             .collect();
 
@@ -1822,7 +2074,7 @@ impl ScanningLogic {
                 continue;
             };
 
-            let line_key = (finding.line, finding.function.clone(), finding.finding_type.clone());
+            let line_key = Self::finding_dedup_key(rule, &finding);
             if processed_lines.contains(&line_key) {
                 continue;
             }

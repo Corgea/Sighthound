@@ -1,34 +1,14 @@
 (
     rules: [
         (
-            id: Some("sql-injection-001"),
-            name: Some("SQL Injection - String Concatenation"),
-            category: Some("sql-injection"),
-            mode: "search",
-            patterns: Some([
-                "CONCAT(",
-                "||",
-                "regex:(?i)SELECT\\s+\\*\\s+WHERE\\b",
-                "regex:(?i)SELECT\\s+\\*\\s+FROM\\s+.+?\\s+WHERE\\b",
-            ]),
-            finding_type: Some("SQL Injection"),
-            severity: Some("Critical"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-89"),
-            description: Some("SQL query using string concatenation may be vulnerable to SQL injection"),
-            file_types: Some((extensions: Some([".sql"]))),
-            tags: Some(["sql-injection", "database", "cwe-89"])
-        ),
-        (
             id: Some("sql-unsafe-001"),
             name: Some("Dynamic SQL with EXECUTE"),
             category: Some("sql-injection"),
             mode: "search",
             patterns: Some([
-                "EXECUTE IMMEDIATE",
-                "EXEC(",
-                "EXECUTE(",
-                "sp_executesql",
+                "regex:(?i)EXECUTE\\s+IMMEDIATE\\s+.*(?:\\|\\||CONCAT\\s*\\(|user|input|param)",
+                "regex:(?i)sp_executesql\\s+.*(?:\\+|CONCAT\\s*\\(|user|input|param)",
+                "regex:(?i)EXEC(?:UTE)?\\s*\\(.*(?:\\+|\\|\\||user|input|param)",
             ]),
             finding_type: Some("SQL Injection"),
             severity: Some("High"),
@@ -37,25 +17,6 @@
             description: Some("Dynamic SQL execution can lead to SQL injection if user input is not properly sanitized"),
             file_types: Some((extensions: Some([".sql"]))),
             tags: Some(["sql-injection", "dynamic-sql", "cwe-89"])
-        ),
-        (
-            id: Some("sql-auth-001"),
-            name: Some("SQL Authentication Bypass Pattern"),
-            category: Some("authentication"),
-            mode: "search",
-            patterns: Some([
-                "OR '1'='1'",
-                "OR 1=1",
-                "OR 'x'='x'",
-                "' OR '1",
-            ]),
-            finding_type: Some("Authentication Bypass"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-89"),
-            description: Some("SQL query contains authentication bypass pattern commonly used in SQL injection attacks"),
-            file_types: Some((extensions: Some([".sql"]))),
-            tags: Some(["sql-injection", "authentication", "cwe-89"])
         ),
         (
             id: Some("sql-comment-001"),
@@ -80,113 +41,6 @@
             description: Some("SQL comment syntax after quotes or semicolons may indicate injection attempt or comment-based attack"),
             file_types: Some((extensions: Some([".sql"]))),
             tags: Some(["sql-injection", "comments", "cwe-89"])
-        ),
-        (
-            id: Some("sql-dangerous-001"),
-            name: Some("Dangerous SQL Command - DROP"),
-            category: Some("dangerous-operation"),
-            mode: "search",
-            patterns: Some([
-                "DROP TABLE",
-                "DROP DATABASE",
-                "DROP SCHEMA",
-            ]),
-            finding_type: Some("Dangerous Operation"),
-            severity: Some("High"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-89"),
-            description: Some("DROP commands can cause data loss - ensure proper authorization and backups"),
-            file_types: Some((extensions: Some([".sql"]))),
-            tags: Some(["dangerous", "data-loss", "cwe-89"])
-        ),
-        (
-            id: Some("sql-dangerous-002"),
-            name: Some("Dangerous SQL Command - TRUNCATE"),
-            category: Some("dangerous-operation"),
-            mode: "search",
-            patterns: Some([
-                "TRUNCATE TABLE",
-                "TRUNCATE",
-            ]),
-            finding_type: Some("Dangerous Operation"),
-            severity: Some("High"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-89"),
-            description: Some("TRUNCATE commands delete all data - ensure proper authorization and backups"),
-            file_types: Some((extensions: Some([".sql"]))),
-            tags: Some(["dangerous", "data-loss", "cwe-89"])
-        ),
-        (
-            id: Some("sql-wildcard-001"),
-            name: Some("SELECT * Usage"),
-            category: Some("best-practice"),
-            mode: "search",
-            patterns: Some([
-                "regex:(?i)SELECT\\s+\\*",
-            ]),
-            finding_type: Some("Performance Issue"),
-            severity: Some("Low"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-1240"),
-            description: Some("Using SELECT * can cause performance issues and expose unnecessary data - specify columns explicitly"),
-            file_types: Some((extensions: Some([".sql"]))),
-            tags: Some(["performance", "best-practice", "cwe-1240"])
-        ),
-        (
-            id: Some("sql-union-001"),
-            name: Some("UNION-based SQL Injection Pattern"),
-            category: Some("sql-injection"),
-            mode: "search",
-            patterns: Some([
-                "UNION SELECT",
-                "UNION ALL SELECT",
-            ]),
-            finding_type: Some("SQL Injection"),
-            severity: Some("High"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-89"),
-            description: Some("UNION SELECT patterns may indicate SQL injection attempts to extract data from other tables"),
-            file_types: Some((extensions: Some([".sql"]))),
-            tags: Some(["sql-injection", "union-based", "cwe-89"])
-        ),
-        (
-            id: Some("sql-batch-001"),
-            name: Some("Batch SQL Separator"),
-            category: Some("sql-injection"),
-            mode: "search",
-            patterns: Some([
-                ";SELECT",
-                ";DROP",
-                ";DELETE",
-                ";UPDATE",
-                ";INSERT",
-            ]),
-            finding_type: Some("SQL Injection"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-89"),
-            description: Some("SQL batch separators followed by dangerous commands may indicate stacked query injection"),
-            file_types: Some((extensions: Some([".sql"]))),
-            tags: Some(["sql-injection", "batch", "cwe-89"])
-        ),
-        (
-            id: Some("sql-timing-001"),
-            name: Some("Time-based SQL Injection Pattern"),
-            category: Some("sql-injection"),
-            mode: "search",
-            patterns: Some([
-                "SLEEP(",
-                "WAITFOR DELAY",
-                "BENCHMARK(",
-                "pg_sleep(",
-            ]),
-            finding_type: Some("SQL Injection"),
-            severity: Some("High"),
-            confidence: Some("Medium"),
-            cwe_id: Some("cwe-89"),
-            description: Some("Time-based delay functions may indicate blind SQL injection attempts"),
-            file_types: Some((extensions: Some([".sql"]))),
-            tags: Some(["sql-injection", "timing-attack", "cwe-89"])
         ),
     ]
 )
