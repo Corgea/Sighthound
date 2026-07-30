@@ -606,8 +606,16 @@ impl AstUtils {
     }
 
     fn check_html_sanitization(code: &str) -> bool {
-        let html_sanitizers =
-            ["DOMPurify.sanitize(", "validator.escape(", "xss(", "escapeHtml(", "encodeHTML("];
+        let html_sanitizers = [
+            "DOMPurify.sanitize(",
+            "validator.escape(",
+            "xss(",
+            "escapeHtml(",
+            "escapeHTML(",
+            "encodeHTML(",
+            "sanitizeHtml(",
+            "sanitizeHTML(",
+        ];
         html_sanitizers.iter().any(|pat| code.contains(pat))
     }
 
