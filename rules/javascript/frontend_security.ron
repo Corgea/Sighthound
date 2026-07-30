@@ -46,6 +46,30 @@
             tags: Some(["xss", "dom", "frontend", "cwe-79"])
         ),
         (
+            id: Some("js-dom-xss-innerhtml-001"),
+            name: Some("DOM XSS via dynamic innerHTML/outerHTML assignment"),
+            category: Some("xss"),
+            mode: "search",
+            // The leading `^[^=;{]*` keeps a match anchored to the assignment that starts the
+            // matched node, so enclosing blocks are not reported instead of the sink line.
+            patterns: Some([
+                // Interpolated template literal: el.innerHTML = `<b>${value}</b>`
+                "regex:^[^=;{]*\\.(innerHTML|outerHTML)\\b[^=]*=[^=][\\s\\S]*\\$\\{",
+                // HTML markup concatenated with an expression:
+                // el.innerHTML = '<b>' + value  /  el.innerHTML = value + '</b>'
+                "regex:^[^=;{]*\\.(innerHTML|outerHTML)\\b[^=]*=[^=][\\s\\S]*(['\"`]\\s*\\+\\s*[A-Za-z_$]|[A-Za-z_$][\\w$]*\\s*\\+\\s*['\"`])",
+                // Non-literal value: el.innerHTML = value / render(value), el.innerHTML += value
+                "regex:^[^=;{]*\\.(innerHTML|outerHTML)\\b[^=]*=\\s*[A-Za-z_$]"
+            ]),
+            finding_type: Some("DOM XSS"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("innerHTML/outerHTML is assigned a value the scanner cannot prove is static HTML, so attacker-controlled markup can execute; assign textContent or sanitize with DOMPurify instead"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["xss", "dom", "frontend", "cwe-79"])
+        ),
+        (
             id: Some("js-react-dangerously-set-inner-html-001"),
             name: Some("React DOM XSS via dangerouslySetInnerHTML"),
             category: Some("xss"),
