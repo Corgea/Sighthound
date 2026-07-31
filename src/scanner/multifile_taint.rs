@@ -358,7 +358,12 @@ impl MultiFileTaintAnalyzer {
 
         // Collect all relevant nodes with error handling
         let mut all_nodes = Vec::new();
-        ScanningLogic::collect_all_relevant_nodes(tree.root_node(), &mut all_nodes, Some(source));
+        ScanningLogic::collect_all_relevant_nodes(
+            tree.root_node(),
+            &mut all_nodes,
+            Some(source),
+            false,
+        );
 
         for node in all_nodes {
             // Safely extract node text to avoid panics

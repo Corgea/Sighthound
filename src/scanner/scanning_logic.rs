@@ -1418,7 +1418,12 @@ impl ScanningLogic {
 
         // Use broader traversal to include assignment statements
         let mut all_nodes = Vec::new();
-        Self::collect_all_relevant_nodes(tree.root_node(), &mut all_nodes, None);
+        Self::collect_all_relevant_nodes(
+            tree.root_node(),
+            &mut all_nodes,
+            None,
+            is_embedded_javascript,
+        );
 
         let ctx = TaintScanContext {
             source,
@@ -1741,17 +1746,27 @@ impl ScanningLogic {
     }
 
     /// Whether `node` should be collected by [`Self::collect_all_relevant_nodes`], based on its
-    /// kind and (when source filtering is enabled) whether its text looks like real code.
-    fn should_collect_node(node: tree_sitter::Node, source: Option<&[u8]>) -> bool {
+    /// kind, embedded-JavaScript mode, and whether its text looks like real code.
+    fn should_collect_node(
+        node: tree_sitter::Node,
+        source: Option<&[u8]>,
+        is_embedded_javascript: bool,
+    ) -> bool {
         match node.kind() {
+            "call_expression" | "augmented_assignment_expression" if is_embedded_javascript => {
+                match source {
+                    Some(source_bytes) => Self::is_relevant_node_text(
+                        &crate::parser::get_node_text(&node, source_bytes),
+                    ),
+                    None => true,
+                }
+            }
             // Always-relevant node kinds: collect unconditionally, or filtered by source text
             // when source filtering is enabled.
             "assignment"
             | "call"
-            | "call_expression"
             | "expression_statement"
             | "assignment_expression"
-            | "augmented_assignment_expression"
             | "variable_declaration"
             | "lexical_declaration"
             | "variable_declarator"
@@ -1796,8 +1811,9 @@ impl ScanningLogic {
         node: tree_sitter::Node<'a>,
         nodes: &mut Vec<tree_sitter::Node<'a>>,
         source: Option<&[u8]>,
+        is_embedded_javascript: bool,
     ) {
-        if Self::should_collect_node(node, source) {
+        if Self::should_collect_node(node, source, is_embedded_javascript) {
             nodes.push(node);
         }
 
@@ -1805,7 +1821,12 @@ impl ScanningLogic {
         let mut cursor = node.walk();
         if cursor.goto_first_child() {
             loop {
-                Self::collect_all_relevant_nodes(cursor.node(), nodes, source);
+                Self::collect_all_relevant_nodes(
+                    cursor.node(),
+                    nodes,
+                    source,
+                    is_embedded_javascript,
+                );
                 if !cursor.goto_next_sibling() {
                     break;
                 }
@@ -2067,7 +2088,7 @@ impl ScanningLogic {
 
         // Use broader traversal to include assignment statements (like taint mode)
         let mut all_nodes = Vec::new();
-        Self::collect_all_relevant_nodes(tree.root_node(), &mut all_nodes, None);
+        Self::collect_all_relevant_nodes(tree.root_node(), &mut all_nodes, None, false);
 
         // Phase 1: Build taint context by tracking variable assignments from taint sources (only if taint rules exist)
         let has_taint_rules = !taint_rules.is_empty();
@@ -2272,5 +2293,33 @@ impl ScanningLogic {
         );
 
         Some(finding)
+    }
+}
+
+#[cfg(all(test, feature = "javascript"))]
+mod tests {
+    use super::ScanningLogic;
+    use crate::parser::LanguageParser;
+
+    #[test]
+    fn embedded_javascript_collects_expression_specific_nodes() {
+        let source = b"element.innerHTML += location.hash; document.write(location.search);";
+        let mut parser = LanguageParser::new("javascript").expect("JavaScript parser");
+        let tree = parser.parse(source).expect("JavaScript parse");
+
+        for (is_embedded_javascript, expected) in [(false, false), (true, true)] {
+            let mut nodes = Vec::new();
+            ScanningLogic::collect_all_relevant_nodes(
+                tree.root_node(),
+                &mut nodes,
+                None,
+                is_embedded_javascript,
+            );
+            assert_eq!(nodes.iter().any(|node| node.kind() == "call_expression"), expected);
+            assert_eq!(
+                nodes.iter().any(|node| node.kind() == "augmented_assignment_expression"),
+                expected
+            );
+        }
     }
 }
