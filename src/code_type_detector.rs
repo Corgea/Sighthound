@@ -247,9 +247,8 @@ impl CodeTypeDetector {
         // Default fallback based on language
         match language.to_lowercase().as_str() {
             "javascript" | "typescript" | "tsx" | "jsx" => CodeType::Frontend,
-            "python" | "java" | "rust" | "go" | "php" | "ruby" | "c" | "cpp" | "c#" | "csharp" => {
-                CodeType::Backend
-            }
+            "python" | "java" | "rust" | "go" | "php" | "ruby" | "objectscript" | "c" | "cpp"
+            | "c#" | "csharp" => CodeType::Backend,
             _ => CodeType::Unknown,
         }
     }
@@ -328,7 +327,7 @@ impl CodeTypeDetector {
             vec!["useState", "useEffect", "useContext", "useReducer", "useMemo", "useCallback"];
 
         // Check for call expressions
-        self.walk_tree(&root_node, &mut |node| {
+        Self::walk_tree(&root_node, &mut |node| {
             if node.kind() == "call_expression" {
                 let text = parser::get_node_text(&node, source);
 
@@ -384,7 +383,7 @@ impl CodeTypeDetector {
         // Server methods
         let server_methods = vec!["get", "post", "put", "delete", "patch", "use", "listen"];
 
-        self.walk_tree(&root_node, &mut |node| {
+        Self::walk_tree(&root_node, &mut |node| {
             if node.kind() == "call_expression" {
                 let text = parser::get_node_text(&node, source);
 
@@ -442,7 +441,7 @@ impl CodeTypeDetector {
         }
     }
 
-    fn walk_tree<F>(&self, node: &Node, callback: &mut F)
+    fn walk_tree<F>(node: &Node, callback: &mut F)
     where
         F: FnMut(Node),
     {
@@ -450,7 +449,7 @@ impl CodeTypeDetector {
 
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            self.walk_tree(&child, callback);
+            Self::walk_tree(&child, callback);
         }
     }
 }
@@ -496,5 +495,21 @@ mod tests {
         let detector = CodeTypeDetector::new();
         let imports = vec!["totally-unrelated-package".to_string()];
         assert_eq!(detector.detect_from_imports(&imports), CodeType::Unknown);
+    }
+
+    #[test]
+    fn detect_from_ast_finds_nested_backend_signal() {
+        let source = br#"
+            function loadConfig() {
+                if (process.env.NODE_ENV) {
+                    return require("fs").readFileSync("config.json");
+                }
+            }
+        "#;
+        let mut parser = crate::parser::LanguageParser::new("javascript").unwrap();
+        let tree = parser.parse(source).unwrap();
+        let detector = CodeTypeDetector::new();
+
+        assert_eq!(detector.detect_from_ast(&tree, source), CodeType::Backend);
     }
 }

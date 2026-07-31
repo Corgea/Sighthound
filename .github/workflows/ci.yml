@@ -2,9 +2,22 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
+  msrv:
+    name: Rust 1.88 MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.88
+        uses: dtolnay/rust-toolchain@1.88
+
+      - name: cargo check
+        run: cargo check --all-targets --all-features --locked
+
   harness:
     name: harness ci
     runs-on: ubuntu-latest
@@ -16,6 +29,8 @@ jobs:
         with:
           components: clippy, rustfmt, llvm-tools-preview
 
+      - uses: Swatinem/rust-cache@v2
+
       - name: Install uv (for uvx lizard)
         uses: astral-sh/setup-uv@v5
 
@@ -26,6 +41,3 @@ jobs:
 
       - name: make ci
         run: make ci
-
-      - name: make audit
-        run: make audit

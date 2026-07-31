@@ -293,7 +293,9 @@ pub struct Cli {
     pub root_dir: Option<String>,
 
     /// Language to scan (optional - triggers explicit mode when used with rules_path)
-    #[arg(help = "Programming language to scan (python, java, javascript, tsx, html, django)")]
+    #[arg(
+        help = "Programming language to scan (python, java, javascript, tsx, html, django, objectscript)"
+    )]
     pub language: Option<String>,
 
     /// Rules file or directory path (optional - triggers explicit mode when used with language)
@@ -375,6 +377,18 @@ pub struct Cli {
     /// Print version information
     #[arg(long, help = "Print version information")]
     pub version: bool,
+
+    /// Exit non-zero if any findings meet or exceed this severity (critical, high, medium, low)
+    #[arg(
+        long,
+        value_name = "SEVERITY",
+        help = "Exit 1 if any finding is at or above SEVERITY (critical/high/medium/low)"
+    )]
+    pub fail_on_severity: Option<String>,
+
+    /// Exit non-zero if any findings are found
+    #[arg(long, help = "Exit 1 if any findings are reported")]
+    pub error_on_findings: bool,
 }
 
 // Helper function for default search mode

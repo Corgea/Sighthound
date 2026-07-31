@@ -259,6 +259,9 @@ pub fn detect_language_from_path(file_path: &Path) -> Option<&'static str> {
         // PHP extensions
         "php" | "php3" | "php4" | "php5" | "php7" | "phtml" => Some("php"),
 
+        // InterSystems ObjectScript class and routine sources
+        "cls" | "mac" | "inc" | "int" | "rtn" => Some("objectscript"),
+
         // JavaScript extensions (including modern variants)
         "js" | "mjs" | "cjs" | "jsx" => Some("javascript"),
 

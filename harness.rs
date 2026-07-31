@@ -34,8 +34,6 @@ const RESET: &str = "\x1b[0m";
 
 struct RunResult {
     ok: bool,
-    #[allow(dead_code)]
-    output: String,
 }
 
 #[derive(Default)]
@@ -73,14 +71,14 @@ fn run(description: &str, cmd: &[&str], opts: Option<&RunOpts>) -> RunResult {
         match status {
             Ok(s) if s.success() => {
                 println!("  {GREEN}\u{2713}{RESET} {description}");
-                return RunResult { ok: true, output: String::new() };
+                return RunResult { ok: true };
             }
             Ok(s) => {
                 println!("  {RED}\u{2717}{RESET} {description}");
                 if opts.is_none_or(|o| !o.no_exit) {
                     std::process::exit(s.code().unwrap_or(1));
                 }
-                return RunResult { ok: false, output: String::new() };
+                return RunResult { ok: false };
             }
             Err(e) => {
                 println!("  {RED}\u{2717}{RESET} {description}");
@@ -88,7 +86,7 @@ fn run(description: &str, cmd: &[&str], opts: Option<&RunOpts>) -> RunResult {
                 if opts.is_none_or(|o| !o.no_exit) {
                     std::process::exit(1);
                 }
-                return RunResult { ok: false, output: String::new() };
+                return RunResult { ok: false };
             }
         }
     }
@@ -108,7 +106,7 @@ fn run(description: &str, cmd: &[&str], opts: Option<&RunOpts>) -> RunResult {
                 let detail = opts.and_then(|o| o.extract).and_then(|f| f(&combined));
                 let suffix = detail.map_or_else(String::new, |d| format!(" {DIM}({d}){RESET}"));
                 println!("  {GREEN}\u{2713}{RESET} {description}{suffix}");
-                RunResult { ok: true, output: combined }
+                RunResult { ok: true }
             } else {
                 println!("  {RED}\u{2717}{RESET} {description}");
                 if !combined.is_empty() {
@@ -117,7 +115,7 @@ fn run(description: &str, cmd: &[&str], opts: Option<&RunOpts>) -> RunResult {
                 if opts.is_none_or(|o| !o.no_exit) {
                     std::process::exit(output.status.code().unwrap_or(1));
                 }
-                RunResult { ok: false, output: combined }
+                RunResult { ok: false }
             }
         }
         Err(e) => {
@@ -126,7 +124,7 @@ fn run(description: &str, cmd: &[&str], opts: Option<&RunOpts>) -> RunResult {
             if opts.is_none_or(|o| !o.no_exit) {
                 std::process::exit(1);
             }
-            RunResult { ok: false, output: String::new() }
+            RunResult { ok: false }
         }
     }
 }
@@ -176,20 +174,124 @@ const SUPPRESSION_PREFIXES: &[(&str, &str)] =
 
 type SuppressionCounts = BTreeMap<String, Vec<Vec<String>>>;
 
-fn parse_line_for_suppressions(line: &str) -> Vec<(String, Vec<String>)> {
-    let mut out = Vec::new();
+#[derive(Clone, Copy)]
+enum LexState {
+    Code,
+    String,
+    RawString(usize),
+    LineComment,
+    BlockComment(usize),
+}
+
+fn raw_string_start(bytes: &[u8], start: usize) -> Option<(usize, usize)> {
+    if bytes.get(start) != Some(&b'r') {
+        return None;
+    }
+    let mut quote = start + 1;
+    while bytes.get(quote) == Some(&b'#') {
+        quote += 1;
+    }
+    (bytes.get(quote) == Some(&b'"')).then_some((quote, quote - start - 1))
+}
+
+fn char_literal_end(source: &str, start: usize) -> Option<usize> {
+    let content = &source[start + 1..];
+    let mut chars = content.char_indices();
+    let (_, first) = chars.next()?;
+    let content_len = if first == '\\' {
+        let (offset, escaped) = chars.next()?;
+        offset + escaped.len_utf8()
+    } else {
+        first.len_utf8()
+    };
+    let end = start + 1 + content_len;
+    (source.as_bytes().get(end) == Some(&b'\'')).then_some(end + 1)
+}
+
+fn suppression_at(source: &str, start: usize) -> Option<(String, Vec<String>, usize)> {
+    let bytes = source.as_bytes();
     for (kind, prefix) in SUPPRESSION_PREFIXES {
-        let mut rest = line;
-        while let Some(idx) = rest.find(prefix) {
-            let after = &rest[idx + prefix.len()..];
-            let Some(end) = after.find(')') else { break };
-            let rules: Vec<String> = after[..end]
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-            out.push(((*kind).to_string(), rules));
-            rest = &after[end + 1..];
+        let after_start = start + prefix.len();
+        if !bytes[start..].starts_with(prefix.as_bytes()) {
+            continue;
+        }
+        let end = bytes[after_start..].iter().position(|byte| *byte == b')')? + after_start;
+        let rules = source[after_start..end]
+            .split(',')
+            .map(|rule| rule.trim().to_string())
+            .filter(|rule| !rule.is_empty())
+            .collect();
+        return Some(((*kind).to_string(), rules, end + 1));
+    }
+    None
+}
+
+fn parse_suppressions(source: &str) -> Vec<(String, Vec<String>)> {
+    let bytes = source.as_bytes();
+    let mut out = Vec::new();
+    let mut state = LexState::Code;
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        match state {
+            LexState::Code if bytes[cursor..].starts_with(b"//") => {
+                state = LexState::LineComment;
+                cursor += 2;
+            }
+            LexState::Code if bytes[cursor..].starts_with(b"/*") => {
+                state = LexState::BlockComment(1);
+                cursor += 2;
+            }
+            LexState::Code if bytes[cursor] == b'\'' => {
+                cursor = char_literal_end(source, cursor).unwrap_or(cursor + 1);
+            }
+            LexState::Code => {
+                if let Some((quote, hashes)) = raw_string_start(bytes, cursor) {
+                    state = LexState::RawString(hashes);
+                    cursor = quote + 1;
+                } else if bytes[cursor] == b'"' {
+                    state = LexState::String;
+                    cursor += 1;
+                } else if let Some((kind, rules, end)) = suppression_at(source, cursor) {
+                    out.push((kind, rules));
+                    cursor = end;
+                } else {
+                    cursor += 1;
+                }
+            }
+            LexState::String if bytes[cursor] == b'\\' => cursor += 2,
+            LexState::String if bytes[cursor] == b'"' => {
+                state = LexState::Code;
+                cursor += 1;
+            }
+            LexState::String => cursor += 1,
+            LexState::RawString(hashes)
+                if bytes[cursor] == b'"'
+                    && bytes
+                        .get(cursor + 1..cursor + 1 + hashes)
+                        .is_some_and(|suffix| suffix.iter().all(|byte| *byte == b'#')) =>
+            {
+                state = LexState::Code;
+                cursor += hashes + 1;
+            }
+            LexState::RawString(_) => cursor += 1,
+            LexState::LineComment if bytes[cursor] == b'\n' => {
+                state = LexState::Code;
+                cursor += 1;
+            }
+            LexState::LineComment => cursor += 1,
+            LexState::BlockComment(depth) if bytes[cursor..].starts_with(b"/*") => {
+                state = LexState::BlockComment(depth + 1);
+                cursor += 2;
+            }
+            LexState::BlockComment(1) if bytes[cursor..].starts_with(b"*/") => {
+                state = LexState::Code;
+                cursor += 2;
+            }
+            LexState::BlockComment(depth) if bytes[cursor..].starts_with(b"*/") => {
+                state = LexState::BlockComment(depth - 1);
+                cursor += 2;
+            }
+            LexState::BlockComment(_) => cursor += 1,
         }
     }
     out
@@ -202,10 +304,8 @@ fn scan_rs_file(path: &Path, results: &mut SuppressionCounts) {
     let Ok(text) = fs::read_to_string(path) else {
         return;
     };
-    for line in text.lines() {
-        for (kind, rules) in parse_line_for_suppressions(line) {
-            results.entry(kind).or_default().push(rules);
-        }
+    for (kind, rules) in parse_suppressions(&text) {
+        results.entry(kind).or_default().push(rules);
     }
 }
 
@@ -879,7 +979,7 @@ fn check_agents_md_drift(no_exit: bool) -> RunResult {
         if !no_exit {
             std::process::exit(1);
         }
-        RunResult { ok: false, output: msg }
+        RunResult { ok: false }
     };
     let Ok(agents) = fs::read(&agents_path) else {
         return fail("AGENTS.md not found".into());
@@ -889,11 +989,11 @@ fn check_agents_md_drift(no_exit: bool) -> RunResult {
             "  {GREEN}\u{26a0}{RESET} agents-md-drift: CLAUDE.md absent \
              (git-ignored mirror \u{2014} run `cargo harness setup-hooks`)"
         );
-        return RunResult { ok: true, output: String::new() };
+        return RunResult { ok: true };
     };
     if claude == agents {
         println!("  {GREEN}\u{2713}{RESET} agents-md-drift");
-        return RunResult { ok: true, output: String::new() };
+        return RunResult { ok: true };
     }
     let line =
         first_diff_line(&String::from_utf8_lossy(&agents), &String::from_utf8_lossy(&claude));
@@ -1119,6 +1219,7 @@ fi
 /// Write `path` with `content` only if it does not already exist. Returns true
 /// when it created the file. Never clobbers an existing file — preserves any
 /// local customization; `check_stop_hook_present` then reports the result.
+#[cfg_attr(not(unix), allow(unused_variables))]
 fn write_if_missing(path: &Path, content: &str, executable: bool) -> bool {
     if path.exists() {
         return false;
@@ -1253,18 +1354,61 @@ mod tests {
 
     #[test]
     fn plain_code_no_match() {
-        assert!(parse_line_for_suppressions("let x = 1;").is_empty());
+        assert!(parse_suppressions("let x = 1;").is_empty());
+    }
+
+    #[test]
+    fn allow_in_string_literal_no_match() {
+        let quoted = concat!("const EXAMPLE: &str = \"", "#[allow(dead_code)]", "\";");
+        assert!(parse_suppressions(quoted).is_empty());
+    }
+
+    #[test]
+    fn allow_after_char_literal_is_match() {
+        let line = concat!("let delimiter = '\"'; ", "#[allow(unused_variables)]", " let x = 10;");
+        assert_eq!(
+            parse_suppressions(line),
+            vec![("allow".to_string(), vec!["unused_variables".to_string()])]
+        );
+    }
+
+    #[test]
+    fn allow_after_raw_string_is_match() {
+        let line = concat!("let s = r#\"C:\\path\\\"#; ", "#[allow(dead_code)]");
+        assert_eq!(
+            parse_suppressions(line),
+            vec![("allow".to_string(), vec!["dead_code".to_string()])]
+        );
+    }
+
+    #[test]
+    fn only_code_suppressions_match_across_lines() {
+        let source = concat!(
+            "let raw = r#\"first line\n",
+            "#[allow(dead_code)]",
+            "\n\"#;\n// ",
+            "#[allow(unused)]",
+            "\n/* outer /* ",
+            "#[allow(unused_imports)]",
+            " */ */\n",
+            "#[allow(unused_variables)]",
+            " let x = 10;"
+        );
+        assert_eq!(
+            parse_suppressions(source),
+            vec![("allow".to_string(), vec!["unused_variables".to_string()])]
+        );
     }
 
     #[test]
     fn single_allow_with_one_rule() {
-        let result = parse_line_for_suppressions("#[allow(dead_code)]");
+        let result = parse_suppressions("#[allow(dead_code)]");
         assert_eq!(result, vec![("allow".to_string(), vec!["dead_code".to_string()])]);
     }
 
     #[test]
     fn allow_with_multiple_rules_and_namespaces() {
-        let result = parse_line_for_suppressions("#[allow(unused, clippy::bool_to_int_with_if)]");
+        let result = parse_suppressions("#[allow(unused, clippy::bool_to_int_with_if)]");
         assert_eq!(
             result,
             vec![(
@@ -1276,7 +1420,7 @@ mod tests {
 
     #[test]
     fn multiple_allows_on_one_line() {
-        let result = parse_line_for_suppressions("#[allow(a)] fn f() {} #[allow(b)]");
+        let result = parse_suppressions("#[allow(a)] fn f() {} #[allow(b)]");
         assert_eq!(
             result,
             vec![
@@ -1288,7 +1432,7 @@ mod tests {
 
     #[test]
     fn crate_level_allow() {
-        let result = parse_line_for_suppressions("#![allow(dead_code)]");
+        let result = parse_suppressions("#![allow(dead_code)]");
         assert!(
             result.iter().any(|(k, r)| k == "allow_crate" && r == &vec!["dead_code".to_string()])
         );
@@ -1449,14 +1593,14 @@ mod property_tests {
 
         #[test]
         fn suppressions_total_on_arbitrary_text(line in ".*") {
-            for (kind, _rules) in parse_line_for_suppressions(&line) {
+            for (kind, _rules) in parse_suppressions(&line) {
                 prop_assert!(kind == "allow" || kind == "allow_crate");
             }
         }
 
         #[test]
         fn suppressions_no_hash_means_no_match(line in "[^#]*") {
-            prop_assert!(parse_line_for_suppressions(&line).is_empty());
+            prop_assert!(parse_suppressions(&line).is_empty());
         }
 
         #[test]
@@ -1464,7 +1608,7 @@ mod property_tests {
             rules in prop::collection::vec("[a-z][a-z0-9_]{0,8}", 1..4),
         ) {
             let line = format!("#[allow({})]", rules.join(", "));
-            let parsed = parse_line_for_suppressions(&line);
+            let parsed = parse_suppressions(&line);
             prop_assert_eq!(parsed, vec![("allow".to_string(), rules)]);
         }
 

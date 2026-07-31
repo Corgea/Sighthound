@@ -437,4 +437,100 @@ def malicious_functions():
         assert!(rule_matches_pattern_unified(url_rule, "t.co"));
         assert!(!rule_matches_pattern_unified(url_rule, "github.com"));
     }
+
+    #[test]
+    fn test_cli_exit_code_gating() {
+        let bin_path = if let Ok(path) = std::env::var("CARGO_BIN_EXE_sighthound") {
+            std::path::PathBuf::from(path)
+        } else {
+            std::path::PathBuf::from("target/debug/sighthound")
+        };
+
+        if !bin_path.exists() {
+            return;
+        }
+
+        // os.system(cmd) is a known High finding in the embedded python rules.
+        // We will test that High triggers "--fail-on-severity high" but NOT "--fail-on-severity critical".
+        let python_content_high = r#"
+import os
+def run(cmd):
+    os.system(cmd)
+"#;
+        let temp_file_high = create_test_python_file(python_content_high);
+        let file_path_high = temp_file_high.path().to_str().unwrap();
+
+        // pickle.loads(data) is a known Critical finding in the embedded python rules.
+        // We will test that Critical triggers "--fail-on-severity critical".
+        let python_content_critical = r#"
+import pickle
+def run(data):
+    pickle.loads(data)
+"#;
+        let temp_file_critical = create_test_python_file(python_content_critical);
+        let file_path_critical = temp_file_critical.path().to_str().unwrap();
+
+        // no gate flag — should always succeed
+        let status = std::process::Command::new(&bin_path)
+            .args([file_path_high, "python", "--simple-analysis"])
+            .status()
+            .expect("failed to run sighthound");
+        assert!(status.success());
+
+        // --error-on-findings should flip exit code when there are findings
+        let status = std::process::Command::new(&bin_path)
+            .args([file_path_high, "python", "--simple-analysis", "--error-on-findings"])
+            .status()
+            .expect("failed to run sighthound");
+        assert_eq!(status.code(), Some(1));
+
+        // critical threshold — os.system is High, so critical threshold should NOT trigger on it
+        let status = std::process::Command::new(&bin_path)
+            .args([file_path_high, "python", "--simple-analysis", "--fail-on-severity", "critical"])
+            .status()
+            .expect("failed to run sighthound");
+        assert!(status.success());
+
+        // critical threshold — pickle.loads is Critical, so critical threshold should trigger on it
+        let status = std::process::Command::new(&bin_path)
+            .args([
+                file_path_critical,
+                "python",
+                "--simple-analysis",
+                "--fail-on-severity",
+                "critical",
+            ])
+            .status()
+            .expect("failed to run sighthound");
+        assert_eq!(status.code(), Some(1));
+
+        // high threshold — os.system is High, so high threshold should trigger on it
+        let status = std::process::Command::new(&bin_path)
+            .args([file_path_high, "python", "--simple-analysis", "--fail-on-severity", "high"])
+            .status()
+            .expect("failed to run sighthound");
+        assert_eq!(status.code(), Some(1));
+
+        // low threshold — still triggered since high >= low
+        let status = std::process::Command::new(&bin_path)
+            .args([file_path_high, "python", "--simple-analysis", "--fail-on-severity", "low"])
+            .status()
+            .expect("failed to run sighthound");
+        assert_eq!(status.code(), Some(1));
+
+        // bad severity value — validation should reject it
+        let output = std::process::Command::new(&bin_path)
+            .args([
+                file_path_high,
+                "python",
+                "--simple-analysis",
+                "--fail-on-severity",
+                "invalid_level",
+            ])
+            .output()
+            .expect("failed to run sighthound");
+        assert!(!output.status.success());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("Invalid severity level: 'invalid_level'"), "got: {stderr}");
+    }
 }

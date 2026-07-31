@@ -6,7 +6,7 @@ Feature: Unsupported file extensions
   looks just as dangerous as a supported file's.
 
   Scenario: A file with an unsupported extension is skipped, not errored
-    Given a staged copy of the fixture "tests/test_files/python/mixed_vulnerabilities.py" as "app.py"
+    Given a staged copy of the fixture "tests/test_files/python/fixtures/mixed_vulnerabilities.py" as "app.py"
     And a staged file "notes.txt" with unsupported-extension content that looks vulnerable
     When I scan the staging directory as "python" with the production rules
     Then the scan should succeed without error

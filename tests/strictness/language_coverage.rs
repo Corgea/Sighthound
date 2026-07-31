@@ -221,9 +221,9 @@ fn include_test_fixtures_flag_enables_scanning_tests_directory() {
     );
     assert!(
         with_flag.iter().any(|f| {
-            f["file"]
-                .as_str()
-                .is_some_and(|path| path.contains("strictness_languages/go/unsafe.go"))
+            f["file"].as_str().is_some_and(|path| {
+                path.replace("\\", "/").contains("strictness_languages/go/unsafe.go")
+            })
         }),
         "expected finding from strictness go fixture, got: {:?}",
         with_flag

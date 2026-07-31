@@ -12,6 +12,10 @@ Tree-sitter based static vulnerability scanner with pattern matching and taint-f
 
 </div>
 
+> **Want Sighthound without the setup?** [Sign up for Corgea](https://corgea.app),
+> where Sighthound is built in alongside AI SAST, secrets, container, dependency,
+> and IaC scanning—with false-positive reduction and automated fixes.
+
 ## What It Does
 
 - Scans source code for security issues using AST-aware rules.
@@ -32,6 +36,7 @@ Tree-sitter based static vulnerability scanner with pattern matching and taint-f
 | C# | `.cs`, `.csx` | Yes | Yes |
 | Go | `.go` | Yes | Yes |
 | Ruby | `.rb` | Yes | Yes |
+| ObjectScript | `.cls`, `.mac`, `.inc`, `.int`, `.rtn` | Yes (class and routine grammars) | Yes |
 | HTML | `.html`, `.htm`, `.twig`, `.ejs`, `.hbs`, ... | Yes | Yes |
 | Django templates | `.html` (Django syntax) | Yes | Yes (HTML rules) |
 
@@ -63,6 +68,16 @@ DOCKER_BUILDKIT=1 docker build \
 ```
 
 Or run `./build_all_platforms.sh`.
+
+### Agent skill
+
+Using Claude Code, Cursor, Codex, or another coding agent? Install the
+[Sighthound skill](https://github.com/Corgea/skills) so your agent knows how
+to install the scanner, run it, and act on its findings:
+
+```bash
+npx skills add corgea/skills --skill sighthound
+```
 
 ## Quick Start
 

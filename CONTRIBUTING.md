@@ -5,44 +5,64 @@ and contribution workflow.
 
 ## Prerequisites
 
-- Rust 1.70+ (install from https://rustup.rs/)
+- Rust stable 1.88+ via [rustup](https://rustup.rs/) (the dev harness uses
+  edition 2024)
 - Git
 
-## Build
+For full CI parity, install the tools CI uses:
+
+```bash
+make tools    # llvm-tools-preview component + cargo-audit, cargo-llvm-cov, cargo-modules
+```
+
+`cargo-audit` is required — `make ci` fails without it. The others degrade to a
+skipped check, but installing them gives you the exact CI result. The complexity
+gate additionally uses [uv](https://docs.astral.sh/uv/) (`uvx`); it is advisory,
+so skipping it never blocks.
+
+## Setup
 
 ```bash
 git clone https://github.com/Corgea/Sighthound.git
 cd Sighthound
+make bootstrap                 # install git pre-commit + pre-push hooks
 cargo build --release          # binary at target/release/sighthound
 ```
 
-`cargo build --release` is the command CI gates on and should succeed before
-you open a PR.
+## Before you open a PR
+
+```bash
+make ci
+```
+
+This is the exact command CI runs: clippy (`-D warnings`) → `cargo fmt --check` →
+`cargo audit` → complexity (advisory) → `cargo test` → acceptance → coverage →
+CRAP (advisory) → architecture check. If `make ci` passes locally, CI passes.
+
+Faster inner-loop targets:
+
+| Target           | Action                                            |
+|------------------|---------------------------------------------------|
+| `make check`     | auto-fix clippy + format, run tests               |
+| `make fix`       | `cargo clippy --fix` + `cargo fmt`                |
+| `make lint`      | clippy + `fmt --check` (read-only)                |
+| `make test`      | `cargo test`                                      |
+| `make ci`        | full CI pipeline — run before every PR            |
+| `make bootstrap` | install git hooks                                 |
+
+The hooks from `make bootstrap` run `make pre-commit` (staged Rust files) and
+`make pre-push` (lint + acceptance + arch) automatically, catching most CI
+failures before they leave your machine.
 
 ## Tests
 
-The repository ships three test harnesses (`unit_tests`, `integration_tests`,
-and `end_to_end_tests`). They are being realigned to the crate's refactored
-rule API — some modules are temporarily disabled and `cargo test` is not yet
-fully green, so CI gates on `cargo build --release`. Restoring `cargo test` to
-green is tracked in its own PR; contributions that fix a harness are welcome.
+`cargo test` runs the unit, integration, and end-to-end harnesses and is a
+blocking CI gate — keep it green.
 
 ```bash
-cargo build --release          # the CI-gated command
-cargo test --test unit_tests   # a single harness (some modules under repair)
+cargo test                     # all harnesses
+cargo test --test unit_tests   # a single harness
 ```
-
-### Make targets
-
-| Target           | Action                              |
-|------------------|-------------------------------------|
-| `make build`     | `cargo build --release`             |
-| `make clean`     | clean build artifacts               |
-| `make install`   | `cargo install --path .`            |
-| `make help`      | list targets                        |
-
-`make test` / `test-unit` / `test-all` invoke `cargo test`, which is under
-repair (see above).
 
 ## Multi-platform builds
 
@@ -60,8 +80,8 @@ authoring guidance.
 
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feature/your-feature`.
-3. Make your changes and add tests where practical.
-4. Confirm `cargo build --release` succeeds.
+3. Make your changes and add tests.
+4. Run `make ci` — the same command CI runs — and confirm it passes.
 5. Submit a pull request.
 
 By contributing, you agree your contributions are licensed under the MIT

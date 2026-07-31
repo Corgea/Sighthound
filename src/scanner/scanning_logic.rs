@@ -105,8 +105,15 @@ impl ScanningLogic {
             "=",
         ];
 
-        let check_pattern =
-            |pattern: &str| CONTEXT_INDICATORS.iter().any(|indicator| pattern.contains(indicator));
+        let check_pattern = |pattern: &str| {
+            CONTEXT_INDICATORS.iter().any(|indicator| pattern.contains(indicator))
+                || (rule.get_category() == "database"
+                    && (pattern.contains('.')
+                        || pattern.contains('*')
+                        || pattern.contains('(')
+                        || pattern.contains("f\"")
+                        || pattern.contains("f'")))
+        };
 
         if let Some(patterns) = &rule.patterns {
             patterns.iter().any(|p| check_pattern(p))
@@ -2002,6 +2009,17 @@ impl ScanningLogic {
         let node_text = crate::parser::get_node_text(node, source);
 
         if !Self::rule_pattern_matches_node(rule, &node_text) {
+            return None;
+        }
+
+        if let Some(conditions) = &rule.conditions
+            && !crate::scanner::conditions::check_ast_conditions(
+                conditions,
+                node,
+                source,
+                language_support,
+            )
+        {
             return None;
         }
 

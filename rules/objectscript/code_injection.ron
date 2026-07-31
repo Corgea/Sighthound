@@ -1,0 +1,22 @@
+(
+    rules: [
+        (
+            id: Some("objectscript-code-injection-xecute"),
+            name: Some("Dynamic ObjectScript execution"),
+            category: Some("code-injection"),
+            mode: "search",
+            patterns: Some([
+                "*XECUTE*_*",
+                "*$XECUTE(*_*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
+            description: Some("ObjectScript code assembled through string concatenation is executed dynamically."),
+            file_types: Some((extensions: Some([".cls", ".mac", ".inc", ".int", ".rtn"]))),
+            tags: Some(["code-injection", "cwe-95", "objectscript"])
+        )
+    ]
+)

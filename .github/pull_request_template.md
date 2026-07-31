@@ -8,6 +8,7 @@
 
 ## Checklist
 
-- [ ] `cargo build --release` succeeds
-- [ ] Ran any test harness relevant to this change (note results; suite under repair)
+- [ ] `make ci` passes locally (the same command CI runs — see CONTRIBUTING.md)
+- [ ] Ran `make bootstrap` once so pre-commit/pre-push hooks are active
+- [ ] Added/updated tests for the change
 - [ ] Updated docs/rules where relevant

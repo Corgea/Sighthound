@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::common::CommonUtils;
 use crate::scanner::dataflow::DataFlowTracer;
 use crate::scanner::flow_tracker::{AnalysisResult, CrossFileFlowKey, VerifiedTaintFlow};
-use crate::scanner::parser_helper::with_local_parser;
+use crate::scanner::parser_helper::with_local_parser_for_path;
 use crate::scanner::scanning_logic::ScanningLogic;
 use crate::scanner::taint_utils::TaintRuleDeduplicator;
 
@@ -291,16 +291,15 @@ impl MultiFileTaintAnalyzer {
         let filepath = file_path.to_string_lossy();
         let source = std::fs::read(file_path)?;
 
-        with_local_parser(language, |parser| {
+        with_local_parser_for_path(language, file_path, |parser| {
             let tree = parser.parse(&source)?;
-            let language_support = crate::language::get_language_support(language)?;
 
             self.analyze_file_imports_exports(
                 &filepath,
                 &source,
                 &tree,
                 rule_deduplicator,
-                language_support.as_ref(),
+                parser.language_support(),
             );
 
             Ok(())

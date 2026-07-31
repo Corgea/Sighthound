@@ -103,7 +103,7 @@ mod django_xss_tests {
                     VulnerabilityScanner::new("python", rules).expect("Failed to create scanner");
                 let results = scanner
                     .find_vulnerabilities_single_threaded(
-                        "tests/test_files/python/django",
+                        "tests/test_files/django/fixtures",
                         "python",
                     )
                     .expect("Failed to scan directory");

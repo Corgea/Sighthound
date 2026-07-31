@@ -185,17 +185,17 @@ impl PreFilter {
     /// Extract all import statements as a single text blob
     fn extract_imports(&self, file_path: &str) -> Result<String> {
         let source = fs::read(file_path)?;
-        let mut parser = LanguageParser::new(&self.language)?;
+        let mut parser = LanguageParser::new_for_path(&self.language, Path::new(file_path))?;
         let tree = parser.parse(&source)?;
 
         let mut imports_text = String::new();
-        self.collect_imports(&tree.root_node(), &source, &mut imports_text);
+        Self::collect_imports(&tree.root_node(), &source, &mut imports_text);
 
         Ok(imports_text.to_lowercase())
     }
 
     /// Recursively collect all import-like text
-    fn collect_imports(&self, node: &Node, source: &[u8], imports_text: &mut String) {
+    fn collect_imports(node: &Node, source: &[u8], imports_text: &mut String) {
         // Check if this looks like an import statement
         let node_kind = node.kind();
         if node_kind.contains("import") {
@@ -208,7 +208,7 @@ impl PreFilter {
         let mut cursor = node.walk();
         if cursor.goto_first_child() {
             loop {
-                self.collect_imports(&cursor.node(), source, imports_text);
+                Self::collect_imports(&cursor.node(), source, imports_text);
                 if !cursor.goto_next_sibling() {
                     break;
                 }

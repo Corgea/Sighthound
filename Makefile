@@ -1,6 +1,6 @@
 # Sighthound Vulnerability Scanner Makefile
 
-.PHONY: all build test test-unit test-all clean install help
+.PHONY: all build test test-unit test-all clean install help tools
 
 # Default target
 all: build test
@@ -10,7 +10,7 @@ build:
 	@echo "🔨 Building Sighthound..."
 	cargo build --release
 
-# Run the Rust test suite via cargo test (under repair)
+# Run the Rust test suite via cargo test (blocking CI gate)
 test-unit:
 	@echo "🦀 Running Rust tests..."
 	cargo test
@@ -32,6 +32,12 @@ install: build
 	@echo "📦 Installing Sighthound..."
 	cargo install --path .
 
+# Install the cargo tools `make ci` uses (same set CI installs)
+tools:
+	@echo "🧰 Installing CI tools..."
+	rustup component add llvm-tools-preview
+	cargo install cargo-audit cargo-llvm-cov cargo-modules
+
 # Show help
 help:
 	@echo "Sighthound Vulnerability Scanner Build System"
@@ -39,9 +45,12 @@ help:
 	@echo ""
 	@echo "Available targets:"
 	@echo "  build       - Build the release binary"
-	@echo "  test        - Run cargo test (under repair; some modules disabled)"
+	@echo "  test        - Run cargo test (unit + integration + end_to_end)"
 	@echo "  test-unit   - Run cargo test"
 	@echo "  test-all    - Run cargo test"
+	@echo "  ci          - Full CI pipeline — run before every PR"
+	@echo "  bootstrap   - Install git pre-commit + pre-push hooks"
+	@echo "  tools       - Install the cargo tools CI uses"
 	@echo "  clean       - Clean build artifacts"
 	@echo "  install     - Install binary to system"
 	@echo "  help        - Show this help message"

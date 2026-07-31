@@ -3,6 +3,34 @@ use crate::parser::get_node_text;
 use crate::rules::Condition;
 use crate::rules::{is_literal_node, match_any_pattern, match_pattern};
 
+fn unwrap_keyword_argument(node: tree_sitter::Node) -> tree_sitter::Node {
+    if node.kind() == "keyword_argument"
+        && let Some(val_node) = node.child_by_field_name("value")
+    {
+        return val_node;
+    }
+    node
+}
+
+fn get_target_argument<'a>(
+    args_node: tree_sitter::Node<'a>,
+    position: usize,
+    source: &[u8],
+) -> Option<tree_sitter::Node<'a>> {
+    for i in 0..args_node.named_child_count() {
+        if let Some(arg) = args_node.named_child(i as u32)
+            && arg.kind() == "keyword_argument"
+            && let Some(name_node) = arg.child_by_field_name("name")
+        {
+            let name_text = get_node_text(&name_node, source);
+            if name_text == "query" || name_text == "operation" || name_text == "sql" {
+                return Some(arg);
+            }
+        }
+    }
+    args_node.named_child(position as u32)
+}
+
 /// Check if all AST conditions are satisfied for a node
 pub fn check_ast_conditions(
     conditions: &[Condition],
@@ -26,7 +54,7 @@ pub fn check_single_condition(
         "has_argument" => check_has_argument_condition(node, source, condition, language_support),
         "in_context" => check_in_context_condition(node, condition),
         "has_parent" => check_has_parent_condition(node, condition),
-        "not_literal" => check_not_literal_condition(node, condition, language_support),
+        "not_literal" => check_not_literal_condition(node, source, condition, language_support),
         "has_ancestor" => check_has_ancestor_condition(node, condition),
         "argument_not_sanitized" => {
             check_argument_not_sanitized_condition(node, source, condition, language_support)
@@ -46,7 +74,7 @@ pub fn check_has_argument_condition(
     if let Some(args_node) = language_support.get_arguments_node(node) {
         // If specific position is specified, check only that argument
         if let Some(position) = condition.argument_position {
-            if let Some(arg) = args_node.named_child(position as u32) {
+            if let Some(arg) = get_target_argument(args_node, position, source) {
                 return check_argument_matches(arg, source, condition);
             }
             return false;
@@ -70,11 +98,12 @@ pub fn check_argument_matches(
     source: &[u8],
     condition: &Condition,
 ) -> bool {
-    let arg_text = get_node_text(&arg, source);
+    let unwrapped = unwrap_keyword_argument(arg);
+    let arg_text = get_node_text(&unwrapped, source);
 
     // Check node type if specified
     if let Some(expected_type) = &condition.node_type
-        && arg.kind() != expected_type
+        && unwrapped.kind() != expected_type
     {
         return false;
     }
@@ -120,19 +149,21 @@ pub fn check_has_parent_condition(node: &tree_sitter::Node, condition: &Conditio
 /// Check if arguments are not literal values
 pub fn check_not_literal_condition(
     node: &tree_sitter::Node,
+    source: &[u8],
     condition: &Condition,
     language_support: &dyn LanguageSupport,
 ) -> bool {
     if let Some(args_node) = language_support.get_arguments_node(node) {
         if let Some(position) = condition.argument_position {
-            if let Some(arg) = args_node.named_child(position as u32) {
-                return !is_literal_node(&arg);
+            if let Some(arg) = get_target_argument(args_node, position, source) {
+                let unwrapped = unwrap_keyword_argument(arg);
+                return !is_literal_node(&unwrapped);
             }
         } else {
             // Check if any argument is not literal
             for i in 0..args_node.named_child_count() {
                 if let Some(arg) = args_node.named_child(i as u32)
-                    && !is_literal_node(&arg)
+                    && !is_literal_node(&unwrap_keyword_argument(arg))
                 {
                     return true;
                 }
@@ -176,7 +207,8 @@ pub fn check_argument_not_sanitized_condition(
         if let Some(args_node) = language_support.get_arguments_node(node) {
             for i in 0..args_node.named_child_count() {
                 if let Some(arg) = args_node.named_child(i as u32) {
-                    let arg_text = get_node_text(&arg, source);
+                    let unwrapped = unwrap_keyword_argument(arg);
+                    let arg_text = get_node_text(&unwrapped, source);
 
                     // Check if argument contains any sanitization patterns
                     for sanitizer in sanitizer_patterns {
