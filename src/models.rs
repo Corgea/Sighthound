@@ -450,6 +450,10 @@ impl Finding {
         self.severity.to_lowercase() == "high" || self.severity.to_lowercase() == "critical"
     }
 
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.as_ref().is_some_and(|tags| tags.iter().any(|t| t == tag))
+    }
+
     pub fn add_trace(&mut self, trace: TraceStep) {
         if let Some(ref mut traces) = self.traces {
             traces.push(trace);

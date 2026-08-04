@@ -20,6 +20,7 @@ pub(crate) struct ScanRuleSet<'a> {
     pub(crate) has_taint_rules: bool,
     pub(crate) search_rules: &'a [&'a crate::rules::UnifiedRule],
     pub(crate) taint_rules: &'a [&'a crate::rules::UnifiedRule],
+    pub(crate) embedded_dom_xss_rules: &'a [&'a crate::rules::UnifiedRule],
 }
 
 /// Invariant context threaded through [`ScanningLogic::scan_file_with_rules_and_taint_context`]'s
@@ -38,6 +39,7 @@ pub(crate) struct EnhancedSearchContext<'a> {
 pub(crate) struct TaintScanContext<'a> {
     pub(crate) source: &'a [u8],
     pub(crate) filepath: &'a str,
+    pub(crate) is_embedded_javascript: bool,
     pub(crate) tree: &'a tree_sitter::Tree,
     pub(crate) language_support: &'a dyn crate::language::LanguageSupport,
     pub(crate) applicable_rules: &'a [&'a crate::rules::UnifiedRule],

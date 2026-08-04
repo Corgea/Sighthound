@@ -190,6 +190,34 @@ pub fn rule_applies_to_file(file_types: Option<&FileTypes>, file_path: &str) -> 
     true
 }
 
+pub(crate) fn is_html_dom_xss_fallback(finding: &crate::models::Finding) -> bool {
+    finding.has_tag("html-inline-dom-xss-001")
+}
+
+/// Prefer a source-to-sink DOM-XSS result over the equivalent legacy HTML fallback.
+#[doc(hidden)]
+pub fn prefer_precise_html_dom_xss(findings: &mut Vec<crate::models::Finding>) {
+    if !findings.iter().any(is_html_dom_xss_fallback) {
+        return;
+    }
+
+    // Owned keys so the set doesn't borrow `findings` during `retain`.
+    let precise = findings
+        .iter()
+        .filter(|finding| {
+            finding.source_info.is_some()
+                && finding.sink_info.is_some()
+                && finding.has_tag("taint_analysis")
+        })
+        .map(|finding| (finding.file.clone(), finding.line, finding.cwe_id.clone()))
+        .collect::<std::collections::BTreeSet<_>>();
+
+    findings.retain(|finding| {
+        !is_html_dom_xss_fallback(finding)
+            || !precise.contains(&(finding.file.clone(), finding.line, finding.cwe_id.clone()))
+    });
+}
+
 /// Helper function to check if file types match (for Path-based version)
 pub fn rule_applies_to_file_path(file_types: Option<&FileTypes>, file_path: &Path) -> bool {
     rule_applies_to_file(file_types, &file_path.to_string_lossy())

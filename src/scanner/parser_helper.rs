@@ -6,6 +6,21 @@ use crate::parser::LanguageParser;
 
 thread_local! {
     static TLS_PARSER: RefCell<Option<(String, LanguageParser)>> = const { RefCell::new(None) };
+    static TLS_EMBEDDED_JAVASCRIPT_PARSER: RefCell<Option<LanguageParser>> =
+        const { RefCell::new(None) };
+}
+
+pub(crate) fn with_local_embedded_javascript_parser<F, R>(f: F) -> Result<R>
+where
+    F: FnOnce(&mut LanguageParser) -> Result<R>,
+{
+    TLS_EMBEDDED_JAVASCRIPT_PARSER.try_with(|cell| {
+        let mut cached = cell.borrow_mut();
+        if cached.is_none() {
+            *cached = Some(LanguageParser::new("javascript")?);
+        }
+        f(cached.as_mut().expect("embedded JavaScript parser initialized"))
+    })?
 }
 
 pub(crate) fn with_local_parser_for_path<F, R>(language: &str, path: &Path, f: F) -> Result<R>

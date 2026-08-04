@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<body>
+<script>
+    document.write("<p>Static content</p>");
+    const staticTarget = document.getElementById("static");
+    staticTarget.innerHTML = "<strong>Static content</strong>";
+</script>
+
+<script>
+    const dirty = location.hash;
+    const clean = DOMPurify.sanitize(dirty);
+    document.getElementById("sanitized").innerHTML = clean;
+</script>
+
+<script>
+    const textOnly = location.search;
+    document.getElementById("text").textContent = textOnly;
+</script>
+
+<script>
+    const unusedSource = location.hash;
+    const fixedValue = "trusted";
+    document.getElementById("unrelated").innerHTML = fixedValue;
+</script>
+
+<script></script>
+<script src="external.js">document.write(`<p>${location.hash}</p>`);</script>
+<script type="application/ld+json">{"html":"document.write(`bad`)"}</script>
+<script type="application/json">document.write(`<p>${location.hash}</p>`);</script>
+<script type="text/template">document.write(`<p>${location.hash}</p>`);</script>
+<script type="text/x-handlebars-template">document.write(`<p>${location.hash}</p>`);</script>
+
+<script type="">
+    document.write("empty type is executable");
+</script>
+<script type="module">
+    document.write("module is executable");
+</script>
+<script TYPE="Text/JavaScript; charset=utf-8">
+    document.write("MIME parameters are ignored");
+</script>
+<script type="application/x-ecmascript">
+    document.write("legacy MIME is executable");
+</script>
+<script type="text/javascript1.5">
+    document.write("versioned MIME is executable");
+</script>
+<script type="text/jscript">
+    document.write("JScript MIME is executable");
+</script>
+<script type="text/livescript">
+    document.write("LiveScript MIME is executable");
+</script>
+
+<script>
+    Promise.resolve("trusted").then(resolvedValue => {
+        document.getElementById("promise").innerHTML = resolvedValue;
+    });
+</script>
+<script>
+    unrelatedClient.load().then(networkResponse => {
+        document.getElementById("unrelated-promise").innerHTML = networkResponse;
+    });
+</script>
+<script>
+    fetch("/api").then(
+        response => response.text(),
+        error => {
+            document.getElementById("rejection").innerHTML = error;
+        },
+    );
+</script>
+<script>
+    fetch("/api").then(sanitizedResult => {
+        const sanitized = DOMPurify.sanitize(sanitizedResult);
+        document.getElementById("remote-sanitized").innerHTML = sanitized;
+    });
+</script>
+<script>
+    Promise.resolve(DOMPurify.sanitize(location.hash)).then(cleanValue => {
+        document.getElementById("promise-presanitized").innerHTML = cleanValue;
+    });
+</script>
+</body>
+</html>

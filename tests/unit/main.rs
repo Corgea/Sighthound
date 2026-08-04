@@ -3,6 +3,7 @@
 mod ast_conditions_tests;
 mod directory_loading_tests;
 mod django_xss_prevention_tests;
+mod embedded_js_dom_xss_tests;
 mod exclusion_patterns_tests;
 mod file_pattern_tests;
 mod injection_pattern_tests;

@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<body>
+<script>
+    const hashParam = location.hash.split("#")[1];
+    if (hashParam !== undefined) {
+        const paramValue = decodeURIComponent(hashParam.split("=")[1]);
+        if (paramValue !== "undefined") {
+            document.write("<OPTION value=3>" + paramValue + "</OPTION>");
+        }
+    }
+</script>
+
+<script type="text/javascript">
+    let ports = [];
+    const output = document.getElementById("output");
+    fetch("/api/ports", { method: "POST" })
+        .then(function (response) {
+            return response.text();
+        })
+        .then(result => {
+            const data = JSON.parse(result);
+            ports = data.ports;
+            for (const p in data.ports) {
+                output.innerHTML += "<span>" + ports[p] + "</span><br>";
+            }
+        });
+</script>
+
+<script>
+    const element = document.getElementById("direct");
+    element.innerHTML = location.hash;
+    element.outerHTML = document.URL;
+    element.innerHTML += location.search;
+</script>
+
+<script>
+    fetch("/reused").then(result => document.write(result));
+    Promise.resolve("trusted").then(result => document.write(result));
+</script>
+</body>
+</html>

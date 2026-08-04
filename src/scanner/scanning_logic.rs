@@ -844,6 +844,111 @@ impl ScanningLogic {
         }
     }
 
+    fn call_callee(node: tree_sitter::Node) -> Option<tree_sitter::Node> {
+        node.child_by_field_name("function").or_else(|| node.child_by_field_name("callee"))
+    }
+
+    fn member_property_is_then(node: tree_sitter::Node, source: &[u8]) -> bool {
+        node.kind() == "member_expression"
+            && node.child_by_field_name("property").is_some_and(|property| {
+                crate::parser::get_node_text_slice(&property, source) == "then"
+            })
+    }
+
+    fn promise_source_root<'tree>(
+        callee: tree_sitter::Node<'tree>,
+        source: &[u8],
+    ) -> Option<tree_sitter::Node<'tree>> {
+        let mut receiver = callee.child_by_field_name("object")?;
+        loop {
+            if receiver.kind() != "call_expression" {
+                return None;
+            }
+            let receiver_callee = Self::call_callee(receiver)?;
+            if !Self::member_property_is_then(receiver_callee, source) {
+                return Some(receiver);
+            }
+            receiver = receiver_callee.child_by_field_name("object")?;
+        }
+    }
+
+    fn first_callback_parameter<'tree>(
+        node: tree_sitter::Node<'tree>,
+    ) -> Option<tree_sitter::Node<'tree>> {
+        let parameter = node.child_by_field_name("parameter").or_else(|| {
+            node.child_by_field_name("parameters").and_then(|parameters| parameters.named_child(0))
+        })?;
+        (parameter.kind() == "identifier").then_some(parameter)
+    }
+
+    /// Returns `(parameter_name, source_line, source_pattern, assignment_code)` when `node` is
+    /// a `.then` callback whose receiver chain matches a taint source pattern.
+    fn promise_fulfillment_source(
+        node: tree_sitter::Node,
+        ctx: &TaintScanContext,
+    ) -> Option<(String, usize, String, String)> {
+        if !matches!(node.kind(), "arrow_function" | "function_expression") {
+            return None;
+        }
+        let parameter = Self::first_callback_parameter(node)?;
+        let arguments = node.parent().filter(|parent| parent.kind() == "arguments")?;
+        let first_argument = arguments.named_child(0)?;
+        if first_argument.start_byte() != node.start_byte()
+            || first_argument.end_byte() != node.end_byte()
+        {
+            return None;
+        }
+
+        let call = arguments.parent().filter(|parent| parent.kind() == "call_expression")?;
+        let callee = Self::call_callee(call)?;
+        if !Self::member_property_is_then(callee, ctx.source) {
+            return None;
+        }
+        let source_root = Self::promise_source_root(callee, ctx.source)?;
+        let assignment_code = crate::parser::get_node_text(&source_root, ctx.source);
+        if TaintExpressionUtils::expression_has_any_sanitizer(
+            ctx.applicable_rules,
+            &assignment_code,
+        ) {
+            return None;
+        }
+        let mut source_chain = assignment_code
+            .chars()
+            .filter(|character| !character.is_whitespace())
+            .collect::<String>();
+        source_chain.push_str(".then");
+        let source_pattern = ctx.rule_deduplicator.matches_source_pattern(&source_chain)?;
+        Some((
+            crate::parser::get_node_text(&parameter, ctx.source),
+            source_root.start_position().row + 1,
+            source_pattern,
+            assignment_code,
+        ))
+    }
+
+    fn track_promise_fulfillment_source(
+        node: &tree_sitter::Node,
+        ctx: &TaintScanContext,
+        func_name: &str,
+        flow_tracker: &mut VariableFlowTracker,
+    ) {
+        let Some((parameter, source_line, source_pattern, assignment_code)) =
+            Self::promise_fulfillment_source(*node, ctx)
+        else {
+            return;
+        };
+
+        flow_tracker.record_tainted_variable(
+            parameter,
+            TaintVariableInfo {
+                source_line,
+                source_pattern,
+                source_function: func_name.to_string(),
+                assignment_code,
+            },
+        );
+    }
+
     /// If `node_text` is an assignment whose value matches a taint source pattern (and isn't
     /// sanitized), mark the assigned variable as tainted.
     fn track_assignment_source(
@@ -921,7 +1026,9 @@ impl ScanningLogic {
         if TaintExpressionUtils::expression_has_any_sanitizer(ctx.applicable_rules, node_text) {
             return;
         }
-        let Some((target_var, dependent_vars)) = Self::detect_taint_propagation(node_text) else {
+        let Some((target_var, dependent_vars)) =
+            Self::detect_taint_propagation(node_text, ctx.is_embedded_javascript)
+        else {
             return;
         };
         log::debug!(
@@ -931,6 +1038,12 @@ impl ScanningLogic {
             node_text
         );
         flow_tracker.record_taint_propagation(&target_var, &dependent_vars);
+
+        // A direct source match on the target (recorded by track_assignment_source) is
+        // more precise than inherited taint; don't clobber it with a dependency's info.
+        if flow_tracker.is_variable_tainted(&target_var, func_name).is_some() {
+            return;
+        }
 
         // Check if any dependent variables are tainted and propagate to target
         for dep_var in &dependent_vars {
@@ -944,16 +1057,35 @@ impl ScanningLogic {
                 );
 
                 // Mark target variable as tainted (inheriting from the dependent variable)
-                flow_tracker.record_tainted_variable(
-                    target_var.clone(),
-                    TaintVariableInfo {
-                        source_line: taint_info.source_line,
-                        source_pattern: taint_info.source_pattern.clone(),
-                        source_function: taint_info.source_function.clone(),
-                        assignment_code: format!("Propagated from {} via: {}", dep_var, node_text),
-                    },
-                );
+                flow_tracker.record_tainted_variable(target_var.clone(), taint_info);
                 break; // Only need one tainted dependency to taint the target
+            }
+        }
+    }
+
+    /// Function context used for taint scoping. For embedded JavaScript, anonymous
+    /// enclosing functions get a positional `closure@line:column` identity instead of
+    /// collapsing into "global", so taint recorded for one callback's parameter cannot
+    /// leak into another callback that reuses the same parameter name.
+    fn taint_function_context(node: &tree_sitter::Node, ctx: &TaintScanContext) -> String {
+        if !ctx.is_embedded_javascript {
+            return crate::scanner::utils::AstUtils::get_function_context(node, ctx.source);
+        }
+        let mut current = *node;
+        loop {
+            if crate::scanner::utils::AstUtils::is_function_node(&current) {
+                // Only a real `name` field counts: the loose identifier fallback in
+                // `extract_function_name` would report an arrow function's parameter
+                // as its name, recreating the cross-callback collision.
+                if let Some(name) = current.child_by_field_name("name") {
+                    return crate::parser::get_node_text(&name, ctx.source);
+                }
+                let position = current.start_position();
+                return format!("closure@{}:{}", position.row + 1, position.column + 1);
+            }
+            match current.parent() {
+                Some(parent) => current = parent,
+                None => return "global".to_string(),
             }
         }
     }
@@ -965,13 +1097,21 @@ impl ScanningLogic {
         ctx: &TaintScanContext,
         flow_tracker: &mut VariableFlowTracker,
     ) {
-        let node_text = crate::parser::get_node_text(node, ctx.source);
         let line = node.start_position().row + 1;
-        let func_name = crate::scanner::utils::AstUtils::get_function_context(node, ctx.source);
+        let func_name = Self::taint_function_context(node, ctx);
 
         Self::track_function_parameter_sources(node, ctx, line, &func_name, flow_tracker);
-        Self::track_assignment_source(&node_text, line, &func_name, ctx, flow_tracker);
-        Self::propagate_taint_for_node(&node_text, &func_name, ctx, flow_tracker);
+        Self::track_promise_fulfillment_source(node, ctx, &func_name, flow_tracker);
+        if !ctx.is_embedded_javascript
+            || matches!(
+                node.kind(),
+                "assignment_expression" | "augmented_assignment_expression" | "variable_declarator"
+            )
+        {
+            let node_text = crate::parser::get_node_text(node, ctx.source);
+            Self::track_assignment_source(&node_text, line, &func_name, ctx, flow_tracker);
+            Self::propagate_taint_for_node(&node_text, &func_name, ctx, flow_tracker);
+        }
     }
 
     /// Extract the variables referenced in a sink expression: PHP-specific `$var` extraction
@@ -998,13 +1138,26 @@ impl ScanningLogic {
         used_variables: &[String],
         findings: &mut Vec<crate::models::Finding>,
     ) {
-        if used_variables.is_empty() || !Self::is_actionable_sink_node(node.kind()) {
+        let is_assignment = ctx.is_embedded_javascript
+            && matches!(node.kind(), "assignment_expression" | "augmented_assignment_expression");
+        if used_variables.is_empty()
+            || !(Self::is_actionable_sink_node(node.kind()) || is_assignment)
+        {
             return;
         }
-        let Some(source_pattern) = ctx.rule_deduplicator.matches_source_pattern(site.node_text)
-        else {
+        // For assignments, match sources against the assigned value only, so the sink's
+        // own property access (e.g. `element.innerHTML = ...`) cannot match as the source.
+        let assigned_value = is_assignment
+            .then(|| node.child_by_field_name("right"))
+            .flatten()
+            .map(|value| crate::parser::get_node_text_slice(&value, ctx.source));
+        let source_text = assigned_value.unwrap_or(site.node_text);
+        let Some(source_pattern) = ctx.rule_deduplicator.matches_source_pattern(source_text) else {
             return;
         };
+        if ctx.is_embedded_javascript && source_pattern == site.sink_pattern {
+            return;
+        }
         let Some(rule) =
             ctx.rule_deduplicator.get_rule_for_combination(&source_pattern, site.sink_pattern)
         else {
@@ -1125,12 +1278,17 @@ impl ScanningLogic {
     ) {
         let node_text = crate::parser::get_node_text(node, ctx.source);
         let line = node.start_position().row + 1;
-        let func_name = crate::scanner::utils::AstUtils::get_function_context(node, ctx.source);
 
         // Check if this node matches any sink pattern
         let Some(sink_pattern) = ctx.rule_deduplicator.matches_sink_pattern(&node_text) else {
             return;
         };
+        if ctx.is_embedded_javascript
+            && Self::has_descendant_sink_operation(*node, ctx.source, &sink_pattern)
+        {
+            return;
+        }
+        let func_name = Self::taint_function_context(node, ctx);
         log::debug!(
             "[SINK_ANALYSIS] Found sink '{}' with pattern '{}' at line {}",
             node_text,
@@ -1168,6 +1326,34 @@ impl ScanningLogic {
         );
     }
 
+    fn has_descendant_sink_operation(
+        node: tree_sitter::Node,
+        source: &[u8],
+        sink_pattern: &str,
+    ) -> bool {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if matches!(
+                child.kind(),
+                "assignment"
+                    | "augmented_assignment"
+                    | "assignment_expression"
+                    | "augmented_assignment_expression"
+                    | "call"
+                    | "call_expression"
+            ) && CommonUtils::matches_taint_pattern(
+                sink_pattern,
+                crate::parser::get_node_text_slice(&child, source),
+            ) {
+                return true;
+            }
+            if Self::has_descendant_sink_operation(child, source, sink_pattern) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Scan file with taint analysis rules (fixed implementation with proper flow tracking)
     pub fn scan_file_with_taint_rules(
         filepath: &str,
@@ -1176,13 +1362,47 @@ impl ScanningLogic {
         taint_rules: &[&crate::rules::UnifiedRule],
         language_support: &dyn crate::language::LanguageSupport,
     ) -> Vec<crate::models::Finding> {
+        Self::scan_taint_rules(filepath, false, source, tree, taint_rules, language_support)
+    }
+
+    /// Scan the JavaScript embedded in an HTML/Django template (parsed via included ranges).
+    pub(crate) fn scan_embedded_javascript_taint_rules(
+        filepath: &str,
+        source: &[u8],
+        tree: &tree_sitter::Tree,
+        taint_rules: &[&crate::rules::UnifiedRule],
+        language_support: &dyn crate::language::LanguageSupport,
+    ) -> Vec<crate::models::Finding> {
+        Self::scan_taint_rules(filepath, true, source, tree, taint_rules, language_support)
+    }
+
+    fn scan_taint_rules(
+        filepath: &str,
+        is_embedded_javascript: bool,
+        source: &[u8],
+        tree: &tree_sitter::Tree,
+        taint_rules: &[&crate::rules::UnifiedRule],
+        language_support: &dyn crate::language::LanguageSupport,
+    ) -> Vec<crate::models::Finding> {
         let mut findings = Vec::new();
+
+        // Rule applicability is extension-based, so embedded scripts match JavaScript
+        // rules through a synthetic "<file>.embedded.js" name while findings keep
+        // reporting the real template path.
+        let applicability_path: std::borrow::Cow<str> = if is_embedded_javascript {
+            format!("{filepath}.embedded.js").into()
+        } else {
+            filepath.into()
+        };
 
         // Filter out rules that don't apply to this file (same as search rules)
         let applicable_rules: Vec<&crate::rules::UnifiedRule> = taint_rules
             .iter()
             .filter(|rule| {
-                crate::scanner::utils::rule_applies_to_file(rule.file_types.as_ref(), filepath)
+                crate::scanner::utils::rule_applies_to_file(
+                    rule.file_types.as_ref(),
+                    &applicability_path,
+                )
             })
             .copied()
             .collect();
@@ -1200,11 +1420,17 @@ impl ScanningLogic {
 
         // Use broader traversal to include assignment statements
         let mut all_nodes = Vec::new();
-        Self::collect_all_relevant_nodes(tree.root_node(), &mut all_nodes, None);
+        Self::collect_all_relevant_nodes(
+            tree.root_node(),
+            &mut all_nodes,
+            None,
+            is_embedded_javascript,
+        );
 
         let ctx = TaintScanContext {
             source,
             filepath,
+            is_embedded_javascript,
             tree,
             language_support,
             applicable_rules: &applicable_rules,
@@ -1286,9 +1512,13 @@ impl ScanningLogic {
     fn detect_generic_assignment_propagation(
         left_side: &str,
         right_side: &str,
+        is_embedded_javascript: bool,
     ) -> Option<(String, Vec<String>)> {
         let target_var = TaintExpressionUtils::normalize_variable(left_side);
         let mut dependent_vars = CommonUtils::extract_all_variables(right_side);
+        if is_embedded_javascript {
+            dependent_vars.extend(CommonUtils::extract_simple_variables(right_side));
+        }
         dependent_vars.extend(TaintExpressionUtils::extract_php_variables(right_side));
         dependent_vars.retain(|var| var != &target_var);
         dependent_vars.sort();
@@ -1307,7 +1537,10 @@ impl ScanningLogic {
 
     /// Detect propagation via an assignment (e.g. `query = f"SELECT {username}"`), trying the
     /// f-string/template, `.format(...)`, and generic-reference cases in turn.
-    fn detect_assignment_propagation(node_text: &str) -> Option<(String, Vec<String>)> {
+    fn detect_assignment_propagation(
+        node_text: &str,
+        is_embedded_javascript: bool,
+    ) -> Option<(String, Vec<String>)> {
         if !node_text.contains('=') || node_text.contains("==") {
             return None;
         }
@@ -1319,7 +1552,13 @@ impl ScanningLogic {
 
         Self::detect_fstring_assignment_propagation(left_side, right_side)
             .or_else(|| Self::detect_format_assignment_propagation(left_side, right_side))
-            .or_else(|| Self::detect_generic_assignment_propagation(left_side, right_side))
+            .or_else(|| {
+                Self::detect_generic_assignment_propagation(
+                    left_side,
+                    right_side,
+                    is_embedded_javascript,
+                )
+            })
     }
 
     /// Detect simple (non-assignment) f-string propagation, e.g. a sink call built directly
@@ -1364,10 +1603,13 @@ impl ScanningLogic {
     }
 
     /// Detect taint propagation in expressions
-    fn detect_taint_propagation(node_text: &str) -> Option<(String, Vec<String>)> {
+    fn detect_taint_propagation(
+        node_text: &str,
+        is_embedded_javascript: bool,
+    ) -> Option<(String, Vec<String>)> {
         log::debug!("[PROPAGATION_CHECK] Checking for taint propagation in: '{}'", node_text);
 
-        let result = Self::detect_assignment_propagation(node_text)
+        let result = Self::detect_assignment_propagation(node_text, is_embedded_javascript)
             .or_else(|| Self::detect_direct_fstring_propagation(node_text))
             .or_else(|| Self::detect_direct_format_propagation(node_text));
 
@@ -1521,9 +1763,21 @@ impl ScanningLogic {
     }
 
     /// Whether `node` should be collected by [`Self::collect_all_relevant_nodes`], based on its
-    /// kind and (when source filtering is enabled) whether its text looks like real code.
-    fn should_collect_node(node: tree_sitter::Node, source: Option<&[u8]>) -> bool {
+    /// kind, embedded-JavaScript mode, and whether its text looks like real code.
+    fn should_collect_node(
+        node: tree_sitter::Node,
+        source: Option<&[u8]>,
+        is_embedded_javascript: bool,
+    ) -> bool {
         match node.kind() {
+            "call_expression" | "augmented_assignment_expression" if is_embedded_javascript => {
+                match source {
+                    Some(source_bytes) => Self::is_relevant_node_text(
+                        &crate::parser::get_node_text(&node, source_bytes),
+                    ),
+                    None => true,
+                }
+            }
             // Always-relevant node kinds: collect unconditionally, or filtered by source text
             // when source filtering is enabled.
             "assignment"
@@ -1574,8 +1828,9 @@ impl ScanningLogic {
         node: tree_sitter::Node<'a>,
         nodes: &mut Vec<tree_sitter::Node<'a>>,
         source: Option<&[u8]>,
+        is_embedded_javascript: bool,
     ) {
-        if Self::should_collect_node(node, source) {
+        if Self::should_collect_node(node, source, is_embedded_javascript) {
             nodes.push(node);
         }
 
@@ -1583,7 +1838,12 @@ impl ScanningLogic {
         let mut cursor = node.walk();
         if cursor.goto_first_child() {
             loop {
-                Self::collect_all_relevant_nodes(cursor.node(), nodes, source);
+                Self::collect_all_relevant_nodes(
+                    cursor.node(),
+                    nodes,
+                    source,
+                    is_embedded_javascript,
+                );
                 if !cursor.goto_next_sibling() {
                     break;
                 }
@@ -1702,7 +1962,8 @@ impl ScanningLogic {
         if TaintExpressionUtils::expression_has_any_sanitizer(taint_rules, node_text) {
             return;
         }
-        let Some((target_var, dependent_vars)) = ScanningLogic::detect_taint_propagation(node_text)
+        let Some((target_var, dependent_vars)) =
+            ScanningLogic::detect_taint_propagation(node_text, false)
         else {
             return;
         };
@@ -1845,7 +2106,7 @@ impl ScanningLogic {
 
         // Use broader traversal to include assignment statements (like taint mode)
         let mut all_nodes = Vec::new();
-        Self::collect_all_relevant_nodes(tree.root_node(), &mut all_nodes, None);
+        Self::collect_all_relevant_nodes(tree.root_node(), &mut all_nodes, None, false);
 
         // Phase 1: Build taint context by tracking variable assignments from taint sources (only if taint rules exist)
         let has_taint_rules = !taint_rules.is_empty();
@@ -2050,5 +2311,53 @@ impl ScanningLogic {
         );
 
         Some(finding)
+    }
+}
+
+#[cfg(all(test, feature = "javascript"))]
+mod tests {
+    use super::ScanningLogic;
+    use crate::parser::LanguageParser;
+
+    #[test]
+    fn non_embedded_assignment_ignores_member_property_names() {
+        assert_eq!(
+            ScanningLogic::detect_generic_assignment_propagation("q", "post.name", false),
+            None
+        );
+    }
+
+    #[test]
+    fn non_embedded_assignment_ignores_identifiers_inside_strings() {
+        let (_, dependent_vars) = ScanningLogic::detect_generic_assignment_propagation(
+            "q",
+            r#""SELECT users" + uid"#,
+            false,
+        )
+        .expect("uid dependency");
+
+        assert_eq!(dependent_vars, ["uid"]);
+    }
+
+    #[test]
+    fn embedded_javascript_collects_expression_specific_nodes() {
+        let source = b"element.innerHTML += location.hash; document.write(location.search);";
+        let mut parser = LanguageParser::new("javascript").expect("JavaScript parser");
+        let tree = parser.parse(source).expect("JavaScript parse");
+
+        for (is_embedded_javascript, expected) in [(false, false), (true, true)] {
+            let mut nodes = Vec::new();
+            ScanningLogic::collect_all_relevant_nodes(
+                tree.root_node(),
+                &mut nodes,
+                None,
+                is_embedded_javascript,
+            );
+            assert_eq!(nodes.iter().any(|node| node.kind() == "call_expression"), expected);
+            assert_eq!(
+                nodes.iter().any(|node| node.kind() == "augmented_assignment_expression"),
+                expected
+            );
+        }
     }
 }

@@ -466,11 +466,15 @@ fn cmd_post_edit() {
     run("Format", &["cargo", "fmt"], Some(&RunOpts { no_exit: true, ..RunOpts::default() }));
 }
 
+/// Turn-end checks. Every step here must stay cheap: this runs after each
+/// agent turn, so a gate that regenerates coverage would re-run the whole
+/// instrumented suite on any `.rs` edit. CRAP therefore reuses an existing
+/// LCOV and skips when it is stale — `ci` is where coverage gets rebuilt.
 fn cmd_stop_hook() {
     println!("\n=== Stop Hook Checks ===\n");
     cmd_post_edit();
     complexity_gate(true);
-    cmd_crap();
+    crap_gate(false);
 }
 
 /// Run Gherkin/BDD acceptance scenarios via cucumber.
@@ -682,6 +686,16 @@ fn complexity_gate(advisory: bool) {
 /// runs where `src/` is newer than the existing LCOV) trigger a full test
 /// re-execution to avoid scoring against stale coverage.
 fn cmd_crap() {
+    crap_gate(true);
+}
+
+/// CRAP scoring with an explicit regeneration policy.
+///
+/// `regenerate` false means reuse-only: a missing or stale LCOV is reported
+/// and skipped rather than rebuilt. The stop-hook needs that — regenerating
+/// costs a full instrumented test run, and any `.rs` edit invalidates the
+/// LCOV, so the expensive path would fire on nearly every agent turn.
+fn crap_gate(regenerate: bool) {
     let max_crap: f64 = arg_value("--max").and_then(|v| v.parse::<f64>().ok()).unwrap_or(30.0);
     let enforce = arg_flag("--enforce");
 
@@ -692,6 +706,13 @@ fn cmd_crap() {
 
     let lcov_path = root().join("target").join("llvm-cov").join("lcov.info");
     if !lcov_path.exists() || !lcov_is_fresh(&lcov_path, &["src", "tests"]) {
+        if !regenerate {
+            println!(
+                "  {DIM}\u{2298} CRAP skipped (coverage stale \u{2014} run \
+                 `cargo harness ci`){RESET}"
+            );
+            return;
+        }
         if let Some(parent) = lcov_path.parent()
             && let Err(e) = fs::create_dir_all(parent)
         {

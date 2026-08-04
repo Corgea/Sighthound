@@ -11,6 +11,14 @@ use crate::language::LanguageSupport;
 // Re-export for backward compatibility
 pub use crate::models::{Condition, FileTypes, UnifiedRule};
 
+/// The canonical frontend DOM-XSS taint rule, shared between standalone JavaScript
+/// scanning and embedded `<script>` scanning in HTML/Django templates.
+pub(crate) const FRONTEND_DOM_XSS_TAINT_RULE_ID: &str = "js-dom-xss-taint-001";
+
+pub(crate) fn is_frontend_dom_xss_taint_rule(rule: &UnifiedRule) -> bool {
+    rule.id.as_deref() == Some(FRONTEND_DOM_XSS_TAINT_RULE_ID)
+}
+
 // Embedded rule directories - every `.ron` rule document under each language dir is
 // embedded at compile time. New rule files auto-wire: drop a `.ron` into the relevant
 // dir and it loads with no edits here. `exclusion_patterns.ron` uses a different RON
@@ -152,7 +160,16 @@ impl Rules {
             "csharp" => all_rules.extend(Self::parse_embedded_dir(&RULES_CSHARP, "C#")?),
             "go" => all_rules.extend(Self::parse_embedded_dir(&RULES_GO, "Go")?),
             "ruby" => all_rules.extend(Self::parse_embedded_dir(&RULES_RUBY, "Ruby")?),
-            "html" | "django" => all_rules.extend(Self::parse_embedded_dir(&RULES_HTML, "HTML")?),
+            "html" | "django" => {
+                all_rules.extend(Self::parse_embedded_dir(&RULES_HTML, "HTML")?);
+                let javascript_rules =
+                    Self::merge_rules(Self::parse_embedded_dir(&RULES_JAVASCRIPT, "JavaScript")?)?;
+                let embedded_dom_xss_rule =
+                    javascript_rules.frontend_dom_xss_rule_only().ok_or_else(|| {
+                        anyhow::anyhow!("Canonical frontend DOM-XSS taint rule is missing")
+                    })?;
+                all_rules.push(embedded_dom_xss_rule);
+            }
             "php" => all_rules.extend(Self::parse_embedded_dir(&RULES_PHP, "PHP")?),
             "objectscript" => {
                 all_rules.extend(Self::parse_embedded_dir(&RULES_OBJECTSCRIPT, "ObjectScript")?)
@@ -192,7 +209,31 @@ impl Rules {
             ));
         }
 
-        Self::merge_rules(all_rules)
+        let mut merged = Self::merge_rules(all_rules)?;
+        merged.dedupe_frontend_dom_xss_rule();
+        Ok(merged)
+    }
+
+    /// Keep at most one copy of the canonical frontend DOM-XSS taint rule, which can be
+    /// loaded both for JavaScript and for HTML/Django embedded-script scanning.
+    pub fn dedupe_frontend_dom_xss_rule(&mut self) {
+        let mut seen = false;
+        self.rules.retain(|rule| {
+            if !is_frontend_dom_xss_taint_rule(rule) {
+                return true;
+            }
+            let keep = !seen;
+            seen = true;
+            keep
+        });
+    }
+
+    /// Extract the canonical frontend DOM-XSS taint rule as a single-rule set.
+    pub fn frontend_dom_xss_rule_only(&self) -> Option<Self> {
+        self.rules
+            .iter()
+            .find(|rule| is_frontend_dom_xss_taint_rule(rule))
+            .map(|rule| Self { rules: vec![rule.clone()] })
     }
 
     pub fn load_from_file(rules_file: &str) -> Result<Self> {
