@@ -1026,7 +1026,9 @@ impl ScanningLogic {
         if TaintExpressionUtils::expression_has_any_sanitizer(ctx.applicable_rules, node_text) {
             return;
         }
-        let Some((target_var, dependent_vars)) = Self::detect_taint_propagation(node_text) else {
+        let Some((target_var, dependent_vars)) =
+            Self::detect_taint_propagation(node_text, ctx.is_embedded_javascript)
+        else {
             return;
         };
         log::debug!(
@@ -1510,10 +1512,13 @@ impl ScanningLogic {
     fn detect_generic_assignment_propagation(
         left_side: &str,
         right_side: &str,
+        is_embedded_javascript: bool,
     ) -> Option<(String, Vec<String>)> {
         let target_var = TaintExpressionUtils::normalize_variable(left_side);
         let mut dependent_vars = CommonUtils::extract_all_variables(right_side);
-        dependent_vars.extend(CommonUtils::extract_simple_variables(right_side));
+        if is_embedded_javascript {
+            dependent_vars.extend(CommonUtils::extract_simple_variables(right_side));
+        }
         dependent_vars.extend(TaintExpressionUtils::extract_php_variables(right_side));
         dependent_vars.retain(|var| var != &target_var);
         dependent_vars.sort();
@@ -1532,7 +1537,10 @@ impl ScanningLogic {
 
     /// Detect propagation via an assignment (e.g. `query = f"SELECT {username}"`), trying the
     /// f-string/template, `.format(...)`, and generic-reference cases in turn.
-    fn detect_assignment_propagation(node_text: &str) -> Option<(String, Vec<String>)> {
+    fn detect_assignment_propagation(
+        node_text: &str,
+        is_embedded_javascript: bool,
+    ) -> Option<(String, Vec<String>)> {
         if !node_text.contains('=') || node_text.contains("==") {
             return None;
         }
@@ -1544,7 +1552,13 @@ impl ScanningLogic {
 
         Self::detect_fstring_assignment_propagation(left_side, right_side)
             .or_else(|| Self::detect_format_assignment_propagation(left_side, right_side))
-            .or_else(|| Self::detect_generic_assignment_propagation(left_side, right_side))
+            .or_else(|| {
+                Self::detect_generic_assignment_propagation(
+                    left_side,
+                    right_side,
+                    is_embedded_javascript,
+                )
+            })
     }
 
     /// Detect simple (non-assignment) f-string propagation, e.g. a sink call built directly
@@ -1589,10 +1603,13 @@ impl ScanningLogic {
     }
 
     /// Detect taint propagation in expressions
-    fn detect_taint_propagation(node_text: &str) -> Option<(String, Vec<String>)> {
+    fn detect_taint_propagation(
+        node_text: &str,
+        is_embedded_javascript: bool,
+    ) -> Option<(String, Vec<String>)> {
         log::debug!("[PROPAGATION_CHECK] Checking for taint propagation in: '{}'", node_text);
 
-        let result = Self::detect_assignment_propagation(node_text)
+        let result = Self::detect_assignment_propagation(node_text, is_embedded_javascript)
             .or_else(|| Self::detect_direct_fstring_propagation(node_text))
             .or_else(|| Self::detect_direct_format_propagation(node_text));
 
@@ -1945,7 +1962,8 @@ impl ScanningLogic {
         if TaintExpressionUtils::expression_has_any_sanitizer(taint_rules, node_text) {
             return;
         }
-        let Some((target_var, dependent_vars)) = ScanningLogic::detect_taint_propagation(node_text)
+        let Some((target_var, dependent_vars)) =
+            ScanningLogic::detect_taint_propagation(node_text, false)
         else {
             return;
         };
@@ -2300,6 +2318,26 @@ impl ScanningLogic {
 mod tests {
     use super::ScanningLogic;
     use crate::parser::LanguageParser;
+
+    #[test]
+    fn non_embedded_assignment_ignores_member_property_names() {
+        assert_eq!(
+            ScanningLogic::detect_generic_assignment_propagation("q", "post.name", false),
+            None
+        );
+    }
+
+    #[test]
+    fn non_embedded_assignment_ignores_identifiers_inside_strings() {
+        let (_, dependent_vars) = ScanningLogic::detect_generic_assignment_propagation(
+            "q",
+            r#""SELECT users" + uid"#,
+            false,
+        )
+        .expect("uid dependency");
+
+        assert_eq!(dependent_vars, ["uid"]);
+    }
 
     #[test]
     fn embedded_javascript_collects_expression_specific_nodes() {
