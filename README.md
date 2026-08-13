@@ -69,6 +69,16 @@ DOCKER_BUILDKIT=1 docker build \
 
 Or run `./build_all_platforms.sh`.
 
+### Agent skill
+
+Using Claude Code, Cursor, Codex, or another coding agent? Install the
+[Sighthound skill](https://github.com/Corgea/skills) so your agent knows how
+to install the scanner, run it, and act on its findings:
+
+```bash
+npx skills add corgea/skills --skill sighthound
+```
+
 ## Quick Start
 
 ```bash

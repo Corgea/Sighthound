@@ -191,10 +191,29 @@ pub(crate) struct TraceSinkSite<'a> {
 /// Classification of how a variable gets its value
 #[derive(Debug, Clone)]
 pub(crate) enum VariableSource {
-    LocalAssignment { source_expression: String, line: usize },
-    KnownSafe { reason: String, line: usize },
-    FunctionParameter { parameter_index: usize },
-    DirectTaintSource { pattern: String, line: usize },
+    LocalAssignment {
+        source_expression: String,
+        line: usize,
+    },
+    KnownSafe {
+        reason: String,
+        line: usize,
+    },
+    FunctionParameter {
+        parameter_index: usize,
+    },
+    DirectTaintSource {
+        pattern: String,
+        line: usize,
+    },
+    /// The AST layer positively determined the variable cannot be resolved
+    /// without guessing (e.g. the sink's bare function name is defined more
+    /// than once in the file). Analysis must report Unknown; a text-path
+    /// fallback would guess the first matching definition and could attribute
+    /// one function's assignments to another function's sink.
+    Unresolved {
+        reason: String,
+    },
 }
 
 /// Analysis result enumeration for conservative approach

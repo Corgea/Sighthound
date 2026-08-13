@@ -1,6 +1,7 @@
 #![allow(clippy::too_many_arguments, clippy::large_enum_variant, clippy::needless_range_loop)]
 
 use crate::common::CommonUtils;
+use crate::scanner::ast_provenance;
 use crate::scanner::flow_tracker::{TaintVariableInfo, VariableFlowTracker};
 use crate::scanner::scan_context::{EnhancedSearchContext, SinkSite, TaintScanContext};
 use crate::scanner::taint_utils::{TaintExpressionUtils, TaintRuleDeduplicator};
@@ -970,8 +971,126 @@ impl ScanningLogic {
         let func_name = crate::scanner::utils::AstUtils::get_function_context(node, ctx.source);
 
         Self::track_function_parameter_sources(node, ctx, line, &func_name, flow_tracker);
-        Self::track_assignment_source(&node_text, line, &func_name, ctx, flow_tracker);
+        if ast_provenance::is_python_source(ctx.filepath) {
+            Self::track_python_assignment_source(
+                node,
+                &node_text,
+                line,
+                &func_name,
+                ctx,
+                flow_tracker,
+            );
+        } else {
+            Self::track_assignment_source(&node_text, line, &func_name, ctx, flow_tracker);
+        }
         Self::propagate_taint_for_node(&node_text, &func_name, ctx, flow_tracker);
+    }
+
+    /// Python phase-1 assignment tracking: record assignment-borne taint only
+    /// from real assignment AST nodes, extracted structurally. Text that only
+    /// looks like an assignment (docstrings, string literals) records nothing,
+    /// while annotated, augmented, chained, tuple, multiline, and
+    /// subscript-target assignments — which the text scan cannot parse — plus
+    /// collection-mutating method calls (`x.append(source)`) are all covered.
+    /// Assignment nodes whose target shape yields no structural facts (e.g.
+    /// attribute targets like `self.cmd = ...`) fall back to the text tracker
+    /// so its coverage is never lost.
+    fn track_python_assignment_source(
+        node: &tree_sitter::Node,
+        node_text: &str,
+        line: usize,
+        func_name: &str,
+        ctx: &TaintScanContext,
+        flow_tracker: &mut VariableFlowTracker,
+    ) {
+        // Mutating a collection with tainted data taints the collection:
+        // `parts.append(input())` taints `parts`. Handled here because a method
+        // call is not an assignment node.
+        if node.kind() == "call" {
+            if let Some((base, args)) =
+                ast_provenance::collection_mutation_target(*node, ctx.source)
+            {
+                Self::record_python_taint_if_source(
+                    &base,
+                    &args,
+                    line,
+                    func_name,
+                    node_text,
+                    ctx,
+                    flow_tracker,
+                );
+            }
+            return;
+        }
+
+        let facts = match node.kind() {
+            "assignment" | "augmented_assignment" => {
+                ast_provenance::assignment_facts_for_node(*node, ctx.source)
+            }
+            // Augmented assignments are not collected as standalone nodes, so
+            // pull them out of their statement wrapper here.
+            "expression_statement" => {
+                ast_provenance::augmented_facts_in_statement(*node, ctx.source)
+            }
+            _ => return,
+        };
+
+        // A real assignment node whose target shape the AST extraction does not
+        // model (e.g. an attribute target: `self.cmd = input()`) must keep the
+        // text tracker's coverage — dropping it silently would lose taint the
+        // text scan used to record. Guarded to assignment nodes so plain
+        // expression statements (docstrings, string literals) still record
+        // nothing.
+        if facts.is_empty() && matches!(node.kind(), "assignment" | "augmented_assignment") {
+            Self::track_assignment_source(node_text, line, func_name, ctx, flow_tracker);
+            return;
+        }
+
+        for fact in facts {
+            Self::record_python_taint_if_source(
+                &fact.target,
+                &fact.rhs,
+                line,
+                func_name,
+                node_text,
+                ctx,
+                flow_tracker,
+            );
+        }
+    }
+
+    /// Record `target` as tainted when `rhs` matches a source pattern and is not
+    /// sanitized. Shared by the assignment and collection-mutation paths.
+    fn record_python_taint_if_source(
+        target: &str,
+        rhs: &str,
+        line: usize,
+        func_name: &str,
+        node_text: &str,
+        ctx: &TaintScanContext,
+        flow_tracker: &mut VariableFlowTracker,
+    ) {
+        let Some(source_pattern) = ctx.rule_deduplicator.matches_source_pattern(rhs) else {
+            return;
+        };
+        if TaintExpressionUtils::expression_has_any_sanitizer(ctx.applicable_rules, rhs) {
+            return;
+        }
+        log::debug!(
+            "[ASSIGNMENT_ANALYSIS] AST source '{}' matches pattern '{}' -> taint '{}'",
+            rhs,
+            source_pattern,
+            target
+        );
+        flow_tracker.record_tainted_variable(
+            target.to_string(),
+            TaintVariableInfo {
+                source_line: line,
+                source_pattern,
+                source_function: func_name.to_string(),
+                assignment_code: node_text.to_string(),
+            },
+        );
     }
 
     /// Extract the variables referenced in a sink expression: PHP-specific `$var` extraction

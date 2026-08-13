@@ -6,6 +6,7 @@
 
 mod helpers;
 
+mod ast_provenance;
 mod cross_file_taint;
 mod django_security;
 mod false_positive_regressions;
