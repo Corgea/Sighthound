@@ -542,11 +542,18 @@ pub fn run_taint_analysis_with_verbosity(
     let taint_rules_count = rules.rules.iter().filter(|r| r.is_taint_rule()).count();
 
     if taint_rules_count == 0 {
+        // Search-only rule packs (SQL, ObjectScript) are legitimate. In a combined scan the
+        // simple pass has already produced the findings, so contribute nothing rather than
+        // failing the whole scan. Only an explicit --taint-analysis request still errors,
+        // because there the caller asked for taint flows specifically.
+        if !verbose_mode {
+            return Ok(Vec::new());
+        }
         return Err(anyhow::anyhow!(
             "No taint flow rules found. Please ensure your rules contain rules with mode='taint'."
         ));
     }
-    if show_progress && verbose_mode {
+    if report {
         print_taint_analysis_intro(root_dir, taint_rules_count, context.total_files);
     }
     // Use the unified VulnerabilityScanner infrastructure for massive speedup!
@@ -590,7 +597,7 @@ pub fn run_taint_analysis_with_verbosity(
 
     let scan_duration = scan_start.elapsed();
 
-    if show_progress && verbose_mode {
+    if report {
         print_taint_analysis_summary(&context, taint_rules_count, scan_duration, &taint_findings);
     }
 
