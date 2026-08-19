@@ -152,3 +152,34 @@ fn django_autoescape_and_htmx_are_not_xss_but_safe_filter_is() {
             .collect::<Vec<_>>()
     );
 }
+
+#[test]
+#[cfg(feature = "html")]
+fn html_language_still_flags_django_safe_filter() {
+    // CLI auto-detect maps `.html` → `html`, not `django`. Search rules must
+    // still see `|safe` on text nodes.
+    let staging = stage_dir();
+    stage_file(
+        staging.path(),
+        "tests/test_files/django/fixtures/template_xss.html",
+        "page.html",
+        &[],
+    );
+
+    let findings = scan_language_simple_with_rules(
+        staging.path(),
+        "html",
+        Rules::load_from_directory("rules/html/").expect("load html rules"),
+    );
+    let xss: Vec<_> = findings.iter().filter(|f| is_xss(f)).cloned().collect();
+
+    assert!(
+        xss.iter().any(|f| f.snippet.contains("request.GET") && f.snippet.contains("|safe")),
+        "|safe on request.GET must be XSS when scanned as html, got: {:?}",
+        findings
+            .iter()
+            .map(|f| (f.line, f.finding_type.as_str(), f.snippet.as_str()))
+            .collect::<Vec<_>>()
+    );
+    assert_no_findings_in_range(&xss, 4, 10, "autoescape, json_script, hx-swap are not XSS");
+}
