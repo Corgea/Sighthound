@@ -134,7 +134,8 @@
             category: Some("code-injection"),
             mode: "search",
             patterns: Some([
-                "*Function(*user*)", "*Function(*input*)", "*Function(*data*)", "*Function(*+*)"
+                "*Function(*user*)", "*Function(*input*)", "*Function(*data*)",
+                "new Function(*+*)", " Function(*+*)"
             ]),
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
@@ -143,6 +144,28 @@
             description: Some("Function constructor with dynamic content can lead to code injection"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["code-injection", "frontend", "cwe-80", "cwe-95"])
+        ),
+        (
+            id: Some("js-code-injection-003"),
+            name: Some("Code injection via setTimeout/setInterval string"),
+            category: Some("code-injection"),
+            mode: "search",
+            // Gate `=` forces full-call matching. First arg must be a string or
+            // `ident,` — not `function` / `async` / `(() =>` callbacks.
+            patterns: Some([
+                "settimeout-eval-sink=",
+                "regex:setTimeout\\(\\s*['\"]",
+                "regex:setTimeout\\(\\s*[A-Za-z_$][\\w$]*\\s*,",
+                "regex:setInterval\\(\\s*['\"]",
+                "regex:setInterval\\(\\s*[A-Za-z_$][\\w$]*\\s*,"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
+            description: Some("setTimeout/setInterval with a string argument evaluates attacker-controlled code"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["code-injection", "frontend", "cwe-95"])
         ),
         (
             id: Some("js-postmessage-001"),
@@ -299,10 +322,10 @@
             finding_type: Some("Dynamic Code Loading"),
             severity: Some("High"),
             confidence: Some("Medium"),
-            cwe_id: Some("cwe-95"),
+            cwe_id: Some("cwe-94"),
             description: Some("User-controlled module paths can lead to code injection"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
-            tags: Some(["code-injection","dynamic-import","frontend","cwe-95"])
+            tags: Some(["code-injection","dynamic-import","frontend","cwe-94"])
         ),
         (
             id: Some("js-redos-001"),

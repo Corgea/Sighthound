@@ -9,14 +9,15 @@
             patterns: Some([
                 "regex:eval\\(\\s*[A-Za-z_$](?:key)?",
                 "regex:new Function\\(\\s*[A-Za-z_$](?:key)?",
+                "regex:vm\\.runIn(?:New|This)?Context\\(\\s*[A-Za-z_$]",
             ]),
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
-            cwe_id: Some("cwe-94"),
+            cwe_id: Some("cwe-95"),
             description: Some("User-controlled input passed to a dynamic code evaluation sink"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
-            tags: Some(["injection", "code", "backend", "cwe-94"])
+            tags: Some(["injection", "code", "backend", "cwe-94", "cwe-95"])
         ),
     ],
 )

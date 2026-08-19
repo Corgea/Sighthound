@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ title }}</title>
+    {{ bootstrap|json_script:"bootstrap" }}
+</head>
+<body hx-swap="innerHTML" hx-get="/items">
+    <h1>{{ title }}</h1>
+    <p>{{ note }}</p>
+    <script type="application/json" id="config">{{ json_data }}</script>
+    <!-- TP: request GET reflected with |safe -->
+    <div>{{ request.GET.q|safe }}</div>
+    <!-- TP: spaced mark_safe on cookies -->
+    <div>{{ request.COOKIES.sid| mark_safe }}</div>
+</body>
+</html>

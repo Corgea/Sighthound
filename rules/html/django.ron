@@ -1,0 +1,37 @@
+(
+    rules: [
+        // Autoescaped `{{ var }}` is not XSS. Flag `|safe`/`|mark_safe` only on
+        // request data. Gate `=` forces full-text match. Spaced filters (`| safe`)
+        // resolve as `{{`, so those patterns are `{{`-prefixed.
+        (
+            id: Some("html-django-safe-request-xss"),
+            name: Some("Django |safe on request data"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "django-safe-filter-sink=",
+                "*request.GET*|safe*",
+                "*request.POST*|safe*",
+                "*request.COOKIES*|safe*",
+                "*request.GET*|mark_safe*",
+                "*request.POST*|mark_safe*",
+                "*request.COOKIES*|mark_safe*",
+                "{{*request.GET*| safe*",
+                "{{*request.POST*| safe*",
+                "{{*request.COOKIES*| safe*",
+                "{{*request.GET*| mark_safe*",
+                "{{*request.POST*| mark_safe*",
+                "{{*request.COOKIES*| mark_safe*"
+            ]),
+            finding_type: Some("Cross-Site Scripting"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Request data passed through |safe / |mark_safe disables autoescape and is reflected XSS"),
+            file_types: Some((
+                extensions: Some([".html", ".htm"])
+            )),
+            tags: Some(["xss", "django", "cwe-79"])
+        )
+    ]
+)
