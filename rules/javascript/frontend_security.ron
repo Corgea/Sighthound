@@ -135,7 +135,9 @@
             mode: "search",
             patterns: Some([
                 "*Function(*user*)", "*Function(*input*)", "*Function(*data*)",
-                "new Function(*+*)", " Function(*+*)"
+                "new Function(*+*)", " Function(*+*)",
+                // Word boundary so `Function('return '+x)` matches but `myFunction` does not.
+                "regex:\\bFunction\\(.*\\+"
             ]),
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
@@ -150,20 +152,41 @@
             name: Some("Code injection via setTimeout/setInterval string"),
             category: Some("code-injection"),
             mode: "search",
-            // Gate `=` forces full-call matching. First arg must be a string or
-            // `ident,` — not `function` / `async` / `(() =>` callbacks.
+            // Gate `=` forces full-call matching. String first arg only —
+            // `setTimeout(handler, n)` is a function reference, not eval.
+            // Taint still flags `setTimeout(userInput)` when the arg is tainted.
             patterns: Some([
                 "settimeout-eval-sink=",
                 "regex:setTimeout\\(\\s*['\"]",
-                "regex:setTimeout\\(\\s*[A-Za-z_$][\\w$]*\\s*,",
-                "regex:setInterval\\(\\s*['\"]",
-                "regex:setInterval\\(\\s*[A-Za-z_$][\\w$]*\\s*,"
+                "regex:setInterval\\(\\s*['\"]"
             ]),
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
             confidence: Some("High"),
             cwe_id: Some("cwe-95"),
             description: Some("setTimeout/setInterval with a string argument evaluates attacker-controlled code"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["code-injection", "frontend", "cwe-95"])
+        ),
+        (
+            id: Some("js-code-injection-004"),
+            name: Some("Code injection via vm.runIn*"),
+            category: Some("code-injection"),
+            mode: "search",
+            // Dummy `=` names pass the call-name prefilter (escaped regex dots
+            // are not a substring of `vm.runInNewContext`).
+            patterns: Some([
+                "vm.runInNewContext=",
+                "vm.runInThisContext=",
+                "vm.runInContext=",
+                "regex:vm\\.runIn(?:New|This)?Context\\(\\s*[A-Za-z_$]",
+                "regex:vm\\.runIn(?:New|This)?Context\\(\\s*['\"]"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
+            description: Some("User-controlled input is evaluated as JavaScript via vm.runIn*"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["code-injection", "frontend", "cwe-95"])
         ),

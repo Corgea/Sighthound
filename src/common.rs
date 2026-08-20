@@ -66,20 +66,56 @@ impl CommonUtils {
             return false;
         }
 
-        // Special handling for DOM property patterns like *.innerHTML
+        // `*.innerHTML` matches assignment to that property only (not any `=`
+        // in the snippet). Optional TS `as` cast: `(el.innerHTML as T) = x`.
         if let Some(property) = pattern.strip_prefix("*.") {
-            // Remove "*."
-
-            // Handle TypeScript casting syntax: (element.innerHTML as Type) = value
-            if text.contains(&format!(".{}", property)) {
-                // Check for assignment context
-                if text.contains('=') && !text.contains("==") && !text.contains("!=") {
-                    return true;
-                }
+            if Self::assignment_follows_dom_property(text, property) {
+                return true;
             }
         }
 
         Self::matches_unified_pattern(pattern, text)
+    }
+
+    pub(crate) fn is_html_write_source_property(property: &str) -> bool {
+        property == "innerHTML" || property == "outerHTML"
+    }
+
+    /// `.innerHTML = x`, `.innerHTML+=x`, or `(el.innerHTML as T) = x`.
+    pub(crate) fn assignment_follows_dom_property(text: &str, property: &str) -> bool {
+        Self::any_dom_property(text, property, Self::suffix_looks_like_dom_assignment)
+    }
+
+    /// `.prop` used as a read, not the left-hand side of an assignment.
+    pub(crate) fn dom_property_has_unassigned_use(text: &str, property: &str) -> bool {
+        Self::any_dom_property(text, property, |after| {
+            !Self::suffix_looks_like_dom_assignment(after)
+        })
+    }
+
+    fn any_dom_property(text: &str, property: &str, pred: impl Fn(&str) -> bool) -> bool {
+        let needle = format!(".{}", property);
+        let mut search = 0;
+        while let Some(rel) = text.get(search..).and_then(|rest| rest.find(&needle)) {
+            let idx = search + rel + needle.len();
+            if pred(&text[idx..]) {
+                return true;
+            }
+            search = idx;
+        }
+        false
+    }
+
+    fn suffix_looks_like_dom_assignment(after: &str) -> bool {
+        let after = after.trim_start();
+        if after.starts_with("+=") || (after.starts_with('=') && !after.starts_with("==")) {
+            return true;
+        }
+        let Some(rest) = after.strip_prefix("as ") else {
+            return false;
+        };
+        rest.find(')')
+            .is_some_and(|paren| Self::suffix_looks_like_dom_assignment(&rest[paren + 1..]))
     }
 
     /// Context-aware taint pattern matching with additional filtering
@@ -750,5 +786,41 @@ impl CommonUtils {
                 "Cannot specify --rules-path without language in auto-detection mode"
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CommonUtils;
+
+    #[test]
+    fn assignment_follows_dom_property_requires_this_property() {
+        assert!(CommonUtils::assignment_follows_dom_property(
+            "el.innerHTML = location.hash",
+            "innerHTML"
+        ));
+        assert!(!CommonUtils::assignment_follows_dom_property(
+            "el.textContent = x; return el.innerHTML",
+            "innerHTML"
+        ));
+        assert!(CommonUtils::assignment_follows_dom_property(
+            "el.textContent = x; return el.innerHTML",
+            "textContent"
+        ));
+        assert!(CommonUtils::assignment_follows_dom_property(
+            "(el.innerHTML as string) = x",
+            "innerHTML"
+        ));
+        assert!(!CommonUtils::assignment_follows_dom_property(
+            "(el.innerHTML as string) == x",
+            "innerHTML"
+        ));
+    }
+
+    #[test]
+    fn html_write_source_property_is_inner_or_outer_html() {
+        assert!(CommonUtils::is_html_write_source_property("innerHTML"));
+        assert!(CommonUtils::is_html_write_source_property("outerHTML"));
+        assert!(!CommonUtils::is_html_write_source_property("textContent"));
     }
 }

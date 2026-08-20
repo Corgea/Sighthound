@@ -55,11 +55,19 @@ impl TaintRuleDeduplicator {
         let result = self.rule_mapping.get(&key);
 
         if let Some(rule) = result {
-            log::debug!("[RULE_SELECTION] Found rule for source='{}' + sink='{}' -> rule_id={:?}, finding_type={:?}", 
-                source_pattern, sink_pattern, rule.id, rule.finding_type);
+            log::debug!(
+                "[RULE_SELECTION] Found rule for source='{}' + sink='{}' -> rule_id={:?}, finding_type={:?}",
+                source_pattern,
+                sink_pattern,
+                rule.id,
+                rule.finding_type
+            );
         } else {
-            log::debug!("[RULE_SELECTION] No rule found for source='{}' + sink='{}'. Showing up to 5 mappings", 
-                source_pattern, sink_pattern);
+            log::debug!(
+                "[RULE_SELECTION] No rule found for source='{}' + sink='{}'. Showing up to 5 mappings",
+                source_pattern,
+                sink_pattern
+            );
             for ((src, snk), rule) in self.rule_mapping.iter().take(5) {
                 log::debug!("   - ('{}', '{}') -> {:?}", src, snk, rule.finding_type);
             }
@@ -79,6 +87,17 @@ impl TaintRuleDeduplicator {
                 && !Self::matches_bare_call_source(pattern, text)
             {
                 continue;
+            }
+            if let Some(property) = pattern.strip_prefix("*.") {
+                // Skip textContent/innerText writes (sanitizers). Keep
+                // innerHTML/outerHTML writes so `el.innerHTML = location.hash`
+                // still pairs as a same-node source+sink.
+                if !CommonUtils::is_html_write_source_property(property)
+                    && CommonUtils::assignment_follows_dom_property(text, property)
+                    && !CommonUtils::dom_property_has_unassigned_use(text, property)
+                {
+                    continue;
+                }
             }
 
             if CommonUtils::matches_taint_pattern(pattern, text) {

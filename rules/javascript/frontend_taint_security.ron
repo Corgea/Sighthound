@@ -1302,15 +1302,13 @@
                 "URLSearchParams(*innerHTML*",
                 "new URLSearchParams(*innerHTML*",
                 
-                // DOM element content patterns to innerHTML
-                "*.textContent*innerHTML*",
-                "*.innerText*innerHTML*",
-                "*.text*innerHTML*",
-                "option.text*innerHTML*",
-                "element.textContent*innerHTML*",
-                "firstMember.querySelector(*).textContent*innerHTML*",
-                "document.querySelector(*).textContent*innerHTML*",
-                "select.previousElementSibling.textContent*innerHTML*",
+                // DOM element content assigned to innerHTML (write). Reading
+                // innerHTML after a textContent write is the escapeHtml helper.
+                "*.innerHTML*=*.textContent*",
+                "*.innerHTML*=*textContent*",
+                "*.textContent*innerHTML*=*",
+                "*.innerText*innerHTML*=*",
+                "*.text*innerHTML*=*",
                 
                 // Template literal patterns with innerHTML
                 "`*${*searchParams.get(*}*`*innerHTML*",

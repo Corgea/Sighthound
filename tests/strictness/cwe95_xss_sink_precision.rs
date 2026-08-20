@@ -38,14 +38,20 @@ fn innerhtml_helpers_are_not_cwe95_but_eval_is() {
 
     assert_findings_in_range(&cwe95, 6, 6, 1, "eval(userInput) is CWE-95");
     assert_findings_in_range(&cwe95, 10, 10, 1, "new Function(userInput) is CWE-95");
-    assert_findings_in_range(&cwe95, 15, 15, 1, "setTimeout(userInput) string form is CWE-95");
-    assert_no_findings_in_range(&cwe95, 23, 63, "DOM/HTMX/callback helpers are not CWE-95");
+    assert_findings_in_range(&cwe95, 15, 15, 1, "setTimeout(string concat) is CWE-95");
+    assert_findings_in_range(&cwe95, 19, 19, 1, "setInterval(string concat) is CWE-95");
+    assert_findings_in_range(&cwe95, 23, 23, 1, "eval(location.hash) is CWE-95");
+    assert_findings_in_range(&cwe95, 27, 27, 1, "vm.runInNewContext(userInput) is CWE-95");
+    assert_findings_in_range(&cwe95, 98, 98, 1, "Function('return '+userInput) is CWE-95");
+    assert_no_findings_in_range(&cwe95, 30, 94, "DOM/HTMX/callback helpers are not CWE-95");
 
     let xss: Vec<_> = findings.iter().filter(|f| is_xss(f)).cloned().collect();
-    assert!(
-        xss.iter().any(|f| f.snippet.contains("innerHTML") && f.snippet.contains("location.hash")),
-        "innerHTML = location.hash must remain XSS, got: {:?}",
-        xss.iter().map(|f| (f.line, f.snippet.as_str())).collect::<Vec<_>>()
+    assert_findings_in_range(&xss, 32, 32, 1, "innerHTML = location.hash must remain XSS");
+    assert_no_findings_in_range(
+        &xss,
+        36,
+        94,
+        "escapeHtml/DOMPurify/template/htmx helpers are not XSS",
     );
     assert!(
         xss.iter().all(|f| f.cwe_id.as_deref() != Some("cwe-95")),
@@ -101,6 +107,7 @@ fn existing_js_xss_true_positives_still_fire() {
                 || f.snippet.contains("Function(")
                 || f.snippet.contains("setTimeout(")
                 || f.snippet.contains("setInterval(")
+                || f.snippet.contains("vm.runIn")
         }),
         "CWE-95 on XSS fixtures must be eval-family only, got: {:?}",
         cwe95_findings(&findings)

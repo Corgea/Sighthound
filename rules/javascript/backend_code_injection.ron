@@ -9,7 +9,13 @@
             patterns: Some([
                 "regex:eval\\(\\s*[A-Za-z_$](?:key)?",
                 "regex:new Function\\(\\s*[A-Za-z_$](?:key)?",
+                // Dummy `=` names pass the call-name prefilter (escaped regex
+                // dots are not a substring of `vm.runInNewContext`).
+                "vm.runInNewContext=",
+                "vm.runInThisContext=",
+                "vm.runInContext=",
                 "regex:vm\\.runIn(?:New|This)?Context\\(\\s*[A-Za-z_$]",
+                "regex:vm\\.runIn(?:New|This)?Context\\(\\s*['\"]",
             ]),
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
