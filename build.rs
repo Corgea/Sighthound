@@ -4,10 +4,11 @@ fn main() {
 
 fn emit_rerun(path: &str) {
     println!("cargo:rerun-if-changed={path}");
-    let Ok(entries) = std::fs::read_dir(path) else {
-        return;
-    };
-    for entry in entries.flatten() {
+    let entries = std::fs::read_dir(path)
+        .unwrap_or_else(|error| panic!("failed to read directory '{path}': {error}"));
+    for entry in entries {
+        let entry = entry
+            .unwrap_or_else(|error| panic!("failed to read directory entry in '{path}': {error}"));
         let child = entry.path();
         let Some(child_str) = child.to_str() else {
             continue;
