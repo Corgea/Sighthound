@@ -78,6 +78,10 @@ impl ScanningLogic {
             finding.sink_info = Some(sink_info);
         }
 
+        if language_support.name() == "sql" {
+            Self::clamp_sql_finding_to_matched_line(&mut finding, source);
+        }
+
         Some(finding)
     }
 
@@ -629,6 +633,24 @@ impl ScanningLogic {
             sink_info: None,
             traces: None,
             tags: None,
+        }
+    }
+
+    /// SQL is matched as one whole-file node (`call_node_types() == ["program"]`), so the raw
+    /// finding carries the entire file as `snippet`/`function` and the file end as `end_line`.
+    /// Clamp the emitted finding to the matched line so consumers don't store the whole file
+    /// per finding; detection stays whole-file.
+    fn clamp_sql_finding_to_matched_line(finding: &mut crate::models::Finding, source: &[u8]) {
+        let text = String::from_utf8_lossy(source);
+        let Some(line_text) = text.lines().nth(finding.line.saturating_sub(1)) else {
+            return;
+        };
+        finding.snippet = line_text.to_string();
+        finding.function = line_text.to_string();
+        finding.end_line = finding.line;
+        finding.end_column = line_text.chars().count() + 1;
+        if let Some(sink_info) = &mut finding.sink_info {
+            sink_info.function_name = line_text.to_string();
         }
     }
 
@@ -2167,6 +2189,10 @@ impl ScanningLogic {
             line,
             taint_context_info,
         );
+
+        if language_support.name() == "sql" {
+            Self::clamp_sql_finding_to_matched_line(&mut finding, source);
+        }
 
         Some(finding)
     }
