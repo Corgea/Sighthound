@@ -237,11 +237,11 @@ const SQL_UNSAFE_FIXTURE: &str = "tests/test_files/strictness_languages/sql/unsa
 // does not start with `SELECT `/`EXEC(`/`EXECUTE(`/`CONCAT(`, since patterns containing
 // `*` are globs anchored at byte 0 — that, not the explicit column list, is what keeps
 // `sql-wildcard-001`'s `SELECT *` quiet, so the `INSERT` has to stay first; no `||`
-// (`sql-injection-002`); no `--`, `/*` or `#` (`sql-comment-001`, whose `unless` list is
-// inert — no code reads that field); no `DROP`/`TRUNCATE` (`sql-dangerous-001/002`); no
-// `UNION SELECT` (`sql-union-001`); no `SLEEP(`/`WAITFOR DELAY`/`BENCHMARK(`/`pg_sleep(`
-// (`sql-timing-001`); no `EXECUTE IMMEDIATE`/`sp_executesql` (`sql-unsafe-001`); no
-// `OR 1=1` family (`sql-auth-001`); and a newline between the two statements, so no
+// (`sql-injection-002`); no `--`, `/*` or `#` (`sql-comment-001`); no `DROP`/`TRUNCATE`
+// (`sql-dangerous-001/002`); no `UNION SELECT` (`sql-union-001`); no `SLEEP(`/
+// `WAITFOR DELAY`/`BENCHMARK(`/`pg_sleep(` (`sql-timing-001`); no `EXECUTE IMMEDIATE`/
+// `sp_executesql` (`sql-unsafe-001`); no `OR 1=1` family (`sql-auth-001`); and a
+// newline between the two statements, so no
 // `;SELECT` (`sql-batch-001`). Counts below were measured, not guessed.
 #[cfg(feature = "sql")]
 #[test]
