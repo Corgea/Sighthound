@@ -666,6 +666,10 @@ impl AstUtils {
                     if depth == 0 {
                         let inner = args.get(1..i).unwrap_or("").trim();
                         let after = args.get(i + 1..).unwrap_or("").trim_start();
+                        // `(fn)()` / `(() => x)()` is an IIFE result, not a callback.
+                        if after.starts_with('(') {
+                            return false;
+                        }
                         return after.starts_with("=>")
                             || Self::starts_with_timer_callback_arg(inner);
                     }
@@ -878,6 +882,11 @@ mod tests {
             sink,
             "setTimeout((function () { paint(); }), 0)"
         ));
+        assert!(!AstUtils::is_timer_callback_eval_sink(
+            sink,
+            "setTimeout((function () { return userInput; })(), 0)"
+        ));
+        assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout((() => userInput)(), 0)"));
         assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout(functionName, 1000)"));
         assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout(userInput, 1000)"));
         assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout(userInput)"));
