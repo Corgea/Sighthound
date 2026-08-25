@@ -230,11 +230,97 @@ fn include_test_fixtures_flag_enables_scanning_tests_directory() {
     );
 }
 
+/// A language whose rule pack ships search rules but no `mode = "taint"` rules must not
+/// abort the scan. Scanning a SINGLE FILE is load-bearing: a directory scan merges in
+/// python/javascript taint rules, the zero-taint-rule guard never fires, and the test
+/// passes with or without the fix.
+#[cfg(feature = "html")]
+#[test]
+fn html_only_single_file_scan_succeeds_without_taint_rules() {
+    let staging = stage_dir();
+    let file = write_staged_file(
+        staging.path(),
+        "page.html",
+        "<html><body><h1>hello</h1><p>plain markup</p></body></html>\n",
+    );
+    let path = file.to_str().unwrap();
+
+    assert_taint_skip_contract(path);
+
+    // Locked decision Q2: the explicit --taint-analysis path degrades the same way.
+    run_json_scan_ok(&[path, "--taint-analysis", "--output-format", "json"]);
+}
+
+#[cfg(feature = "objectscript")]
+#[test]
+fn objectscript_only_single_file_scan_succeeds_without_taint_rules() {
+    let staging = stage_dir();
+    let file = write_staged_file(
+        staging.path(),
+        "Sample.cls",
+        r#"Class Demo.Sample Extends %RegisteredObject
+{
+
+ClassMethod Run(input As %String) As %String
+{
+  Quit input
+}
+
+}
+"#,
+    );
+    assert_taint_skip_contract(file.to_str().unwrap());
+}
+
+/// json invocation: exit 0, stdout parses as a JSON array, no notice on stdout.
+/// text invocation: exit 0, notice on stderr only, and never the benchmark-grepped string.
+#[cfg(any(feature = "html", feature = "objectscript"))]
+fn assert_taint_skip_contract(path: &str) {
+    const NOTICE: &str = "skipping taint analysis";
+    const OLD_ERROR: &str = "No taint flow rules found";
+
+    let json = run_json_scan_ok(&[path, "--output-format", "json"]);
+    let json_stdout = String::from_utf8_lossy(&json.stdout);
+    assert!(
+        !json_stdout.contains(NOTICE),
+        "{path}: json stdout must stay pure JSON, got: {json_stdout}"
+    );
+
+    let text = run_cli_raw(&[path]);
+    let stdout = String::from_utf8_lossy(&text.stdout);
+    let stderr = String::from_utf8_lossy(&text.stderr);
+    assert_eq!(text.status.code(), Some(0), "{path}: text scan should exit 0, stderr: {stderr}");
+    assert!(stderr.contains(NOTICE), "{path}: expected skip notice on stderr, got: {stderr}");
+    assert!(!stdout.contains(NOTICE), "{path}: skip notice leaked to stdout: {stdout}");
+    assert!(
+        !stderr.contains(OLD_ERROR) && !stdout.contains(OLD_ERROR),
+        "{path}: legacy '{OLD_ERROR}' text must be gone, stdout: {stdout} stderr: {stderr}"
+    );
+}
+
+/// Run the CLI and assert exit 0 with a parseable JSON array on stdout. Deliberately says
+/// nothing about length: a minimal fixture legitimately yields `[]`.
+#[cfg(any(feature = "html", feature = "objectscript"))]
+fn run_json_scan_ok(args: &[&str]) -> std::process::Output {
+    let output = run_cli_raw(args);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "{args:?}: expected exit 0, stderr: {stderr}");
+    serde_json::from_slice::<Vec<Value>>(&output.stdout).unwrap_or_else(|e| {
+        panic!(
+            "{args:?}: stdout is not a JSON array ({e}): {}",
+            String::from_utf8_lossy(&output.stdout)
+        )
+    });
+    output
+}
+
+/// Raw process output — exit code, stdout, and stderr kept separate.
+fn run_cli_raw(args: &[&str]) -> std::process::Output {
+    Command::new(sighthound_binary()).args(args).output().expect("failed to run sighthound binary")
+}
+
 fn run_cli_json(args: &[&str]) -> Vec<Value> {
-    let output = Command::new(sighthound_binary())
-        .args(args)
-        .output()
-        .expect("failed to run sighthound binary");
+    let output = run_cli_raw(args);
     assert!(
         output.status.success(),
         "sighthound failed with status {:?}: {}",
