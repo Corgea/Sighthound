@@ -4,8 +4,6 @@ use super::helpers::*;
 use serde_json::Value;
 use sighthound::rules::Rules;
 use std::collections::BTreeSet;
-use std::path::PathBuf;
-use std::process::Command;
 
 #[cfg(feature = "php")]
 #[test]
@@ -312,39 +310,6 @@ fn run_json_scan_ok(args: &[&str]) -> std::process::Output {
         )
     });
     output
-}
-
-/// Raw process output — exit code, stdout, and stderr kept separate.
-fn run_cli_raw(args: &[&str]) -> std::process::Output {
-    Command::new(sighthound_binary()).args(args).output().expect("failed to run sighthound binary")
-}
-
-fn run_cli_json(args: &[&str]) -> Vec<Value> {
-    let output = run_cli_raw(args);
-    assert!(
-        output.status.success(),
-        "sighthound failed with status {:?}: {}",
-        output.status.code(),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    match serde_json::from_slice(&output.stdout) {
-        Ok(findings) => findings,
-        Err(_) => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            if stdout.trim().is_empty() || stdout.trim_start().starts_with("No ") {
-                Vec::new()
-            } else {
-                panic!("failed to parse scanner JSON output: {stdout}");
-            }
-        }
-    }
-}
-
-fn sighthound_binary() -> PathBuf {
-    if let Ok(path) = std::env::var("CARGO_BIN_EXE_sighthound") {
-        return PathBuf::from(path);
-    }
-    fixture_path("target/debug/sighthound")
 }
 
 fn finding_key_set(findings: &[Value]) -> BTreeSet<(String, u64, String, String)> {

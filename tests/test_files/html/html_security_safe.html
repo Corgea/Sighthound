@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HTML security negatives</title>
+<meta http-equiv="refresh" content="5;url=/dashboard">
+</head>
+<body>
+<a href="/login">Login</a>
+<a href="https://example.com/javascript-guide">Guide</a>
+<form action="/submit" method="post"></form>
+<img src="/static/logo.png">
+<a href="data:text/plain,hello">Data</a>
+<button onclick="submitForm()">Run</button>
+<button onclick="greet(userName)">Greet</button>
+<iframe srcdoc="Static content only"></iframe>
+<div style="width:120px">Sized</div>
+<script>document.write("static banner");</script>
+<script>parseInt(userInput, 10);</script>
+<script>window.postMessage(payload, "https://example.com");</script>
+</body>
+</html>
