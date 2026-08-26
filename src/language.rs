@@ -53,6 +53,8 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
         "php" => Ok(Box::new(PHPLanguage)),
         #[cfg(feature = "objectscript")]
         "objectscript" => Ok(Box::new(ObjectScriptLanguage::udl())),
+        #[cfg(feature = "sql")]
+        "sql" => Ok(Box::new(SQLLanguage)),
         _ => {
             let mut supported = Vec::new();
             #[cfg(feature = "python")]
@@ -79,6 +81,8 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
             supported.push("php");
             #[cfg(feature = "objectscript")]
             supported.push("objectscript");
+            #[cfg(feature = "sql")]
+            supported.push("sql");
 
             anyhow::bail!(
                 "Unsupported language: {}. Supported languages: {}",
@@ -681,5 +685,37 @@ impl LanguageSupport for DjangoTemplateLanguage {
             }
             _ => node.child_by_field_name("value"),
         }
+    }
+}
+
+// SQL Implementation — text-based matching; the JS grammar is a no-op host.
+// `call_node_types()` names the parse-tree root, so `traverse_calls_only` yields
+// exactly one node per file and `get_function_name` hands rules the whole file
+// as the text to match against.
+#[cfg(feature = "sql")]
+pub struct SQLLanguage;
+
+#[cfg(feature = "sql")]
+impl LanguageSupport for SQLLanguage {
+    fn name(&self) -> &'static str {
+        "sql"
+    }
+    fn file_extension(&self) -> &'static str {
+        ".sql"
+    }
+    fn tree_sitter_language(&self) -> Language {
+        tree_sitter_javascript::LANGUAGE.into()
+    }
+    fn call_node_types(&self) -> &[&'static str] {
+        &["program"]
+    }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        let text = &source[node.start_byte()..node.end_byte()];
+        std::str::from_utf8(text).ok()
+    }
+
+    fn get_arguments_node<'a>(&self, _node: &'a Node) -> Option<Node<'a>> {
+        None // Not used for simple text matching
     }
 }

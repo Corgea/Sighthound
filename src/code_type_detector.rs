@@ -249,7 +249,7 @@ impl CodeTypeDetector {
         match language.to_lowercase().as_str() {
             "javascript" | "typescript" | "tsx" | "jsx" => CodeType::Frontend,
             "python" | "java" | "rust" | "go" | "php" | "ruby" | "objectscript" | "c" | "cpp"
-            | "c#" | "csharp" => CodeType::Backend,
+            | "c#" | "csharp" | "sql" => CodeType::Backend,
             _ => CodeType::Unknown,
         }
     }

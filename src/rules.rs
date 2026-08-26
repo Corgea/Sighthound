@@ -27,6 +27,7 @@ static RULES_RUBY: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/ruby");
 static RULES_HTML: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/html");
 static RULES_PHP: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/php");
 static RULES_OBJECTSCRIPT: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/objectscript");
+static RULES_SQL: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/sql");
 
 // Structure for centralized exclusion patterns
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -157,6 +158,7 @@ impl Rules {
             "objectscript" => {
                 all_rules.extend(Self::parse_embedded_dir(&RULES_OBJECTSCRIPT, "ObjectScript")?)
             }
+            "sql" => all_rules.extend(Self::parse_embedded_dir(&RULES_SQL, "SQL")?),
             _ => {
                 return Err(anyhow::anyhow!(
                     "No embedded rules available for language: {}",

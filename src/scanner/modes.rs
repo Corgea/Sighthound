@@ -541,7 +541,7 @@ pub fn run_taint_analysis_with_verbosity(
     // Check if we have taint flow rules
     let taint_rules_count = rules.rules.iter().filter(|r| r.is_taint_rule()).count();
 
-    // Some rule packs ship search-mode rules only (e.g. html, objectscript). Skip the taint
+    // Some rule packs ship search-mode rules only (e.g. html, objectscript, sql). Skip the taint
     // pass instead of failing the scan and discarding the search-pass findings.
     if taint_rules_count == 0 {
         if show_progress {
@@ -552,7 +552,7 @@ pub fn run_taint_analysis_with_verbosity(
         }
         return Ok(Vec::new());
     }
-    if show_progress && verbose_mode {
+    if report {
         print_taint_analysis_intro(root_dir, taint_rules_count, context.total_files);
     }
     // Use the unified VulnerabilityScanner infrastructure for massive speedup!
@@ -596,7 +596,7 @@ pub fn run_taint_analysis_with_verbosity(
 
     let scan_duration = scan_start.elapsed();
 
-    if show_progress && verbose_mode {
+    if report {
         print_taint_analysis_summary(&context, taint_rules_count, scan_duration, &taint_findings);
     }
 
