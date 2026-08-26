@@ -50,18 +50,17 @@ rather than against parsed statements.
 - Patterns without a wildcard match as substrings **anywhere** in the file.
 - Patterns containing `*` are globs evaluated against the whole file, so they are **anchored
   at the first byte**: `EXEC(@sql);` on line 1 is reported, the same statement on line 2 is not.
-- Findings report an accurate start line, but `end_line` always runs to end of file.
+- Findings report the matched line as both their start and end line.
 - The bundled rules are tautology- and payload-oriented. Dynamic SQL inside a stored-procedure
   body, `CREATE USER … IDENTIFIED BY '…'`, and `GRANT ALL … TO PUBLIC` are **not** detected.
 - Dialect-specific syntax (T-SQL, PL/SQL, PL/pgSQL) is not understood.
 - `.ddl` and `.dml` files are recognized and scanned, but every bundled rule is scoped to
   `.sql`, so the bundled pack reports nothing for them. Use `--rules-dir` with rules whose
   `file_types` include those extensions.
-- The bundled SQL pack is pattern-only and ships no `mode: "taint"` rules. The default combined
-  mode tolerates that — the taint pass contributes nothing and the scan still succeeds on the
-  search findings — so no extra flag is needed for a SQL-only tree in auto-detect mode or for
-  explicit `sighthound <dir> sql rules/sql`. Only an explicit `--taint-analysis` still fails,
-  with `No taint flow rules found`. The `.html` and ObjectScript packs behave the same way.
+- The bundled SQL pack is pattern-only and ships no `mode: "taint"` rules. Default combined mode
+  keeps the search findings, while explicit `--taint-analysis` succeeds with no findings. Text
+  output warns that taint analysis was skipped. The `.html` and ObjectScript packs behave the
+  same way.
 - Files under `tests/`, `test/`, `vendor/`, `build/`, `dist/` and `target/` are skipped
   before language detection (whole-path-component match); `--include-test-fixtures` reopens
   `tests/` and `test/` only.

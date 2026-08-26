@@ -3,6 +3,18 @@ use anyhow::Result;
 use std::path::Path;
 use tree_sitter::{Language, Node};
 
+/// How search-mode rules are matched against the parse tree.
+///
+/// `Ast` is the default every language inherits: the prefilter and the final match both
+/// run against the resolved "function" name. `Markup` matches against the full text of
+/// the candidate node instead, which is what lets a pattern span two attributes or sit
+/// inside a `<script>` body — neither of which a name is able to express.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchSemantics {
+    Ast,
+    Markup,
+}
+
 pub trait LanguageSupport: Send + Sync {
     fn name(&self) -> &'static str;
     fn file_extension(&self) -> &'static str;
@@ -10,6 +22,9 @@ pub trait LanguageSupport: Send + Sync {
     fn call_node_types(&self) -> &[&'static str];
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str>;
     fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>>;
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Ast
+    }
 }
 
 pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSupport>> {
@@ -532,6 +547,10 @@ pub struct HTMLLanguage;
 
 #[cfg(feature = "html")]
 impl LanguageSupport for HTMLLanguage {
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Markup
+    }
+
     fn name(&self) -> &'static str {
         "html"
     }
@@ -598,6 +617,10 @@ pub struct DjangoTemplateLanguage;
 
 #[cfg(feature = "django")]
 impl LanguageSupport for DjangoTemplateLanguage {
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Markup
+    }
+
     fn name(&self) -> &'static str {
         "django"
     }
