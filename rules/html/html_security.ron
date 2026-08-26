@@ -1,7 +1,7 @@
 (
     rules: [
         // Generic HTML security patterns: dangerous markup that is unsafe on its own,
-        // independent of any template engine. Twelve rules, all `mode: "search"`, all
+        // independent of any template engine. Eleven rules, all `mode: "search"`, all
         // scoped to `.html` / `.htm`.
         //
         // ENGINE NOTE: `.html` files are matched with `SearchSemantics::Markup`
@@ -19,17 +19,34 @@
         // still match but would silently fall back to heuristic line attribution.
         //
         // SCOPING: `html-xss-012` and `html-xss-013` carry a `node_kind` condition
-        // pinning them to `script_element`. Without it, `-013` would double-report the
-        // `onclick="eval(...)"` lines already covered by `-004`.
+        // pinning them to `script_element`. Without it, both patterns would also match
+        // against `attribute`/`start_tag` node text exposed by markup search semantics
+        // (e.g. an `onclick` handler whose value happens to contain `document.write(` or
+        // `eval(` text), firing outside any actual `<script>` body.
+        //
+        // PRECISION (2026-08): `html-xss-001`/`-002`/`-019` (javascript: URL sinks) and
+        // `-014` (template syntax in inline event handlers) were measured against 1,817
+        // deduped real-world HTML files and produced only false positives — the shape of
+        // a `javascript:` payload or an unbounded `.*` scan is not evidence of
+        // attacker-controlled data. All four now require a value-interpolation marker
+        // (`{{`, `${`, or `<%=`) inside the sink, bounded to the attribute's own quote
+        // character. `{%` is deliberately excluded: it is a Django/Jinja *control* tag
+        // (loops, conditionals, `{% url %}`), not value interpolation — Django's own
+        // admindocs bookmarklet template embeds `{% url %}` inside a `javascript:` href
+        // and is not exploitable. `html-xss-004` (any onclick/onerror/... handler
+        // containing `eval(`) was removed outright: it carries no taint signal at all —
+        // not even a template marker — so it is strictly less precise than the bounded
+        // `-014`, which now covers the same attributes with an actual interpolation
+        // check.
         (
             id: Some("html-xss-001"),
             name: Some("JavaScript URL in href Attribute"),
             category: Some("xss"),
             mode: "search",
             patterns: Some([
-                "href=\"javascript:",
-                "href='javascript:",
-                "href=javascript:",
+                "regex:(?i)href\\s*=\\s*\"javascript:[^\"]*(?:\\{\\{|\\$\\{|<%=)",
+                "regex:(?i)href\\s*=\\s*'javascript:[^']*(?:\\{\\{|\\$\\{|<%=)",
+                "regex:(?i)href\\s*=\\s*javascript:[^\\s>]*(?:\\{\\{|\\$\\{|<%=)",
             ]),
             finding_type: Some("Cross-Site Scripting (XSS)"),
             severity: Some("High"),
@@ -45,9 +62,9 @@
             category: Some("xss"),
             mode: "search",
             patterns: Some([
-                "action=\"javascript:",
-                "action='javascript:",
-                "action=javascript:",
+                "regex:(?i)action\\s*=\\s*\"javascript:[^\"]*(?:\\{\\{|\\$\\{|<%=)",
+                "regex:(?i)action\\s*=\\s*'javascript:[^']*(?:\\{\\{|\\$\\{|<%=)",
+                "regex:(?i)action\\s*=\\s*javascript:[^\\s>]*(?:\\{\\{|\\$\\{|<%=)",
             ]),
             finding_type: Some("Cross-Site Scripting (XSS)"),
             severity: Some("High"),
@@ -56,29 +73,6 @@
             description: Some("JavaScript URLs in form action attributes can execute arbitrary code on form submission"),
             file_types: Some((extensions: Some([".html", ".htm"]))),
             tags: Some(["xss", "html", "javascript-url", "cwe-79"])
-        ),
-        (
-            id: Some("html-xss-004"),
-            name: Some("Inline Event Handler with eval()"),
-            category: Some("xss"),
-            mode: "search",
-            patterns: Some([
-                "regex:onclick\\s*=\\s*[^>]*\\beval\\s*\\(",
-                "regex:onmouseover\\s*=\\s*[^>]*\\beval\\s*\\(",
-                "regex:onload\\s*=\\s*[^>]*\\beval\\s*\\(",
-                "regex:onerror\\s*=\\s*[^>]*\\beval\\s*\\(",
-                "regex:onchange\\s*=\\s*[^>]*\\beval\\s*\\(",
-                "regex:onfocus\\s*=\\s*[^>]*\\beval\\s*\\(",
-                "regex:onblur\\s*=\\s*[^>]*\\beval\\s*\\(",
-                "regex:onsubmit\\s*=\\s*[^>]*\\beval\\s*\\(",
-            ]),
-            finding_type: Some("Code Injection"),
-            severity: Some("Critical"),
-            confidence: Some("High"),
-            cwe_id: Some("cwe-95"),
-            description: Some("Using eval() in inline event handlers can execute arbitrary code, especially with user-controlled input"),
-            file_types: Some((extensions: Some([".html", ".htm"]))),
-            tags: Some(["html", "code-injection", "eval", "cwe-95"])
         ),
         (
             id: Some("html-xss-008"),
@@ -196,11 +190,21 @@
             category: Some("xss"),
             mode: "search",
             patterns: Some([
-                "regex:onclick\\s*=.*\\$\\{",
-                "regex:onmouseover\\s*=.*\\$\\{",
-                "regex:onerror\\s*=.*\\$\\{",
-                "regex:onload\\s*=.*\\$\\{",
-                "regex:onchange\\s*=.*\\$\\{",
+                // Bounded to the attribute's own quote character, per quote variant
+                // (no backreferences/lookaround in the `regex` crate). The prior
+                // unbounded `.*` scanned past the attribute value entirely — two
+                // real-corpus firings matched 108,788 and 36,212 characters, from a
+                // bundled JS event dispatcher to an unrelated `${` far downstream.
+                "regex:onclick\\s*=\\s*\"[^\"]*\\$\\{",
+                "regex:onclick\\s*=\\s*'[^']*\\$\\{",
+                "regex:onmouseover\\s*=\\s*\"[^\"]*\\$\\{",
+                "regex:onmouseover\\s*=\\s*'[^']*\\$\\{",
+                "regex:onerror\\s*=\\s*\"[^\"]*\\$\\{",
+                "regex:onerror\\s*=\\s*'[^']*\\$\\{",
+                "regex:onload\\s*=\\s*\"[^\"]*\\$\\{",
+                "regex:onload\\s*=\\s*'[^']*\\$\\{",
+                "regex:onchange\\s*=\\s*\"[^\"]*\\$\\{",
+                "regex:onchange\\s*=\\s*'[^']*\\$\\{",
             ]),
             finding_type: Some("Cross-Site Scripting (XSS)"),
             severity: Some("High"),
@@ -216,8 +220,8 @@
             category: Some("xss"),
             mode: "search",
             patterns: Some([
-                "src=\"javascript:",
-                "src='javascript:",
+                "regex:(?i)src\\s*=\\s*\"javascript:[^\"]*(?:\\{\\{|\\$\\{|<%=)",
+                "regex:(?i)src\\s*=\\s*'javascript:[^']*(?:\\{\\{|\\$\\{|<%=)",
             ]),
             finding_type: Some("Cross-Site Scripting (XSS)"),
             severity: Some("High"),

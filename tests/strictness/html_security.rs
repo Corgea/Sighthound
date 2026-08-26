@@ -14,14 +14,22 @@ const SAFE_FIXTURE: &str = "html_security_safe.html";
 /// (rule id — documentation only, `Finding` has no rule-id field; fixture line;
 /// `finding_type`; `description`; `snippet`).
 ///
-/// `description` is the discriminator: eight of the twelve share
-/// "Cross-Site Scripting (XSS)", two share "Code Injection", and `tags` are identical
-/// across -001 / -002 / -019. **Do not simplify these assertions back to
-/// `finding_type`** — they would stop distinguishing eight of the twelve rules.
+/// `description` is the discriminator: eight of the eleven share
+/// "Cross-Site Scripting (XSS)", and `tags` are identical across -001 / -002 / -019.
+/// **Do not simplify these assertions back to `finding_type`** — they would stop
+/// distinguishing eight of the eleven rules.
 ///
 /// `snippet` is the verbatim `get_node_text` of the node that matched, which is what
-/// pins "tightest node span wins" (assertion 4). Nine are attribute-level; the four
+/// pins "tightest node span wins" (assertion 4). Seven are attribute-level; the four
 /// tag-level ones are not typos — see the comment on assertion 4.
+///
+/// -001/-002/-019 payloads carry a `{{ }}` / `${ }` value-interpolation marker (not
+/// the bare `javascript:alert(1)` these used to hold): the rules now require one, since
+/// the un-bounded literal payload shape produced nothing but false positives against a
+/// real-world corpus (`javascript:void(0)`, `javascript:history.back()`, Django's own
+/// admindocs bookmarklet). `html-xss-004` is gone — dropped for carrying no taint
+/// signal once `-014` was bounded to the attribute value — so this fixture no longer
+/// carries an "EXPECT html-xss-004" case.
 const EXPECTED: &[(&str, u64, &str, &str, &str)] = &[
     (
         "html-xss-011",
@@ -35,21 +43,21 @@ const EXPECTED: &[(&str, u64, &str, &str, &str)] = &[
         11,
         "Cross-Site Scripting (XSS)",
         "JavaScript URLs in href attributes can execute arbitrary code when clicked",
-        "href=\"javascript:alert(1)\"",
+        "href=\"javascript:{{ user_var }}\"",
     ),
     (
         "html-xss-002",
         13,
         "Cross-Site Scripting (XSS)",
         "JavaScript URLs in form action attributes can execute arbitrary code on form submission",
-        "action=\"javascript:alert(1)\"",
+        "action=\"javascript:${xss}\"",
     ),
     (
         "html-xss-019",
         15,
         "Cross-Site Scripting (XSS)",
         "JavaScript URLs in src attributes can execute arbitrary code",
-        "src=\"javascript:alert(1)\"",
+        "src=\"javascript:{{ user_var }}\"",
     ),
     (
         "html-xss-020",
@@ -59,50 +67,43 @@ const EXPECTED: &[(&str, u64, &str, &str, &str)] = &[
         "href=\"data:text/html,<script>alert(1)</script>\"",
     ),
     (
-        "html-xss-004",
-        19,
-        "Code Injection",
-        "Using eval() in inline event handlers can execute arbitrary code, especially with user-controlled input",
-        "onclick=\"eval(userInput)\"",
-    ),
-    (
         "html-xss-014",
-        21,
+        19,
         "Cross-Site Scripting (XSS)",
         "Template expressions in event handlers can inject user-controlled data, leading to XSS",
         "onclick=\"greet('${userName}')\"",
     ),
     (
         "html-xss-008",
-        23,
+        21,
         "Cross-Site Scripting (XSS)",
         "The srcdoc attribute can inject HTML/JavaScript into an iframe, creating XSS vulnerabilities",
         "srcdoc=\"${userContent}\"",
     ),
     (
         "html-xss-010",
-        25,
+        23,
         "Cross-Site Scripting (XSS)",
         "CSS expressions in IE can execute JavaScript code (legacy vulnerability but still relevant)",
         "style=\"width:expression(alert(1))\"",
     ),
     (
         "html-xss-012",
-        27,
+        25,
         "DOM XSS",
         "document.write can inject HTML/JavaScript into the page, potentially leading to XSS",
         "<script>document.write(userInput);</script>",
     ),
     (
         "html-xss-013",
-        29,
+        27,
         "Code Injection",
         "eval() can execute arbitrary JavaScript code, especially dangerous with user input",
         "<script>eval(userInput);</script>",
     ),
     (
         "html-sec-001",
-        31,
+        29,
         "Insecure postMessage",
         "Using wildcard (*) as targetOrigin in postMessage allows any site to receive the message",
         "<script>window.postMessage(payload, \"*\");</script>",
@@ -154,7 +155,7 @@ fn html_security_rules_fire_through_cli_auto_detection() {
     let positives = findings_for_file(&findings, POSITIVE_FIXTURE);
     let observed = line_description_pairs(&positives);
 
-    // 1. All twelve triples present at their marked lines.
+    // 1. All eleven triples present at their marked lines.
     for (id, line, finding_type, description, _) in EXPECTED {
         assert!(
             positives.iter().any(|f| {
@@ -175,7 +176,7 @@ fn html_security_rules_fire_through_cli_auto_detection() {
     );
 
     // 3. Nested markup collapses: exactly one finding per (line, description).
-    //    `description`, not `finding_type` — eight of the twelve share a finding_type.
+    //    `description`, not `finding_type` — eight of the eleven share a finding_type.
     let mut counts: std::collections::BTreeMap<(u64, String), usize> =
         std::collections::BTreeMap::new();
     for f in &positives {
@@ -194,9 +195,9 @@ fn html_security_rules_fire_through_cli_auto_detection() {
     //    first-seen the enclosing `start_tag` wins and every attribute-level equality
     //    below breaks.
     //
-    //    Nine snippets are attribute-level and four are tag-level. That asymmetry is the
-    //    tightest span, not an oversight: html-xss-011 (line 7) matches across two
-    //    attributes (`http-equiv` and the `javascript:` URL), and lines 27/29/31 match
+    //    Seven snippets are attribute-level and four are tag-level. That asymmetry is
+    //    the tightest span, not an oversight: html-xss-011 (line 7) matches across two
+    //    attributes (`http-equiv` and the `javascript:` URL), and lines 25/27/29 match
     //    inside a `<script>` body — in neither case does any single `attribute` node's
     //    text contain the match, so the enclosing node is the smallest one that does.
     //

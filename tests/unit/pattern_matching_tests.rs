@@ -245,7 +245,7 @@ mod pattern_matching_tests {
     }
 
     #[test]
-    fn html_security_pack_declares_exactly_the_twelve_rule_ids() {
+    fn html_security_pack_declares_exactly_the_eleven_rule_ids() {
         // Relative path works from a test — tests/strictness/helpers.rs already does
         // Rules::load_from_directory("rules/python/").
         let rules = Rules::load_from_file("rules/html/html_security.ron")
@@ -253,10 +253,12 @@ mod pattern_matching_tests {
 
         let ids: BTreeSet<&str> =
             rules.rules.iter().filter_map(|rule| rule.id.as_deref()).collect();
+        // html-xss-004 was removed: it had no taint signal (any onclick/... handler
+        // containing `eval(`), and once html-xss-014 was bounded to the attribute value
+        // it is the strictly more precise rule covering the same attributes.
         let expected: BTreeSet<&str> = [
             "html-xss-001",
             "html-xss-002",
-            "html-xss-004",
             "html-xss-008",
             "html-xss-010",
             "html-xss-011",
@@ -270,8 +272,8 @@ mod pattern_matching_tests {
         .into_iter()
         .collect();
 
-        assert_eq!(ids, expected, "html_security.ron must declare exactly the twelve rule ids");
-        assert_eq!(rules.rules.len(), 12, "every rule in the pack must carry an id");
+        assert_eq!(ids, expected, "html_security.ron must declare exactly the eleven rule ids");
+        assert_eq!(rules.rules.len(), 11, "every rule in the pack must carry an id");
 
         // validate_unified_rule_patterns has no production call site (src/rules.rs), so a
         // malformed `regex:` would otherwise fail silently at scan time.

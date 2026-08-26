@@ -8,15 +8,13 @@
 </head>
 <body>
 <!-- EXPECT html-xss-001 -->
-<a href="javascript:alert(1)">Click</a>
+<a href="javascript:{{ user_var }}">Click</a>
 <!-- EXPECT html-xss-002 -->
-<form action="javascript:alert(1)"></form>
+<form action="javascript:${xss}"></form>
 <!-- EXPECT html-xss-019 -->
-<img src="javascript:alert(1)">
+<img src="javascript:{{ user_var }}">
 <!-- EXPECT html-xss-020 -->
 <a href="data:text/html,<script>alert(1)</script>">Data</a>
-<!-- EXPECT html-xss-004 -->
-<button onclick="eval(userInput)">Run</button>
 <!-- EXPECT html-xss-014 -->
 <button onclick="greet('${userName}')">Greet</button>
 <!-- EXPECT html-xss-008 -->
