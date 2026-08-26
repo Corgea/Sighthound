@@ -24,20 +24,12 @@
         // (e.g. an `onclick` handler whose value happens to contain `document.write(` or
         // `eval(` text), firing outside any actual `<script>` body.
         //
-        // PRECISION (2026-08): `html-xss-001`/`-002`/`-019` (javascript: URL sinks) and
-        // `-014` (template syntax in inline event handlers) were measured against 1,817
-        // deduped real-world HTML files and produced only false positives — the shape of
-        // a `javascript:` payload or an unbounded `.*` scan is not evidence of
-        // attacker-controlled data. All four now require a value-interpolation marker
-        // (`{{`, `${`, or `<%=`) inside the sink, bounded to the attribute's own quote
-        // character. `{%` is deliberately excluded: it is a Django/Jinja *control* tag
-        // (loops, conditionals, `{% url %}`), not value interpolation — Django's own
-        // admindocs bookmarklet template embeds `{% url %}` inside a `javascript:` href
-        // and is not exploitable. `html-xss-004` (any onclick/onerror/... handler
-        // containing `eval(`) was removed outright: it carries no taint signal at all —
-        // not even a template marker — so it is strictly less precise than the bounded
-        // `-014`, which now covers the same attributes with an actual interpolation
-        // check.
+        // PRECISION (2026-08): `html-xss-001`/`-002`/`-019` require `{{`, `${`, or
+        // `<%=` in their configured javascript: URL forms. `html-xss-014` requires only
+        // `${`, bounded to a quoted or valid unquoted inline-handler value. `{%` is
+        // excluded because it is a Django/Jinja control tag, not value interpolation.
+        // `html-xss-004` was removed because its eval-in-handler check had no taint
+        // signal; bounded `-014` covers the same eight handlers with interpolation.
         (
             id: Some("html-xss-001"),
             name: Some("JavaScript URL in href Attribute"),
@@ -190,21 +182,11 @@
             category: Some("xss"),
             mode: "search",
             patterns: Some([
-                // Bounded to the attribute's own quote character, per quote variant
-                // (no backreferences/lookaround in the `regex` crate). The prior
-                // unbounded `.*` scanned past the attribute value entirely — two
-                // real-corpus firings matched 108,788 and 36,212 characters, from a
-                // bundled JS event dispatcher to an unrelated `${` far downstream.
-                "regex:onclick\\s*=\\s*\"[^\"]*\\$\\{",
-                "regex:onclick\\s*=\\s*'[^']*\\$\\{",
-                "regex:onmouseover\\s*=\\s*\"[^\"]*\\$\\{",
-                "regex:onmouseover\\s*=\\s*'[^']*\\$\\{",
-                "regex:onerror\\s*=\\s*\"[^\"]*\\$\\{",
-                "regex:onerror\\s*=\\s*'[^']*\\$\\{",
-                "regex:onload\\s*=\\s*\"[^\"]*\\$\\{",
-                "regex:onload\\s*=\\s*'[^']*\\$\\{",
-                "regex:onchange\\s*=\\s*\"[^\"]*\\$\\{",
-                "regex:onchange\\s*=\\s*'[^']*\\$\\{",
+                // Attribute-node anchoring rejects names such as `data-onclick`;
+                // separate variants bound quoted and valid unquoted values.
+                "regex:(?i)^on(?:click|mouseover|load|error|change|focus|blur|submit)\\s*=\\s*\"[^\"]*\\$\\{",
+                "regex:(?i)^on(?:click|mouseover|load|error|change|focus|blur|submit)\\s*=\\s*'[^']*\\$\\{",
+                "regex:(?i)^on(?:click|mouseover|load|error|change|focus|blur|submit)\\s*=\\s*[^\\s\"'`=<>]*\\$\\{",
             ]),
             finding_type: Some("Cross-Site Scripting (XSS)"),
             severity: Some("High"),

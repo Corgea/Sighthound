@@ -27,5 +27,13 @@
 <script>eval(userInput);</script>
 <!-- EXPECT html-sec-001 -->
 <script>window.postMessage(payload, "*");</script>
+<!-- EXPECT html-xss-014: unquoted handler -->
+<button onclick=render(${userName})>Render</button>
+<!-- EXPECT html-xss-014: templated eval in onfocus -->
+<input onfocus="eval('${focusValue}')">
+<!-- EXPECT html-xss-014: templated eval in onblur -->
+<input onblur="eval('${blurValue}')">
+<!-- EXPECT html-xss-014: templated eval in onsubmit -->
+<form onsubmit="eval('${submission}')"></form>
 </body>
 </html>

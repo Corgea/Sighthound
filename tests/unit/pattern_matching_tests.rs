@@ -253,9 +253,7 @@ mod pattern_matching_tests {
 
         let ids: BTreeSet<&str> =
             rules.rules.iter().filter_map(|rule| rule.id.as_deref()).collect();
-        // html-xss-004 was removed: it had no taint signal (any onclick/... handler
-        // containing `eval(`), and once html-xss-014 was bounded to the attribute value
-        // it is the strictly more precise rule covering the same attributes.
+        // html-xss-004 was removed because an eval call alone carried no taint signal.
         let expected: BTreeSet<&str> = [
             "html-xss-001",
             "html-xss-002",

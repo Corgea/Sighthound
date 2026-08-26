@@ -14,22 +14,23 @@ const SAFE_FIXTURE: &str = "html_security_safe.html";
 /// (rule id — documentation only, `Finding` has no rule-id field; fixture line;
 /// `finding_type`; `description`; `snippet`).
 ///
-/// `description` is the discriminator: eight of the eleven share
+/// `description` is the discriminator: eight of the eleven rules share
 /// "Cross-Site Scripting (XSS)", and `tags` are identical across -001 / -002 / -019.
 /// **Do not simplify these assertions back to `finding_type`** — they would stop
 /// distinguishing eight of the eleven rules.
 ///
 /// `snippet` is the verbatim `get_node_text` of the node that matched, which is what
-/// pins "tightest node span wins" (assertion 4). Seven are attribute-level; the four
+/// pins "tightest node span wins" (assertion 4). Eleven are attribute-level; the four
 /// tag-level ones are not typos — see the comment on assertion 4.
 ///
-/// -001/-002/-019 payloads carry a `{{ }}` / `${ }` value-interpolation marker (not
-/// the bare `javascript:alert(1)` these used to hold): the rules now require one, since
-/// the un-bounded literal payload shape produced nothing but false positives against a
-/// real-world corpus (`javascript:void(0)`, `javascript:history.back()`, Django's own
-/// admindocs bookmarklet). `html-xss-004` is gone — dropped for carrying no taint
-/// signal once `-014` was bounded to the attribute value — so this fixture no longer
-/// carries an "EXPECT html-xss-004" case.
+/// -001/-002/-019 accept `{{`, `${`, or `<%=` value-interpolation markers (not the bare
+/// `javascript:alert(1)` these used to hold). The un-bounded literal payload shape
+/// produced nothing but false positives against a real-world corpus
+/// (`javascript:void(0)`, `javascript:history.back()`, Django's own admindocs
+/// bookmarklet). `html-xss-014` accepts `${` only across onclick, onmouseover, onerror,
+/// onload, onchange, onfocus, onblur, and onsubmit. `html-xss-004` is gone — dropped for
+/// carrying no taint signal — so this fixture no longer carries an
+/// "EXPECT html-xss-004" case.
 const EXPECTED: &[(&str, u64, &str, &str, &str)] = &[
     (
         "html-xss-011",
@@ -108,6 +109,34 @@ const EXPECTED: &[(&str, u64, &str, &str, &str)] = &[
         "Using wildcard (*) as targetOrigin in postMessage allows any site to receive the message",
         "<script>window.postMessage(payload, \"*\");</script>",
     ),
+    (
+        "html-xss-014",
+        31,
+        "Cross-Site Scripting (XSS)",
+        "Template expressions in event handlers can inject user-controlled data, leading to XSS",
+        "onclick=render(${userName})",
+    ),
+    (
+        "html-xss-014",
+        33,
+        "Cross-Site Scripting (XSS)",
+        "Template expressions in event handlers can inject user-controlled data, leading to XSS",
+        "onfocus=\"eval('${focusValue}')\"",
+    ),
+    (
+        "html-xss-014",
+        35,
+        "Cross-Site Scripting (XSS)",
+        "Template expressions in event handlers can inject user-controlled data, leading to XSS",
+        "onblur=\"eval('${blurValue}')\"",
+    ),
+    (
+        "html-xss-014",
+        37,
+        "Cross-Site Scripting (XSS)",
+        "Template expressions in event handlers can inject user-controlled data, leading to XSS",
+        "onsubmit=\"eval('${submission}')\"",
+    ),
 ];
 
 fn scan_staged_html_fixtures() -> Vec<Value> {
@@ -155,7 +184,8 @@ fn html_security_rules_fire_through_cli_auto_detection() {
     let positives = findings_for_file(&findings, POSITIVE_FIXTURE);
     let observed = line_description_pairs(&positives);
 
-    // 1. All eleven triples present at their marked lines.
+    // 1. All fifteen expected cases, covering all eleven rules, are present at their
+    //    marked lines.
     for (id, line, finding_type, description, _) in EXPECTED {
         assert!(
             positives.iter().any(|f| {
@@ -195,7 +225,7 @@ fn html_security_rules_fire_through_cli_auto_detection() {
     //    first-seen the enclosing `start_tag` wins and every attribute-level equality
     //    below breaks.
     //
-    //    Seven snippets are attribute-level and four are tag-level. That asymmetry is
+    //    Eleven snippets are attribute-level and four are tag-level. That asymmetry is
     //    the tightest span, not an oversight: html-xss-011 (line 7) matches across two
     //    attributes (`http-equiv` and the `javascript:` URL), and lines 25/27/29 match
     //    inside a `<script>` body — in neither case does any single `attribute` node's
