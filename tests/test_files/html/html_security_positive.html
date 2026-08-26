@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HTML security positives</title>
+<!-- EXPECT html-xss-011 -->
+<meta http-equiv="refresh" content="0;url=javascript:alert(1)">
+</head>
+<body>
+<!-- EXPECT html-xss-001 -->
+<a href="javascript:alert(1)">Click</a>
+<!-- EXPECT html-xss-002 -->
+<form action="javascript:alert(1)"></form>
+<!-- EXPECT html-xss-019 -->
+<img src="javascript:alert(1)">
+<!-- EXPECT html-xss-020 -->
+<a href="data:text/html,<script>alert(1)</script>">Data</a>
+<!-- EXPECT html-xss-004 -->
+<button onclick="eval(userInput)">Run</button>
+<!-- EXPECT html-xss-014 -->
+<button onclick="greet('${userName}')">Greet</button>
+<!-- EXPECT html-xss-008 -->
+<iframe srcdoc="${userContent}"></iframe>
+<!-- EXPECT html-xss-010 -->
+<div style="width:expression(alert(1))">Legacy</div>
+<!-- EXPECT html-xss-012 -->
+<script>document.write(userInput);</script>
+<!-- EXPECT html-xss-013 -->
+<script>eval(userInput);</script>
+<!-- EXPECT html-sec-001 -->
+<script>window.postMessage(payload, "*");</script>
+</body>
+</html>

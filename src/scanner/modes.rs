@@ -528,7 +528,7 @@ pub fn run_taint_analysis_with_verbosity(
     verbose_mode: bool,
 ) -> Result<Vec<Finding>> {
     // When taint runs as the second pass of a combined scan (verbose_mode = false),
-    // stay completely silent so we don't duplicate the banner, progress bar, or tallies.
+    // suppress the banner, progress bar, and tallies so we don't duplicate the first pass.
     let report = show_progress && verbose_mode;
     let scan_start = std::time::Instant::now();
 
@@ -541,20 +541,20 @@ pub fn run_taint_analysis_with_verbosity(
     // Check if we have taint flow rules
     let taint_rules_count = rules.rules.iter().filter(|r| r.is_taint_rule()).count();
 
+    // Some rule packs ship search-mode rules only (e.g. html, objectscript, sql). Skip the taint
+    // pass instead of failing the scan and discarding the search-pass findings.
     if taint_rules_count == 0 {
-        // Combined default mode (simple + taint) visits this as a silent second
-        // pass. HTML/Django packs are search-only; aborting here discarded the
-        // search findings and made `sighthound file.html` exit non-zero.
-        // `--taint-analysis` (verbose_mode) still errors so the exclusive flag
-        // stays honest.
-        if verbose_mode {
-            return Err(anyhow::anyhow!(
-                "No taint flow rules found. Please ensure your rules contain rules with mode='taint'."
+        // Combined default mode visits this as a second pass. Search-only packs
+        // must skip taint instead of aborting. `--taint-analysis` degrades the same way.
+        if show_progress {
+            crate::ui::warn(&format!(
+                "no taint-mode rules for {} - skipping taint analysis",
+                context.detected_languages.join(", ")
             ));
         }
         return Ok(Vec::new());
     }
-    if show_progress && verbose_mode {
+    if report {
         print_taint_analysis_intro(root_dir, taint_rules_count, context.total_files);
     }
     // Use the unified VulnerabilityScanner infrastructure for massive speedup!
@@ -598,7 +598,7 @@ pub fn run_taint_analysis_with_verbosity(
 
     let scan_duration = scan_start.elapsed();
 
-    if show_progress && verbose_mode {
+    if report {
         print_taint_analysis_summary(&context, taint_rules_count, scan_duration, &taint_findings);
     }
 

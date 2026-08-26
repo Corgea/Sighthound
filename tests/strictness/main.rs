@@ -11,6 +11,7 @@ mod cross_file_taint;
 mod cwe95_xss_sink_precision;
 mod django_security;
 mod false_positive_regressions;
+mod html_security;
 mod language_coverage;
 mod sanitizer_and_scope;
 mod search_conditions;

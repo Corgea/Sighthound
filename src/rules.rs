@@ -27,6 +27,7 @@ static RULES_RUBY: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/ruby");
 static RULES_HTML: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/html");
 static RULES_PHP: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/php");
 static RULES_OBJECTSCRIPT: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/objectscript");
+static RULES_SQL: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/sql");
 
 // Structure for centralized exclusion patterns
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -157,6 +158,7 @@ impl Rules {
             "objectscript" => {
                 all_rules.extend(Self::parse_embedded_dir(&RULES_OBJECTSCRIPT, "ObjectScript")?)
             }
+            "sql" => all_rules.extend(Self::parse_embedded_dir(&RULES_SQL, "SQL")?),
             _ => {
                 return Err(anyhow::anyhow!(
                     "No embedded rules available for language: {}",
@@ -408,6 +410,47 @@ pub fn rule_matches_pattern_unified(rule: &UnifiedRule, text: &str) -> bool {
     }
 
     false
+}
+
+/// Byte range of the first match of `pattern` inside `text`, when the pattern form can
+/// express one.
+///
+/// Mirrors `CommonUtils::matches_unified_pattern` (src/common.rs) branch for branch, in
+/// its exact order. If match and range dispatch disagree, a finding lands on the wrong
+/// line.
+fn pattern_match_range(pattern: &str, text: &str) -> Option<std::ops::Range<usize>> {
+    if pattern == text {
+        return Some(0..text.len());
+    }
+    if let Some(stripped) = pattern.strip_prefix("regex:") {
+        return Regex::new(stripped).ok()?.find(text).map(|m| m.range());
+    }
+    if pattern.contains("\\\\") || pattern.contains("\\.") {
+        return Regex::new(pattern).ok()?.find(text).map(|m| m.range());
+    }
+    if pattern.contains('\\') || pattern.contains('*') {
+        // Escaped and glob forms are not range-resolvable; the caller falls back to
+        // today's line attribution when no pattern resolves.
+        return None;
+    }
+    text.find(pattern).map(|start| start..start + pattern.len())
+}
+
+/// Byte range of the first of the rule's patterns that resolves one against `text`.
+///
+/// Because `find_map` skips `None`, a `None` from the escaped/glob branch is
+/// indistinguishable from "this pattern did not match" — iteration simply continues.
+/// The caller therefore falls back to heuristic line attribution only when *every*
+/// pattern returns `None`.
+pub(crate) fn first_positive_match_range(
+    rule: &UnifiedRule,
+    text: &str,
+) -> Option<std::ops::Range<usize>> {
+    // Same pattern order as rule_matches_pattern_unified: `pattern` then `patterns`,
+    // returning the first pattern that resolves a range.
+    rule.pattern.as_deref().and_then(|pattern| pattern_match_range(pattern, text)).or_else(|| {
+        rule.patterns.as_ref()?.iter().find_map(|pattern| pattern_match_range(pattern, text))
+    })
 }
 
 pub fn validate_unified_rule_patterns(rule: &UnifiedRule) -> Result<(), String> {
