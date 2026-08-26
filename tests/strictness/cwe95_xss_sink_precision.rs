@@ -42,15 +42,15 @@ fn innerhtml_helpers_are_not_cwe95_but_eval_is() {
     assert_findings_in_range(&cwe95, 19, 19, 1, "setInterval(string concat) is CWE-95");
     assert_findings_in_range(&cwe95, 23, 23, 1, "eval(location.hash) is CWE-95");
     assert_findings_in_range(&cwe95, 27, 27, 1, "vm.runInNewContext(userInput) is CWE-95");
-    assert_findings_in_range(&cwe95, 98, 98, 1, "Function('return '+userInput) is CWE-95");
-    assert_no_findings_in_range(&cwe95, 30, 94, "DOM/HTMX/callback helpers are not CWE-95");
+    assert_findings_in_range(&cwe95, 103, 103, 1, "Function('return '+userInput) is CWE-95");
+    assert_no_findings_in_range(&cwe95, 30, 98, "DOM/HTMX/callback helpers are not CWE-95");
 
     let xss: Vec<_> = findings.iter().filter(|f| is_xss(f)).cloned().collect();
     assert_findings_in_range(&xss, 32, 32, 1, "innerHTML = location.hash must remain XSS");
     assert_no_findings_in_range(
         &xss,
         36,
-        94,
+        98,
         "escapeHtml/DOMPurify/template/htmx helpers are not XSS",
     );
     assert!(
@@ -149,6 +149,11 @@ fn django_autoescape_and_htmx_are_not_xss_but_safe_filter_is() {
         "spaced | mark_safe on request.COOKIES must be XSS, got: {:?}",
         xss.iter().map(|f| (f.line, f.snippet.as_str())).collect::<Vec<_>>()
     );
+    assert!(
+        xss.iter().any(|f| f.snippet.contains("value=") && f.snippet.contains("|safe")),
+        "|safe on request.GET in an attribute must be XSS, got: {:?}",
+        xss.iter().map(|f| (f.line, f.snippet.as_str())).collect::<Vec<_>>()
+    );
     assert_no_findings_in_range(&xss, 4, 10, "autoescape, json_script, hx-swap are not XSS");
     assert!(
         findings.iter().all(|f| !is_cwe95(f)),
@@ -164,7 +169,7 @@ fn django_autoescape_and_htmx_are_not_xss_but_safe_filter_is() {
 #[cfg(feature = "html")]
 fn html_language_still_flags_django_safe_filter() {
     // CLI auto-detect maps `.html` → `html`, not `django`. Search rules must
-    // still see `|safe` on text nodes.
+    // still see `|safe` on text nodes and attribute values.
     let staging = stage_dir();
     stage_file(
         staging.path(),
@@ -188,5 +193,44 @@ fn html_language_still_flags_django_safe_filter() {
             .map(|f| (f.line, f.finding_type.as_str(), f.snippet.as_str()))
             .collect::<Vec<_>>()
     );
+    assert!(
+        xss.iter().any(|f| f.snippet.contains("value=") && f.snippet.contains("|safe")),
+        "|safe in an attribute must be XSS when scanned as html, got: {:?}",
+        xss.iter().map(|f| (f.line, f.snippet.as_str())).collect::<Vec<_>>()
+    );
     assert_no_findings_in_range(&xss, 4, 10, "autoescape, json_script, hx-swap are not XSS");
+}
+
+#[test]
+#[cfg(feature = "javascript")]
+fn request_body_to_ejs_render_is_cwe94_not_cwe95() {
+    let staging = stage_dir();
+    write_staged_file(
+        staging.path(),
+        "render.js",
+        "function render(req) {\n    const template = req.body.template;\n    ejs.render(template);\n}\n",
+    );
+    let findings = scan_language_unified_with_rules(
+        staging.path(),
+        "javascript",
+        Rules::load_from_directory("rules/backend_javascript/").expect("load backend js rules"),
+    );
+    assert!(
+        findings
+            .iter()
+            .any(|f| f.cwe_id.as_deref() == Some("cwe-94") && f.snippet.contains("ejs.render")),
+        "ejs.render(req.body) must be CWE-94 SSTI, got: {:?}",
+        findings
+            .iter()
+            .map(|f| (f.line, f.cwe_id.as_deref(), f.snippet.as_str()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        findings.iter().all(|f| f.cwe_id.as_deref() != Some("cwe-95")),
+        "SSTI must not be labeled CWE-95, got: {:?}",
+        findings
+            .iter()
+            .map(|f| (f.line, f.cwe_id.as_deref(), f.snippet.as_str()))
+            .collect::<Vec<_>>()
+    );
 }

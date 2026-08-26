@@ -152,13 +152,15 @@
             name: Some("Code injection via setTimeout/setInterval string"),
             category: Some("code-injection"),
             mode: "search",
-            // Gate `=` forces full-call matching. String first arg only —
-            // `setTimeout(handler, n)` is a function reference, not eval.
-            // Taint still flags `setTimeout(userInput)` when the arg is tainted.
+            // Gate `=` forces full-call matching. First arg must be a concatenated
+            // or interpolated string, not a constant (`setTimeout('tick')`) or
+            // identifier callback (`setTimeout(handler, n)`). Identifiers stay with taint.
             patterns: Some([
                 "settimeout-eval-sink=",
-                "regex:setTimeout\\(\\s*['\"]",
-                "regex:setInterval\\(\\s*['\"]"
+                "regex:setTimeout\\(\\s*['\"][^'\"]*['\"]\\s*\\+",
+                "regex:setTimeout\\(\\s*`[^`]*\\$\\{",
+                "regex:setInterval\\(\\s*['\"][^'\"]*['\"]\\s*\\+",
+                "regex:setInterval\\(\\s*`[^`]*\\$\\{"
             ]),
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),

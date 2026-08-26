@@ -12,5 +12,7 @@
     <div>{{ request.GET.q|safe }}</div>
     <!-- TP: spaced mark_safe on cookies -->
     <div>{{ request.COOKIES.sid| mark_safe }}</div>
+    <!-- TP: |safe on request data in an attribute value -->
+    <input value="{{ request.GET.q|safe }}">
 </body>
 </html>

@@ -593,12 +593,18 @@ impl LanguageSupport for HTMLLanguage {
         // resolve as the matchable "function" name for search rules.
         match node.kind() {
             "text" => django_template_name_from_text(get_node_text_slice(node, source)),
-            "attribute" => node
-                .child_by_field_name("name")
-                .or_else(|| {
-                    crate::common::CommonUtils::find_child(node, |c| c.kind() == "attribute_name")
+            "attribute" => {
+                let attr_text = get_node_text_slice(node, source);
+                django_template_name_from_text(attr_text).or_else(|| {
+                    node.child_by_field_name("name")
+                        .or_else(|| {
+                            crate::common::CommonUtils::find_child(node, |c| {
+                                c.kind() == "attribute_name"
+                            })
+                        })
+                        .map(|child| get_node_text_slice(&child, source))
                 })
-                .map(|child| get_node_text_slice(&child, source)),
+            }
             "start_tag" | "element" => node
                 .child_by_field_name("name")
                 .or_else(|| {
@@ -663,7 +669,11 @@ impl LanguageSupport for DjangoTemplateLanguage {
         match node.kind() {
             "text" => django_template_name_from_text(get_node_text_slice(node, source)),
             "attribute" => {
-                node.child_by_field_name("name").map(|child| get_node_text_slice(&child, source))
+                let attr_text = get_node_text_slice(node, source);
+                django_template_name_from_text(attr_text).or_else(|| {
+                    node.child_by_field_name("name")
+                        .map(|child| get_node_text_slice(&child, source))
+                })
             }
             "script_element" => Some("script"),
             _ => None,

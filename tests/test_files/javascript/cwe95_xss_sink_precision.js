@@ -93,6 +93,11 @@ function timeoutHandler(handler) {
     setTimeout(handler, 1000);
 }
 
+// TN CWE-95: constant timer string is not attacker-controlled
+function timeoutConst() {
+    setTimeout('refreshUI', 100);
+}
+
 // TP CWE-95: bare Function() concatenation (no `new`)
 function functionConcat(userInput) {
     Function('return ' + userInput);
