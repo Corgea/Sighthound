@@ -1,6 +1,8 @@
 #![allow(clippy::too_many_arguments, clippy::large_enum_variant, clippy::needless_range_loop)]
 
 use crate::common::CommonUtils;
+use crate::language::SearchSemantics;
+use crate::scanner::ast_provenance;
 use crate::scanner::flow_tracker::{TaintVariableInfo, VariableFlowTracker};
 use crate::scanner::scan_context::{EnhancedSearchContext, SinkSite, TaintScanContext};
 use crate::scanner::taint_utils::{TaintExpressionUtils, TaintRuleDeduplicator};
@@ -16,12 +18,13 @@ impl ScanningLogic {
         func_name: &str,
         language_support: &dyn crate::language::LanguageSupport,
     ) -> Option<crate::models::Finding> {
-        let pattern_matches = if Self::rule_needs_full_context(rule) {
-            let node_text = crate::parser::get_node_text(node, source);
-            crate::rules::rule_matches_pattern_unified(rule, &node_text)
-        } else {
-            crate::rules::rule_matches_pattern_unified(rule, func_name)
-        };
+        let markup = language_support.search_semantics() == SearchSemantics::Markup;
+        let mut node_text = (markup || Self::rule_needs_full_context(rule))
+            .then(|| crate::parser::get_node_text(node, source));
+        let pattern_matches = crate::rules::rule_matches_pattern_unified(
+            rule,
+            node_text.as_deref().unwrap_or(func_name),
+        );
 
         if !pattern_matches {
             return None;
@@ -43,8 +46,10 @@ impl ScanningLogic {
         }
 
         if language_support.name() == "javascript" || language_support.name() == "typescript" {
-            let node_text = crate::parser::get_node_text(node, source);
-            if !Self::should_apply_rule_with_sanitization(rule, &node_text) {
+            let node_text = node_text
+                .get_or_insert_with(|| crate::parser::get_node_text(node, source))
+                .as_str();
+            if !Self::should_apply_rule_with_sanitization(rule, node_text) {
                 return None;
             }
         }
@@ -67,6 +72,23 @@ impl ScanningLogic {
 
         Self::add_finding_metadata(&mut finding, rule, node);
 
+        // Markup line attribution. `find_vulnerable_line_in_node` cannot resolve a
+        // `regex:` pattern (it searches for the pattern literally), so for markup we
+        // recompute the line from the first pattern that resolves a byte range.
+        //
+        // This must stay *inside* `check_rule_against_node`, before `scan_file_with_rules`
+        // derives the dedup key from the returned finding — reversing that order silently
+        // breaks dedup. Only `line` is corrected; `column`, `end_line` and `end_column`
+        // stay node-derived on purpose.
+        if markup {
+            let node_text = node_text.as_deref().expect("markup matching initializes node text");
+            if let Some(range) = crate::rules::first_positive_match_range(rule, node_text) {
+                finding.line = node.start_position().row
+                    + 1
+                    + node_text[..range.start].bytes().filter(|b| *b == b'\n').count();
+            }
+        }
+
         if let Some(source_info) = Self::detect_source_pattern(node, source, language_support) {
             finding.source_info = Some(source_info);
         }
@@ -75,6 +97,10 @@ impl ScanningLogic {
             Self::detect_sink_pattern(node, source, func_name, rule.get_finding_type())
         {
             finding.sink_info = Some(sink_info);
+        }
+
+        if language_support.name() == "sql" {
+            Self::clamp_sql_finding_to_matched_line(&mut finding, source);
         }
 
         Some(finding)
@@ -134,18 +160,30 @@ impl ScanningLogic {
         rules: &[&crate::rules::UnifiedRule],
         language_support: &dyn crate::language::LanguageSupport,
     ) -> Vec<crate::models::Finding> {
-        let mut findings = Vec::new();
+        let mut findings: Vec<crate::models::Finding> = Vec::new();
         let mut processed_lines = std::collections::HashSet::new();
+        let markup = language_support.search_semantics() == SearchSemantics::Markup;
+        // Markup only: key -> index into `findings`, so a collision replaces the right
+        // finding. A `findings.iter_mut().find(..)` over the key would match the first
+        // finding on that line regardless of which rule produced it, and clobber an
+        // unrelated finding when two rules hit one line.
+        let mut markup_index: std::collections::HashMap<(usize, &str), usize> =
+            std::collections::HashMap::new();
 
         let call_nodes: Vec<tree_sitter::Node> =
             crate::parser::traverse_calls_only(tree.root_node(), language_support).collect();
 
         for node in call_nodes.iter() {
             if let Some(func_name) = language_support.get_function_name(node, source) {
+                // Computed once per node, not once per rule.
+                let markup_text = markup.then(|| crate::parser::get_node_text(node, source));
                 let relevant_rules: Vec<(usize, &crate::rules::UnifiedRule)> = rules
                     .iter()
                     .enumerate()
-                    .filter(|(_, rule)| Self::rule_might_match_function(rule, func_name))
+                    .filter(|(_, rule)| match &markup_text {
+                        Some(text) => crate::rules::rule_matches_pattern_unified(rule, text),
+                        None => Self::rule_might_match_function(rule, func_name),
+                    })
                     .map(|(idx, rule)| (idx, *rule))
                     .collect();
 
@@ -158,11 +196,42 @@ impl ScanningLogic {
                         func_name,
                         language_support,
                     ) {
-                        let line_key =
-                            (finding.line, finding.function.clone(), finding.finding_type.clone());
-                        if !processed_lines.contains(&line_key) {
-                            processed_lines.insert(line_key);
-                            findings.push(finding);
+                        if markup {
+                            // Markup needs rule identity: ancestor and descendant findings carry
+                            // different `function` values ("a" for the start tag, "href" for the
+                            // attribute) and would not collapse under the AST key. `id` is Option
+                            // on UnifiedRule, so fall back name -> finding_type.
+                            let rule_key = rule
+                                .id
+                                .as_deref()
+                                .or(rule.name.as_deref())
+                                .unwrap_or_else(|| rule.get_finding_type());
+                            let line_key = (finding.line, rule_key);
+                            match markup_index.get(&line_key) {
+                                Some(&idx) => {
+                                    // Tightest node span wins: the snippet is
+                                    // get_node_text of the matching node, so a shorter
+                                    // snippet is a smaller byte span. Strict `<` keeps
+                                    // the first-seen (outermost) finding on a tie.
+                                    if finding.snippet.len() < findings[idx].snippet.len() {
+                                        findings[idx] = finding;
+                                    }
+                                }
+                                None => {
+                                    markup_index.insert(line_key, findings.len());
+                                    findings.push(finding);
+                                }
+                            }
+                        } else {
+                            let line_key = (
+                                finding.line,
+                                finding.function.clone(),
+                                finding.finding_type.clone(),
+                            );
+                            if !processed_lines.contains(&line_key) {
+                                processed_lines.insert(line_key);
+                                findings.push(finding);
+                            }
                         }
                     }
                 }
@@ -628,6 +697,24 @@ impl ScanningLogic {
         }
     }
 
+    /// SQL is matched as one whole-file node (`call_node_types() == ["program"]`), so the raw
+    /// finding carries the entire file as `snippet`/`function` and the file end as `end_line`.
+    /// Clamp the emitted finding to the matched line so consumers don't store the whole file
+    /// per finding; detection stays whole-file.
+    fn clamp_sql_finding_to_matched_line(finding: &mut crate::models::Finding, source: &[u8]) {
+        let text = String::from_utf8_lossy(source);
+        let Some(line_text) = text.lines().nth(finding.line.saturating_sub(1)) else {
+            return;
+        };
+        finding.snippet = line_text.to_string();
+        finding.function = line_text.to_string();
+        finding.end_line = finding.line;
+        finding.end_column = line_text.chars().count() + 1;
+        if let Some(sink_info) = &mut finding.sink_info {
+            sink_info.function_name = line_text.to_string();
+        }
+    }
+
     pub fn create_finding_with_rule(
         file: &str,
         node: &tree_sitter::Node,
@@ -970,8 +1057,126 @@ impl ScanningLogic {
         let func_name = crate::scanner::utils::AstUtils::get_function_context(node, ctx.source);
 
         Self::track_function_parameter_sources(node, ctx, line, &func_name, flow_tracker);
-        Self::track_assignment_source(&node_text, line, &func_name, ctx, flow_tracker);
+        if ast_provenance::is_python_source(ctx.filepath) {
+            Self::track_python_assignment_source(
+                node,
+                &node_text,
+                line,
+                &func_name,
+                ctx,
+                flow_tracker,
+            );
+        } else {
+            Self::track_assignment_source(&node_text, line, &func_name, ctx, flow_tracker);
+        }
         Self::propagate_taint_for_node(&node_text, &func_name, ctx, flow_tracker);
+    }
+
+    /// Python phase-1 assignment tracking: record assignment-borne taint only
+    /// from real assignment AST nodes, extracted structurally. Text that only
+    /// looks like an assignment (docstrings, string literals) records nothing,
+    /// while annotated, augmented, chained, tuple, multiline, and
+    /// subscript-target assignments — which the text scan cannot parse — plus
+    /// collection-mutating method calls (`x.append(source)`) are all covered.
+    /// Assignment nodes whose target shape yields no structural facts (e.g.
+    /// attribute targets like `self.cmd = ...`) fall back to the text tracker
+    /// so its coverage is never lost.
+    fn track_python_assignment_source(
+        node: &tree_sitter::Node,
+        node_text: &str,
+        line: usize,
+        func_name: &str,
+        ctx: &TaintScanContext,
+        flow_tracker: &mut VariableFlowTracker,
+    ) {
+        // Mutating a collection with tainted data taints the collection:
+        // `parts.append(input())` taints `parts`. Handled here because a method
+        // call is not an assignment node.
+        if node.kind() == "call" {
+            if let Some((base, args)) =
+                ast_provenance::collection_mutation_target(*node, ctx.source)
+            {
+                Self::record_python_taint_if_source(
+                    &base,
+                    &args,
+                    line,
+                    func_name,
+                    node_text,
+                    ctx,
+                    flow_tracker,
+                );
+            }
+            return;
+        }
+
+        let facts = match node.kind() {
+            "assignment" | "augmented_assignment" => {
+                ast_provenance::assignment_facts_for_node(*node, ctx.source)
+            }
+            // Augmented assignments are not collected as standalone nodes, so
+            // pull them out of their statement wrapper here.
+            "expression_statement" => {
+                ast_provenance::augmented_facts_in_statement(*node, ctx.source)
+            }
+            _ => return,
+        };
+
+        // A real assignment node whose target shape the AST extraction does not
+        // model (e.g. an attribute target: `self.cmd = input()`) must keep the
+        // text tracker's coverage — dropping it silently would lose taint the
+        // text scan used to record. Guarded to assignment nodes so plain
+        // expression statements (docstrings, string literals) still record
+        // nothing.
+        if facts.is_empty() && matches!(node.kind(), "assignment" | "augmented_assignment") {
+            Self::track_assignment_source(node_text, line, func_name, ctx, flow_tracker);
+            return;
+        }
+
+        for fact in facts {
+            Self::record_python_taint_if_source(
+                &fact.target,
+                &fact.rhs,
+                line,
+                func_name,
+                node_text,
+                ctx,
+                flow_tracker,
+            );
+        }
+    }
+
+    /// Record `target` as tainted when `rhs` matches a source pattern and is not
+    /// sanitized. Shared by the assignment and collection-mutation paths.
+    fn record_python_taint_if_source(
+        target: &str,
+        rhs: &str,
+        line: usize,
+        func_name: &str,
+        node_text: &str,
+        ctx: &TaintScanContext,
+        flow_tracker: &mut VariableFlowTracker,
+    ) {
+        let Some(source_pattern) = ctx.rule_deduplicator.matches_source_pattern(rhs) else {
+            return;
+        };
+        if TaintExpressionUtils::expression_has_any_sanitizer(ctx.applicable_rules, rhs) {
+            return;
+        }
+        log::debug!(
+            "[ASSIGNMENT_ANALYSIS] AST source '{}' matches pattern '{}' -> taint '{}'",
+            rhs,
+            source_pattern,
+            target
+        );
+        flow_tracker.record_tainted_variable(
+            target.to_string(),
+            TaintVariableInfo {
+                source_line: line,
+                source_pattern,
+                source_function: func_name.to_string(),
+                assignment_code: node_text.to_string(),
+            },
+        );
     }
 
     /// Extract the variables referenced in a sink expression: PHP-specific `$var` extraction
@@ -2044,6 +2249,10 @@ impl ScanningLogic {
             line,
             taint_context_info,
         );
+
+        if language_support.name() == "sql" {
+            Self::clamp_sql_finding_to_matched_line(&mut finding, source);
+        }
 
         Some(finding)
     }

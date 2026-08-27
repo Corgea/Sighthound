@@ -39,8 +39,34 @@ Tree-sitter based static vulnerability scanner with pattern matching and taint-f
 | ObjectScript | `.cls`, `.mac`, `.inc`, `.int`, `.rtn` | Yes (class and routine grammars) | Yes |
 | HTML | `.html`, `.htm`, `.twig`, `.ejs`, `.hbs`, ... | Yes | Yes |
 | Django templates | `.html` (Django syntax) | Yes | Yes (HTML rules) |
+| SQL | `.sql`, `.ddl`, `.dml` | No — textual matching | Yes (`.sql` files only) |
 
 Not currently supported: Razor (`.cshtml`), C/C++ (`.c`, `.h`).
+
+**SQL limitations.** SQL is matched textually, not parsed. Sighthound compiles no SQL grammar
+and performs no dataflow or taint analysis on SQL, so rules match against the whole file
+rather than against parsed statements.
+
+- Patterns without a wildcard match as substrings **anywhere** in the file.
+- Patterns containing `*` are globs evaluated against the whole file, so they are **anchored
+  at the first byte**: `EXEC(@sql);` on line 1 is reported, the same statement on line 2 is not.
+- Findings report the matched line as both their start and end line.
+- The bundled rules are tautology- and payload-oriented. Dynamic SQL inside a stored-procedure
+  body, `CREATE USER … IDENTIFIED BY '…'`, and `GRANT ALL … TO PUBLIC` are **not** detected.
+- Dialect-specific syntax (T-SQL, PL/SQL, PL/pgSQL) is not understood.
+- `.ddl` and `.dml` files are recognized and scanned, but every bundled rule is scoped to
+  `.sql`, so the bundled pack reports nothing for them. Use `--rules-dir` with rules whose
+  `file_types` include those extensions.
+- The bundled SQL pack is pattern-only and ships no `mode: "taint"` rules. Default combined mode
+  keeps the search findings, while explicit `--taint-analysis` succeeds with no findings. Text
+  output warns that taint analysis was skipped. The `.html` and ObjectScript packs behave the
+  same way.
+- Files under `tests/`, `test/`, `vendor/`, `build/`, `dist/` and `target/` are skipped
+  before language detection (whole-path-component match); `--include-test-fixtures` reopens
+  `tests/` and `test/` only.
+
+Expect both false positives (a benign `||` concatenation is reported, at `Low` severity) and
+false negatives (dynamic SQL that is not the first thing in the file is missed).
 
 ## Installation
 
