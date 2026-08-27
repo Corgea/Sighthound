@@ -262,6 +262,9 @@ pub fn detect_language_from_path(file_path: &Path) -> Option<&'static str> {
         // InterSystems ObjectScript class and routine sources
         "cls" | "mac" | "inc" | "int" | "rtn" => Some("objectscript"),
 
+        // SQL, DDL and DML scripts (text-matched, no SQL grammar)
+        "sql" | "ddl" | "dml" => Some("sql"),
+
         // JavaScript extensions (including modern variants)
         "js" | "mjs" | "cjs" | "jsx" => Some("javascript"),
 

@@ -1,6 +1,3 @@
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-
 use crate::common::CommonUtils;
 
 #[derive(Debug, Clone)]
@@ -11,33 +8,19 @@ pub(crate) struct TaintRuleDeduplicator {
     source_patterns: std::collections::BTreeSet<String>,
     /// Consolidated sink patterns across all rules
     pub(crate) sink_patterns: std::collections::BTreeSet<String>,
-    /// Precalculated u64 hash fingerprint identifying this deduplicator rule set
-    fingerprint: u64,
 }
 
 impl TaintRuleDeduplicator {
     /// Create a new deduplicator from a list of taint rules
     pub(crate) fn new(taint_rules: &[&crate::rules::UnifiedRule]) -> Self {
-        let mut hasher = DefaultHasher::new();
-
         let mut deduplicator = Self {
             rule_mapping: std::collections::BTreeMap::new(),
             source_patterns: std::collections::BTreeSet::new(),
             sink_patterns: std::collections::BTreeSet::new(),
-            fingerprint: 0,
         };
 
         // Process each rule and create specific source-sink mappings
         for rule in taint_rules {
-            rule.id.hash(&mut hasher);
-            rule.mode.hash(&mut hasher);
-            if let Some(sources) = &rule.sources {
-                sources.hash(&mut hasher);
-            }
-            if let Some(sinks) = &rule.sinks {
-                sinks.hash(&mut hasher);
-            }
-
             if let (Some(sources), Some(sinks)) = (&rule.sources, &rule.sinks) {
                 // Add all patterns to consolidated sets
                 for source in sources {
@@ -57,13 +40,7 @@ impl TaintRuleDeduplicator {
             }
         }
 
-        deduplicator.fingerprint = hasher.finish();
         deduplicator
-    }
-
-    /// Return the precomputed rule set fingerprint
-    pub(crate) fn fingerprint(&self) -> u64 {
-        self.fingerprint
     }
 
     /// Get the specific rule for a source-sink combination

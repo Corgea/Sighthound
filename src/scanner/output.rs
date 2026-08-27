@@ -676,7 +676,6 @@ mod sarif_tests {
         assert_eq!(sarif_uri("/repo/src/app.py", Some(repository_root)), "src/app.py");
         assert_eq!(sarif_uri("backend/src/app.py", Some(repository_root)), "backend/src/app.py");
     }
-
     #[test]
     fn escapes_csv_field_delimiters_quotes_and_newlines() {
         assert_eq!(csv_field("plain"), "plain");
