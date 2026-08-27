@@ -321,18 +321,34 @@ impl MultiFileTaintAnalyzer {
             // If language_filter is specified, use that language exclusively
             if let Some(files) = files_by_language.get(filter_lang) {
                 for file_path in files {
-                    self.analyze_file_for_imports_exports(
+                    if let Err(e) = self.analyze_file_for_imports_exports(
                         file_path,
                         filter_lang,
                         &rule_deduplicator,
-                    )?;
+                    ) {
+                        log::warn!(
+                            "Failed to analyze imports/exports for file '{}': {}",
+                            file_path.display(),
+                            e
+                        );
+                    }
                 }
             }
         } else {
             // Process files for all available languages
             for (language, files) in files_by_language {
                 for file_path in files {
-                    self.analyze_file_for_imports_exports(file_path, language, &rule_deduplicator)?;
+                    if let Err(e) = self.analyze_file_for_imports_exports(
+                        file_path,
+                        language,
+                        &rule_deduplicator,
+                    ) {
+                        log::warn!(
+                            "Failed to analyze imports/exports for file '{}': {}",
+                            file_path.display(),
+                            e
+                        );
+                    }
                 }
             }
         }

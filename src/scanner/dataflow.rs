@@ -1184,19 +1184,31 @@ impl DataFlowTracer {
         found
     }
 
-    /// Check if a file contains a function definition
+    /// Helper to check if a source line declares a callable function definition
+    fn is_function_definition_line(line: &str, function_name: &str) -> bool {
+        let trimmed = line.trim();
+        trimmed.starts_with(&format!("def {}(", function_name))
+            || trimmed.starts_with(&format!("async def {}(", function_name))
+            || trimmed.starts_with(&format!("def {} ", function_name))
+            || trimmed.starts_with(&format!("function {}(", function_name))
+            || trimmed.starts_with(&format!("async function {}(", function_name))
+            || trimmed.starts_with(&format!("const {} = (", function_name))
+            || trimmed.starts_with(&format!("const {} = async (", function_name))
+            || trimmed.starts_with(&format!("let {} = (", function_name))
+            || trimmed.starts_with(&format!("let {} = async (", function_name))
+            || trimmed.starts_with(&format!("var {} = (", function_name))
+            || trimmed.starts_with(&format!("var {} = async (", function_name))
+            || trimmed.starts_with(&format!("fn {}(", function_name))
+            || trimmed.starts_with(&format!("pub fn {}(", function_name))
+            || trimmed.starts_with(&format!("pub(crate) fn {}(", function_name))
+            || trimmed.starts_with(&format!("async fn {}(", function_name))
+            || trimmed.starts_with(&format!("func {}(", function_name))
+    }
+
+    /// Check if a file contains a callable function definition
     fn file_contains_function(&self, file_path: &str, function_name: &str) -> bool {
         if let Ok(content) = std::fs::read_to_string(file_path) {
-            let py_pattern = format!("def {}(", function_name);
-            let js_pattern1 = format!("function {}(", function_name);
-            let js_pattern2 = format!("const {} =", function_name);
-            let js_pattern3 = format!("let {} =", function_name);
-            let fn_pattern = format!("fn {}(", function_name);
-            content.contains(&py_pattern)
-                || content.contains(&js_pattern1)
-                || content.contains(&js_pattern2)
-                || content.contains(&js_pattern3)
-                || content.contains(&fn_pattern)
+            content.lines().any(|line| Self::is_function_definition_line(line, function_name))
         } else {
             false
         }
@@ -1543,7 +1555,7 @@ impl DataFlowTracer {
         log::debug!("[EXTRACT_FUNCTION_BODY] Looking for function: {}", function_name);
 
         for (line_num, line) in lines.iter().enumerate() {
-            if line.trim().starts_with(&format!("def {}(", function_name)) {
+            if Self::is_function_definition_line(line, function_name) {
                 log::debug!(
                     "[EXTRACT_FUNCTION_BODY] Found function definition at line {}: {}",
                     line_num + 1,
