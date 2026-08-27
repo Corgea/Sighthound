@@ -8,13 +8,15 @@ use crate::scanner::flow_tracker::{
 };
 use crate::scanner::taint_utils::{TaintExpressionUtils, TaintRuleDeduplicator};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct DataFlowTracer {
-    /// Cache of analyzed variable sources to avoid re-computation. Keyed by
-    /// (file, function, variable, sink line): provenance is sink-relative,
-    /// since only assignments that can reach the sink line count.
+    /// Cache of analyzed variable sources to avoid re-computation (keyed by file, function, variable, sink line, and active sink pattern).
     variable_source_cache:
-        std::collections::HashMap<(String, String, String, usize), VariableSource>,
+        std::collections::HashMap<(String, String, String, usize, String), VariableSource>,
+    /// Active sink pattern to isolate cache by rule/sink pattern
+    active_sink_pattern: String,
+    /// In-flight variables currently being analyzed to prevent stack overflow on cyclic dependencies
+    in_flight_variables: std::collections::BTreeSet<(String, String, String)>,
     /// Verified taint flows that have been fully validated
     verified_flows: Vec<VerifiedTaintFlow>,
     /// Resolved imports parsed elsewhere: calling_file -> {imported_function -> source_file}.
@@ -30,6 +32,8 @@ impl DataFlowTracer {
     pub(crate) fn new() -> Self {
         Self {
             variable_source_cache: std::collections::HashMap::new(),
+            active_sink_pattern: String::new(),
+            in_flight_variables: std::collections::BTreeSet::new(),
             verified_flows: Vec::new(),
             import_map: std::collections::BTreeMap::new(),
             ast_provenance: PythonAstProvenance::default(),
@@ -117,6 +121,24 @@ impl DataFlowTracer {
             sink_function
         );
 
+        let is_top_level = self.in_flight_variables.is_empty();
+        if is_top_level {
+            self.active_sink_pattern = sink_pattern.to_string();
+        }
+
+        let sink_var_key =
+            (sink_file.to_string(), sink_function.to_string(), sink_variable.to_string());
+
+        if !self.in_flight_variables.insert(sink_var_key.clone()) {
+            log::debug!(
+                "[DATA_FLOW_TRACER] Cyclic sink variable resolution detected for '{}' in {}::{}",
+                sink_variable,
+                sink_file,
+                sink_function
+            );
+            return AnalysisResult::Unknown { reason: "cyclic variable dependency".to_string() };
+        }
+
         // Step 1: Determine how this variable gets its value at the sink line
         let variable_source = self.analyze_variable_source(
             sink_file,
@@ -126,7 +148,7 @@ impl DataFlowTracer {
             rule_deduplicator,
         );
 
-        match variable_source {
+        let result = match variable_source {
             VariableSource::KnownSafe { reason, line } => {
                 log::debug!("[DATA_FLOW_TRACER] Variable proven safe at line {}: {}", line, reason);
                 AnalysisResult::DefinitelySafe
@@ -188,7 +210,10 @@ impl DataFlowTracer {
                 log::debug!("[DATA_FLOW_TRACER] Variable unresolvable: {}", reason);
                 AnalysisResult::Unknown { reason }
             }
-        }
+        };
+
+        self.in_flight_variables.remove(&sink_var_key);
+        result
     }
 
     /// Analyze how a variable gets its value (assignment, import, parameter, etc.)
@@ -207,6 +232,7 @@ impl DataFlowTracer {
             function_name.to_string(),
             variable_name.to_string(),
             sink_line,
+            self.active_sink_pattern.clone(),
         );
 
         // Check cache first
@@ -297,7 +323,9 @@ impl DataFlowTracer {
         }
 
         // Check if RHS is a direct taint source
-        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(rhs) {
+        if let Some(source_pattern) =
+            rule_deduplicator.matches_source_pattern_for_sink(rhs, &self.active_sink_pattern)
+        {
             log::debug!("[COMPUTE_VARIABLE_SOURCE] Direct taint source: '{}'", source_pattern);
             return VariableSource::DirectTaintSource { pattern: source_pattern, line: file_line };
         }
@@ -579,6 +607,7 @@ impl DataFlowTracer {
     /// Classify an expression that reads an environment variable: user-controlled keys are
     /// tainted, known config keys are safe, anything else falls through (`None`).
     fn classify_env_key_expression(
+        &self,
         expr: &str,
         rule_deduplicator: &TaintRuleDeduplicator,
     ) -> Option<ValueSourceClassification> {
@@ -586,7 +615,7 @@ impl DataFlowTracer {
 
         if Self::is_user_controlled_env_key(&env_key) {
             let source_pattern = rule_deduplicator
-                .matches_source_pattern(expr)
+                .matches_source_pattern_for_sink(expr, &self.active_sink_pattern)
                 .unwrap_or_else(|| format!("env:{}", env_key));
             return Some(ValueSourceClassification::Tainted(source_pattern));
         }
@@ -605,6 +634,7 @@ impl DataFlowTracer {
     /// `sys.argv`, `request.`, ...) as tainted when it also matches a configured source
     /// pattern; falls through (`None`) otherwise.
     fn classify_known_source_indicators(
+        &self,
         expr: &str,
         rule_deduplicator: &TaintRuleDeduplicator,
     ) -> Option<ValueSourceClassification> {
@@ -618,7 +648,9 @@ impl DataFlowTracer {
             return None;
         }
 
-        rule_deduplicator.matches_source_pattern(expr).map(ValueSourceClassification::Tainted)
+        rule_deduplicator
+            .matches_source_pattern_for_sink(expr, &self.active_sink_pattern)
+            .map(ValueSourceClassification::Tainted)
     }
 
     fn classify_value_source(
@@ -654,17 +686,18 @@ impl DataFlowTracer {
             return ValueSourceClassification::Safe("static config/template file read".to_string());
         }
 
-        if let Some(classification) = Self::classify_env_key_expression(expr, rule_deduplicator) {
+        if let Some(classification) = self.classify_env_key_expression(expr, rule_deduplicator) {
             return classification;
         }
 
-        if let Some(classification) =
-            Self::classify_known_source_indicators(expr, rule_deduplicator)
+        if let Some(classification) = self.classify_known_source_indicators(expr, rule_deduplicator)
         {
             return classification;
         }
 
-        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(expr) {
+        if let Some(source_pattern) =
+            rule_deduplicator.matches_source_pattern_for_sink(expr, &self.active_sink_pattern)
+        {
             return ValueSourceClassification::Tainted(source_pattern);
         }
 
@@ -1029,7 +1062,9 @@ impl DataFlowTracer {
         }
 
         // Check if the source expression is a direct taint source
-        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(source_expression) {
+        if let Some(source_pattern) = rule_deduplicator
+            .matches_source_pattern_for_sink(source_expression, &self.active_sink_pattern)
+        {
             log::debug!("[TRACE_LOCAL] Direct taint source found: '{}'", source_pattern);
             return self.record_direct_taint_flow(&site, source_pattern, assignment_line);
         }
@@ -1338,7 +1373,9 @@ impl DataFlowTracer {
         }
 
         // Check if return expression is a direct taint source
-        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(return_expr) {
+        if let Some(source_pattern) = rule_deduplicator
+            .matches_source_pattern_for_sink(return_expr, &self.active_sink_pattern)
+        {
             log::debug!(
                 "[ANALYZE_FUNCTION] Function returns direct taint source: \"{}\"",
                 source_pattern
@@ -1594,6 +1631,139 @@ impl DataFlowTracer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::UnifiedRule;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_cyclic_variable_dependency_does_not_stack_overflow() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let code = r#"
+def test_func():
+    a = b
+    b = a
+    sink(a)
+"#;
+        temp_file.write_all(code.as_bytes()).unwrap();
+        let path_str = temp_file.path().to_str().unwrap();
+
+        let rule = UnifiedRule {
+            id: Some("test_rule".to_string()),
+            name: Some("Test Rule".to_string()),
+            description: None,
+            category: None,
+            mode: "taint".to_string(),
+            pattern: None,
+            patterns: None,
+            sources: Some(vec!["source_func()".to_string()]),
+            sinks: Some(vec!["sink".to_string()]),
+            propagators: None,
+            sanitizers: None,
+            conditions: None,
+            message: None,
+            finding_type: None,
+            file_types: None,
+            severity: None,
+            confidence: None,
+            cwe_id: None,
+            tags: None,
+        };
+
+        let rules = vec![&rule];
+        let deduplicator = TaintRuleDeduplicator::new(&rules);
+        let mut tracer = DataFlowTracer::new();
+
+        let result =
+            tracer.analyze_sink_variable(path_str, "test_func", "a", "sink", 5, &deduplicator);
+        match result {
+            AnalysisResult::Unknown { reason } => {
+                assert_eq!(reason, "cyclic variable dependency");
+            }
+            _ => panic!(
+                "Expected AnalysisResult::Unknown with 'cyclic variable dependency', got {:?}",
+                result
+            ),
+        }
+    }
+
+    #[test]
+    fn test_rule_fingerprint_cache_isolation() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let code = r#"
+def test_func():
+    var = input()
+"#;
+        temp_file.write_all(code.as_bytes()).unwrap();
+        let path_str = temp_file.path().to_str().unwrap();
+
+        let rule1 = UnifiedRule {
+            id: Some("rule1".to_string()),
+            name: Some("Rule 1".to_string()),
+            description: None,
+            category: None,
+            mode: "taint".to_string(),
+            pattern: None,
+            patterns: None,
+            sources: Some(vec!["input(".to_string()]),
+            sinks: Some(vec!["sink1".to_string()]),
+            propagators: None,
+            sanitizers: None,
+            conditions: None,
+            message: None,
+            finding_type: None,
+            file_types: None,
+            severity: None,
+            confidence: None,
+            cwe_id: None,
+            tags: None,
+        };
+
+        let rule2 = UnifiedRule {
+            id: Some("rule2".to_string()),
+            name: Some("Rule 2".to_string()),
+            description: None,
+            category: None,
+            mode: "taint".to_string(),
+            pattern: None,
+            patterns: None,
+            sources: Some(vec!["different_source()".to_string()]),
+            sinks: Some(vec!["sink2".to_string()]),
+            propagators: None,
+            sanitizers: None,
+            conditions: None,
+            message: None,
+            finding_type: None,
+            file_types: None,
+            severity: None,
+            confidence: None,
+            cwe_id: None,
+            tags: None,
+        };
+
+        let rules1 = vec![&rule1];
+        let dedup1 = TaintRuleDeduplicator::new(&rules1);
+
+        let rules2 = vec![&rule2];
+        let dedup2 = TaintRuleDeduplicator::new(&rules2);
+
+        let mut tracer = DataFlowTracer::new();
+
+        let result1 =
+            tracer.analyze_sink_variable(path_str, "test_func", "var", "sink1", 3, &dedup1);
+        let result2 =
+            tracer.analyze_sink_variable(path_str, "test_func", "var", "sink2", 3, &dedup2);
+
+        assert!(matches!(result1, AnalysisResult::DefinitelyTainted { .. }));
+        assert!(!matches!(result2, AnalysisResult::DefinitelyTainted { .. }));
+        if let AnalysisResult::Unknown { ref reason } = result2 {
+            assert_ne!(reason, "cyclic variable dependency");
+        }
+
+        // Rerun first rule set (dedup1) to verify cached hit returns DefinitelyTainted without leaking in_flight keys
+        let result3 =
+            tracer.analyze_sink_variable(path_str, "test_func", "var", "sink1", 3, &dedup1);
+        assert!(matches!(result3, AnalysisResult::DefinitelyTainted { .. }));
+    }
 
     /// A sink line below every fact in these tests, so each write is treated as
     /// reaching at or above the sink unless a test says otherwise.
