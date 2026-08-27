@@ -110,7 +110,7 @@ mod django_xss_tests {
                     .expect("Failed to scan directory");
 
                 println!("Found {} vulnerabilities with Django rules", results.len());
-                assert!(results.len() >= 1, "Should detect at least one vulnerability");
+                assert!(!results.is_empty(), "Should detect at least one vulnerability");
             }
             Err(e) => {
                 println!("Warning: Failed to load Django rules directory: {}", e);
@@ -125,7 +125,6 @@ mod django_xss_tests {
         let django_dir = Path::new("tests/test_files/django/fixtures");
         if !django_dir.exists() {
             println!("Skipping Django test because tests/test_files/django/fixtures directory doesn't exist");
-            return;
         }
     }
 }
