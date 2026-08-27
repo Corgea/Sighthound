@@ -6,6 +6,18 @@ on:
   pull_request:
 
 jobs:
+  msrv:
+    name: Rust 1.88 MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.88
+        uses: dtolnay/rust-toolchain@1.88
+
+      - name: cargo check
+        run: cargo check --all-targets --all-features --locked
+
   harness:
     name: harness ci
     runs-on: ubuntu-latest

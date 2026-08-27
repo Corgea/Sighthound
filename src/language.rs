@@ -114,8 +114,8 @@ pub fn get_language_support_for_path(
 
 fn direct_named_child_of_kind<'a>(node: &Node<'a>, kind: &str) -> Option<Node<'a>> {
     let mut cursor = node.walk();
-    let child = node.named_children(&mut cursor).find(|child| child.kind() == kind);
-    child
+
+    node.named_children(&mut cursor).find(|child| child.kind() == kind)
 }
 
 // Python Implementation

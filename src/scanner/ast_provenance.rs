@@ -15,7 +15,7 @@
 //! function name is defined more than once, falling back would guess, so
 //! callers must treat the variable as unknown instead.
 
-use crate::parser::{get_node_text_slice, LanguageParser};
+use crate::parser::{LanguageParser, get_node_text_slice};
 use tree_sitter::Node;
 
 /// How a variable received a value, in source order within one function.
@@ -443,10 +443,10 @@ fn target_value_pairs<'a>(
     value: Node<'a>,
     source: &[u8],
 ) -> Vec<(String, Node<'a>)> {
-    if matches!(target.kind(), "pattern_list" | "tuple_pattern") {
-        if let Some(pairs) = positional_pairs(target, value, source) {
-            return pairs;
-        }
+    if matches!(target.kind(), "pattern_list" | "tuple_pattern")
+        && let Some(pairs) = positional_pairs(target, value, source)
+    {
+        return pairs;
     }
     target_identifiers(target, source).into_iter().map(|name| (name, value)).collect()
 }
@@ -637,14 +637,14 @@ fn is_literal_collection(node: Node) -> bool {
 
 fn has_named_children(node: Node) -> bool {
     let mut cursor = node.walk();
-    let any = node.named_children(&mut cursor).any(|c| c.kind() != "comment");
-    any
+
+    node.named_children(&mut cursor).any(|c| c.kind() != "comment")
 }
 
 fn all_named_children(node: Node, predicate: impl Fn(Node) -> bool) -> bool {
     let mut cursor = node.walk();
-    let all = node.named_children(&mut cursor).filter(|c| c.kind() != "comment").all(&predicate);
-    all
+
+    node.named_children(&mut cursor).filter(|c| c.kind() != "comment").all(&predicate)
 }
 
 fn has_interpolation(node: Node) -> bool {
@@ -652,8 +652,8 @@ fn has_interpolation(node: Node) -> bool {
         return true;
     }
     let mut cursor = node.walk();
-    let found = node.children(&mut cursor).any(has_interpolation);
-    found
+
+    node.children(&mut cursor).any(has_interpolation)
 }
 
 #[cfg(test)]

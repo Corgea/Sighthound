@@ -1,6 +1,5 @@
-use sighthound::rules::Rules;
 use sighthound::VulnerabilityScanner;
-use std::path::Path;
+use sighthound::rules::Rules;
 
 // Helper function to load general rules (as a fallback)
 // note: the general Python ruleset is now shipped as `general_security.ron`.
@@ -116,15 +115,6 @@ mod django_xss_tests {
                 println!("Warning: Failed to load Django rules directory: {}", e);
                 // Don't fail the test - this indicates a rules configuration issue
             }
-        }
-    }
-
-    #[test]
-    fn test_django_scanner_output() {
-        // Skip if django fixtures directory doesn't exist
-        let django_dir = Path::new("tests/test_files/django/fixtures");
-        if !django_dir.exists() {
-            println!("Skipping Django test because tests/test_files/django/fixtures directory doesn't exist");
         }
     }
 }

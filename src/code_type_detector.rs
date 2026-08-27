@@ -228,14 +228,13 @@ impl CodeTypeDetector {
         }
 
         // Then try AST analysis for JavaScript/TypeScript
-        if matches!(language.to_lowercase().as_str(), "javascript" | "typescript" | "tsx") {
-            if let Ok(mut parser) = crate::parser::LanguageParser::new(language) {
-                if let Ok(tree) = parser.parse(content.as_bytes()) {
-                    let ast_result = self.detect_from_ast(&tree, content.as_bytes());
-                    if ast_result != CodeType::Unknown {
-                        return ast_result;
-                    }
-                }
+        if matches!(language.to_lowercase().as_str(), "javascript" | "typescript" | "tsx")
+            && let Ok(mut parser) = crate::parser::LanguageParser::new(language)
+            && let Ok(tree) = parser.parse(content.as_bytes())
+        {
+            let ast_result = self.detect_from_ast(&tree, content.as_bytes());
+            if ast_result != CodeType::Unknown {
+                return ast_result;
             }
         }
 

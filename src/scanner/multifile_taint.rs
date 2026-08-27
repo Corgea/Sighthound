@@ -599,10 +599,6 @@ impl MultiFileTaintAnalyzer {
         // Handle "import module" pattern (for module-level imports)
         imports.extend(Self::parse_bare_import(trimmed_text));
 
-        if imports.is_empty() {
-            None
-        } else {
-            Some(imports)
-        }
+        if imports.is_empty() { None } else { Some(imports) }
     }
 }

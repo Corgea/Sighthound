@@ -1,7 +1,7 @@
 use sighthound::models::UnifiedRule;
 use sighthound::rules::{
-    match_any_pattern, match_pattern, rule_matches_pattern_unified, validate_unified_rule_patterns,
-    Rules,
+    Rules, match_any_pattern, match_pattern, rule_matches_pattern_unified,
+    validate_unified_rule_patterns,
 };
 use std::collections::BTreeSet;
 

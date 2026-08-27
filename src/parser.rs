@@ -1,4 +1,4 @@
-use crate::language::{get_language_support, get_language_support_for_path, LanguageSupport};
+use crate::language::{LanguageSupport, get_language_support, get_language_support_for_path};
 use anyhow::{Context, Result};
 use std::path::Path;
 use tree_sitter::{Node, Parser as TSParser, Tree};

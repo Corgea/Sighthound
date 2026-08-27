@@ -3,8 +3,8 @@ use crate::config::filters::SKIP_DIRS;
 use crate::parser::get_node_text;
 use crate::rules::FileTypes;
 use anyhow::Result;
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore::WalkBuilder;
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::collections::{BTreeMap, HashMap};
@@ -336,10 +336,10 @@ fn discover_files_parallel(
         .follow_links(false)
         .into_iter()
         .filter_entry(|e| {
-            if e.file_type().is_dir() {
-                if let Some(name) = e.file_name().to_str() {
-                    return !should_skip_dir(name, include_test_fixtures);
-                }
+            if e.file_type().is_dir()
+                && let Some(name) = e.file_name().to_str()
+            {
+                return !should_skip_dir(name, include_test_fixtures);
             }
             true
         })
@@ -348,11 +348,7 @@ fn discover_files_parallel(
             entry.ok().and_then(|e| {
                 if e.path().is_file() {
                     // Skip files that are ignored by Git
-                    if is_git_ignored(e.path()) {
-                        None
-                    } else {
-                        Some(e.path().to_path_buf())
-                    }
+                    if is_git_ignored(e.path()) { None } else { Some(e.path().to_path_buf()) }
                 } else {
                     None
                 }
@@ -397,10 +393,10 @@ fn discover_files_sequential(
         .follow_links(false)
         .into_iter()
         .filter_entry(|e| {
-            if e.file_type().is_dir() {
-                if let Some(name) = e.file_name().to_str() {
-                    return !should_skip_dir(name, include_test_fixtures);
-                }
+            if e.file_type().is_dir()
+                && let Some(name) = e.file_name().to_str()
+            {
+                return !should_skip_dir(name, include_test_fixtures);
             }
             true
         })
@@ -408,17 +404,15 @@ fn discover_files_sequential(
     {
         if entry.path().is_file() {
             // Skip files that are ignored by Git
-            if !is_git_ignored(entry.path()) {
-                if let Some(language) = detect_language_from_path(entry.path()) {
-                    files_by_language
-                        .entry(language.to_string())
-                        .or_insert_with(|| {
-                            Vec::with_capacity(
-                                crate::config::ScanDefaults::ESTIMATED_FILES_PER_LANG,
-                            )
-                        })
-                        .push(entry.path().to_path_buf());
-                }
+            if !is_git_ignored(entry.path())
+                && let Some(language) = detect_language_from_path(entry.path())
+            {
+                files_by_language
+                    .entry(language.to_string())
+                    .or_insert_with(|| {
+                        Vec::with_capacity(crate::config::ScanDefaults::ESTIMATED_FILES_PER_LANG)
+                    })
+                    .push(entry.path().to_path_buf());
             }
         }
     }

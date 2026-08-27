@@ -532,17 +532,15 @@ impl DataFlowTracer {
         // initializer sets it AND every reaching write is itself literal — a
         // later `cfg["cmd"] = user_supplied` or `parts.append(input())`
         // (recorded as a non-literal fact) must defeat the verdict.
-        if let Some(init) = dominating_init {
-            if init.literal_collection && assignments.iter().all(|fact| fact.literal_value) {
-                log::debug!(
-                    "[COMPUTE_VARIABLE_SOURCE] AST: literal collection at line {}",
-                    init.line
-                );
-                return Some(VariableSource::KnownSafe {
-                    reason: "value drawn from a literal collection".to_string(),
-                    line: init.line,
-                });
-            }
+        if let Some(init) = dominating_init
+            && init.literal_collection
+            && assignments.iter().all(|fact| fact.literal_value)
+        {
+            log::debug!("[COMPUTE_VARIABLE_SOURCE] AST: literal collection at line {}", init.line);
+            return Some(VariableSource::KnownSafe {
+                reason: "value drawn from a literal collection".to_string(),
+                line: init.line,
+            });
         }
 
         // Walk reaching writes newest-first. A write whose RHS is safe adds no

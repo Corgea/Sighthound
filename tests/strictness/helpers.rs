@@ -1,6 +1,6 @@
+use sighthound::VulnerabilityScanner;
 use sighthound::models::Finding;
 use sighthound::rules::Rules;
-use sighthound::VulnerabilityScanner;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -186,9 +186,7 @@ pub fn assert_findings_in_range(
         hits.len() >= min_count,
         "{context}: expected at least {min_count} findings between lines {min_line}-{max_line}, got {}: {:?}",
         hits.len(),
-        hits.iter()
-            .map(|f| (f.line, &f.finding_type))
-            .collect::<Vec<_>>()
+        hits.iter().map(|f| (f.line, &f.finding_type)).collect::<Vec<_>>()
     );
 }
 
@@ -217,10 +215,7 @@ pub fn assert_has_cross_file_finding_near(
     assert!(
         !hits.is_empty(),
         "{context}: expected cross-file finding in {filename} near line {line} (±{tolerance}), got: {:?}",
-        cross_file_findings(findings)
-            .iter()
-            .map(|f| (f.file.as_str(), f.line))
-            .collect::<Vec<_>>()
+        cross_file_findings(findings).iter().map(|f| (f.file.as_str(), f.line)).collect::<Vec<_>>()
     );
 }
 

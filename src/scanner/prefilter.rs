@@ -1,5 +1,5 @@
 use crate::config::filters::SKIP_MINIFIED_PATTERNS;
-use crate::parser::{get_node_text, LanguageParser};
+use crate::parser::{LanguageParser, get_node_text};
 use crate::rules::Rules;
 use crate::scanner::utils::matches_glob_pattern;
 use anyhow::Result;
@@ -52,10 +52,10 @@ impl PreFilter {
 
     pub fn should_scan_file(&self, file_path: &str) -> bool {
         // Skip empty files
-        if let Ok(metadata) = fs::metadata(file_path) {
-            if metadata.len() == 0 {
-                return false;
-            }
+        if let Ok(metadata) = fs::metadata(file_path)
+            && metadata.len() == 0
+        {
+            return false;
         }
 
         // For malicious scanning, scan everything else (including text/doc and
@@ -311,10 +311,10 @@ impl PreFilter {
     /// Single-pass filtering with reason tracking to avoid duplicate checks
     fn check_file_with_reason(&self, file_path: &str) -> FilterReason {
         // Skip empty files first (fastest check)
-        if let Ok(metadata) = fs::metadata(file_path) {
-            if metadata.len() == 0 {
-                return FilterReason::Doc; // Treat empty files as doc files
-            }
+        if let Ok(metadata) = fs::metadata(file_path)
+            && metadata.len() == 0
+        {
+            return FilterReason::Doc; // Treat empty files as doc files
         }
 
         // For malicious scanning, include everything else (skip other checks),

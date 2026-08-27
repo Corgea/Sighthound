@@ -46,10 +46,10 @@ impl CommonUtils {
         }
 
         // Try filename only
-        if let Some(filename) = std::path::Path::new(file_path).file_name() {
-            if let Some(filename_str) = filename.to_str() {
-                return Self::matches_unified_pattern(pattern, filename_str);
-            }
+        if let Some(filename) = std::path::Path::new(file_path).file_name()
+            && let Some(filename_str) = filename.to_str()
+        {
+            return Self::matches_unified_pattern(pattern, filename_str);
         }
 
         false
@@ -131,12 +131,11 @@ impl CommonUtils {
             }
 
             // Also try matching against just the filename
-            if let Some(filename) = std::path::Path::new(text).file_name() {
-                if let Some(filename_str) = filename.to_str() {
-                    if glob_pattern.matches(filename_str) {
-                        return true;
-                    }
-                }
+            if let Some(filename) = std::path::Path::new(text).file_name()
+                && let Some(filename_str) = filename.to_str()
+                && glob_pattern.matches(filename_str)
+            {
+                return true;
             }
         }
 
@@ -286,11 +285,7 @@ impl CommonUtils {
 
         let result = Self::extract_clean_variable_name(target);
 
-        if return_empty_on_none && result.is_none() {
-            Some(String::new())
-        } else {
-            result
-        }
+        if return_empty_on_none && result.is_none() { Some(String::new()) } else { result }
     }
 
     /// Extract clean variable name from complex expressions
@@ -417,21 +412,21 @@ impl CommonUtils {
                 }
                 '}' if brace_depth > 0 => {
                     brace_depth -= 1;
-                    if brace_depth == 0 {
-                        if let Some(start) = current_start.take() {
-                            // Extract the variable using character indices, not byte indices
-                            let raw_var: String = chars[start..i].iter().collect();
-                            let raw_var = raw_var.trim();
-                            // Strip format specifiers after ':' or '!'
-                            let clean_var =
-                                raw_var.split([':', '!'].as_ref()).next().unwrap_or("").trim();
-                            if Self::is_valid_variable_name(clean_var) {
-                                log::debug!("[F_STRING_EXTRACT] Found variable: {}", clean_var);
-                                variables.push(clean_var.to_string());
-                            } else {
-                                // For complex expressions, try to extract simple variables
-                                variables.extend(Self::extract_simple_variables(clean_var));
-                            }
+                    if brace_depth == 0
+                        && let Some(start) = current_start.take()
+                    {
+                        // Extract the variable using character indices, not byte indices
+                        let raw_var: String = chars[start..i].iter().collect();
+                        let raw_var = raw_var.trim();
+                        // Strip format specifiers after ':' or '!'
+                        let clean_var =
+                            raw_var.split([':', '!'].as_ref()).next().unwrap_or("").trim();
+                        if Self::is_valid_variable_name(clean_var) {
+                            log::debug!("[F_STRING_EXTRACT] Found variable: {}", clean_var);
+                            variables.push(clean_var.to_string());
+                        } else {
+                            // For complex expressions, try to extract simple variables
+                            variables.extend(Self::extract_simple_variables(clean_var));
                         }
                     }
                 }
@@ -468,17 +463,17 @@ impl CommonUtils {
                 dollar_brace_depth += 1;
             } else if chars[i] == '}' && dollar_brace_depth > 0 {
                 dollar_brace_depth -= 1;
-                if dollar_brace_depth == 0 {
-                    if let Some(start) = current_start.take() {
-                        // Extract the expression inside ${}
-                        let raw_expr: String = chars[start..i].iter().collect();
-                        let raw_expr = raw_expr.trim();
+                if dollar_brace_depth == 0
+                    && let Some(start) = current_start.take()
+                {
+                    // Extract the expression inside ${}
+                    let raw_expr: String = chars[start..i].iter().collect();
+                    let raw_expr = raw_expr.trim();
 
-                        log::debug!("[TEMPLATE_LITERAL_EXTRACT] Found expression: '{}'", raw_expr);
+                    log::debug!("[TEMPLATE_LITERAL_EXTRACT] Found expression: '{}'", raw_expr);
 
-                        // Extract variables from the expression
-                        variables.extend(Self::extract_all_variables(raw_expr));
-                    }
+                    // Extract variables from the expression
+                    variables.extend(Self::extract_all_variables(raw_expr));
                 }
             }
 
@@ -486,10 +481,11 @@ impl CommonUtils {
         }
 
         // Also extract assignment target if this is an assignment with template literal
-        if expr.contains('=') && expr.contains('`') {
-            if let Some(var) = Self::extract_variable_from_assignment(expr, false) {
-                variables.push(var);
-            }
+        if expr.contains('=')
+            && expr.contains('`')
+            && let Some(var) = Self::extract_variable_from_assignment(expr, false)
+        {
+            variables.push(var);
         }
 
         variables

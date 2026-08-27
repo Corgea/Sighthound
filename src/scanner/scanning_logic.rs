@@ -34,15 +34,15 @@ impl ScanningLogic {
             return None;
         }
 
-        if let Some(conditions) = &rule.conditions {
-            if !crate::scanner::conditions::check_ast_conditions(
+        if let Some(conditions) = &rule.conditions
+            && !crate::scanner::conditions::check_ast_conditions(
                 conditions,
                 node,
                 source,
                 language_support,
-            ) {
-                return None;
-            }
+            )
+        {
+            return None;
         }
 
         if language_support.name() == "javascript" || language_support.name() == "typescript" {
@@ -314,32 +314,29 @@ impl ScanningLogic {
                         .unwrap_or_else(|| Self::extract_assignment_target(&node_text));
 
                 for rule in assignment_rules {
-                    if Self::rule_might_match_assignment(rule, &node_text) {
-                        if let Some(finding) = Self::check_rule_against_node(
+                    if Self::rule_might_match_assignment(rule, &node_text)
+                        && let Some(finding) = Self::check_rule_against_node(
                             rule,
                             &node,
                             source,
                             filepath,
                             &assignment_target,
                             language_support,
-                        ) {
-                            let line_key = (
-                                finding.line,
-                                finding.function.clone(),
-                                finding.finding_type.clone(),
-                            );
-                            // A call-shaped sink (e.g. subprocess.Popen(shell=True)) can be
-                            // matched both by the call pass and here via its `=`-bearing
-                            // pattern; the call pass records a different `function`, so also
-                            // guard on (line, finding_type) to avoid a duplicate finding.
-                            let already = processed_lines.contains(&line_key)
-                                || findings.iter().any(|f| {
-                                    f.line == finding.line && f.finding_type == finding.finding_type
-                                });
-                            if !already {
-                                processed_lines.insert(line_key);
-                                findings.push(finding);
-                            }
+                        )
+                    {
+                        let line_key =
+                            (finding.line, finding.function.clone(), finding.finding_type.clone());
+                        // A call-shaped sink (e.g. subprocess.Popen(shell=True)) can be
+                        // matched both by the call pass and here via its `=`-bearing
+                        // pattern; the call pass records a different `function`, so also
+                        // guard on (line, finding_type) to avoid a duplicate finding.
+                        let already = processed_lines.contains(&line_key)
+                            || findings.iter().any(|f| {
+                                f.line == finding.line && f.finding_type == finding.finding_type
+                            });
+                        if !already {
+                            processed_lines.insert(line_key);
+                            findings.push(finding);
                         }
                     }
                 }
@@ -926,7 +923,10 @@ impl ScanningLogic {
                     },
                 );
             } else {
-                log::debug!("[FUNCTION_PARAM_ANALYSIS] Function parameter '{}' does not match any source pattern", param);
+                log::debug!(
+                    "[FUNCTION_PARAM_ANALYSIS] Function parameter '{}' does not match any source pattern",
+                    param
+                );
             }
         }
     }
@@ -1677,11 +1677,7 @@ impl ScanningLogic {
             }
         }
 
-        if parameters.is_empty() {
-            None
-        } else {
-            Some(parameters)
-        }
+        if parameters.is_empty() { None } else { Some(parameters) }
     }
 
     /// Extract parameter name from complex parameter node
@@ -2221,15 +2217,15 @@ impl ScanningLogic {
             return None;
         }
 
-        if let Some(conditions) = &rule.conditions {
-            if !crate::scanner::conditions::check_ast_conditions(
+        if let Some(conditions) = &rule.conditions
+            && !crate::scanner::conditions::check_ast_conditions(
                 conditions,
                 node,
                 source,
                 language_support,
-            ) {
-                return None;
-            }
+            )
+        {
+            return None;
         }
 
         // Extract variables used in this node

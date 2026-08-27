@@ -40,13 +40,13 @@ pub mod ui;
 
 pub use scanner::modes::run_taint_analysis_with_verbosity;
 pub use scanner::{
-    run_auto_detection_scan, run_explicit_scan, run_taint_analysis, FilterStats, PreFilter,
-    ScanningLogic, VulnerabilityScanner,
+    FilterStats, PreFilter, ScanningLogic, VulnerabilityScanner, run_auto_detection_scan,
+    run_explicit_scan, run_taint_analysis,
 };
 
 pub use common::CommonUtils;
 pub use config::ScanDefaults;
-pub use rules::{check_for_injection_pattern, match_pattern, Rules};
+pub use rules::{Rules, check_for_injection_pattern, match_pattern};
 
 pub use code_type_detector::{CodeType, CodeTypeDetector};
 

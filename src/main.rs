@@ -4,8 +4,8 @@ use sighthound::scanner::core::{
     print_findings_csv, print_findings_json, print_findings_sarif, print_findings_text,
 };
 use sighthound::{
-    run_auto_detection_scan, run_explicit_scan, run_taint_analysis,
-    run_taint_analysis_with_verbosity, Cli, CommonUtils,
+    Cli, CommonUtils, run_auto_detection_scan, run_explicit_scan, run_taint_analysis,
+    run_taint_analysis_with_verbosity,
 };
 
 fn print_version_info() {
@@ -48,7 +48,9 @@ fn configure_thread_pool(cli: &Cli) -> Result<()> {
 
 fn validate_scan_flags(cli: &Cli) -> Result<()> {
     if cli.taint_analysis && cli.simple_analysis {
-        return Err(anyhow::anyhow!("Cannot specify both --taint-analysis and --simple-analysis. Use one or neither (default: both modes)."));
+        return Err(anyhow::anyhow!(
+            "Cannot specify both --taint-analysis and --simple-analysis. Use one or neither (default: both modes)."
+        ));
     }
     if let Some(ref severity) = cli.fail_on_severity {
         match severity.to_lowercase().as_str() {
