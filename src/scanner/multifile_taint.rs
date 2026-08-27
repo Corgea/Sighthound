@@ -37,31 +37,33 @@ impl MultiFileTaintAnalyzer {
     }
 
     /// NEW: Analyze cross-file taint flows using the enhanced DataFlowTracer
-    /// Select the target language and its files for cross-file analysis: `language_filter`'s
-    /// files if present and non-empty (no fallback when it yields nothing), else Python (the
-    /// legacy default) if present and non-empty.
+    /// Select the target languages and files for cross-file analysis: `language_filter`'s
+    /// files if present and non-empty, else all languages present in `files_by_language`.
     fn select_cross_file_targets<'a>(
         files_by_language: &'a std::collections::BTreeMap<String, Vec<std::path::PathBuf>>,
         language_filter: Option<&'a str>,
-    ) -> Option<(Vec<std::path::PathBuf>, &'a str)> {
+    ) -> Vec<(Vec<std::path::PathBuf>, &'a str)> {
         if let Some(filter_lang) = language_filter {
-            let filtered_files = files_by_language.get(filter_lang)?;
-            if filtered_files.is_empty() {
-                return None;
+            if let Some(filtered_files) = files_by_language.get(filter_lang) {
+                if !filtered_files.is_empty() {
+                    log::debug!(
+                        "[CROSS_FILE_NEW] Using language_filter: {} ({} files)",
+                        filter_lang,
+                        filtered_files.len()
+                    );
+                    return vec![(filtered_files.clone(), filter_lang)];
+                }
             }
-            log::debug!(
-                "[CROSS_FILE_NEW] Using language_filter: {} ({} files)",
-                filter_lang,
-                filtered_files.len()
-            );
-            return Some((filtered_files.clone(), filter_lang));
+            return Vec::new();
         }
 
-        let python_files = files_by_language.get("python")?;
-        if python_files.is_empty() {
-            return None;
+        let mut targets = Vec::new();
+        for (lang, files) in files_by_language {
+            if !files.is_empty() {
+                targets.push((files.clone(), lang.as_str()));
+            }
         }
-        Some((python_files.clone(), "python"))
+        targets
     }
 
     /// Handle one sink's analysis result: for a definite taint flow, record a deduplicated
@@ -133,18 +135,18 @@ impl MultiFileTaintAnalyzer {
     ) -> Result<Vec<crate::models::Finding>> {
         log::debug!("[CROSS_FILE_NEW] Starting enhanced cross-file taint analysis");
 
-        // If still no files, skip cross-file analysis
-        let Some((target_files, language)) =
-            Self::select_cross_file_targets(files_by_language, language_filter)
-        else {
+        let target_groups = Self::select_cross_file_targets(files_by_language, language_filter);
+        if target_groups.is_empty() {
             log::debug!("[CROSS_FILE_NEW] No suitable files found for cross-file analysis");
             return Ok(Vec::new());
-        };
-        log::debug!(
-            "[CROSS_FILE_NEW] Analyzing {} {} files for cross-file taint flows",
-            target_files.len(),
-            language
-        );
+        }
+        for (target_files, language) in &target_groups {
+            log::debug!(
+                "[CROSS_FILE_NEW] Analyzing {} {} files for cross-file taint flows",
+                target_files.len(),
+                language
+            );
+        }
 
         let mut data_flow_tracer = DataFlowTracer::new();
 
@@ -319,23 +321,33 @@ impl MultiFileTaintAnalyzer {
             // If language_filter is specified, use that language exclusively
             if let Some(files) = files_by_language.get(filter_lang) {
                 for file_path in files {
-                    self.analyze_file_for_imports_exports(
+                    if let Err(e) = self.analyze_file_for_imports_exports(
                         file_path,
                         filter_lang,
                         &rule_deduplicator,
-                    )?;
+                    ) {
+                        log::warn!(
+                            "Failed to analyze imports/exports for file '{}': {}",
+                            file_path.display(),
+                            e
+                        );
+                    }
                 }
             }
         } else {
-            // Original fallback logic: process JavaScript and Python files
+            // Process files for all available languages
             for (language, files) in files_by_language {
-                if language == "javascript" || language == "python" {
-                    for file_path in files {
-                        self.analyze_file_for_imports_exports(
-                            file_path,
-                            language,
-                            &rule_deduplicator,
-                        )?;
+                for file_path in files {
+                    if let Err(e) = self.analyze_file_for_imports_exports(
+                        file_path,
+                        language,
+                        &rule_deduplicator,
+                    ) {
+                        log::warn!(
+                            "Failed to analyze imports/exports for file '{}': {}",
+                            file_path.display(),
+                            e
+                        );
                     }
                 }
             }

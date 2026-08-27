@@ -1102,23 +1102,27 @@ impl DataFlowTracer {
         Some(module_b_path)
     }
 
-    /// Fallback: scan Python files in the same directory as `calling_file` for one that
-    /// defines `function_name`.
-    fn find_in_sibling_python_files(
+    /// Fallback: scan source files with the same extension in the same directory as `calling_file`
+    /// for one that defines `function_name`.
+    fn find_in_sibling_source_files(
         &self,
         calling_dir: &str,
         calling_file: &str,
         function_name: &str,
     ) -> Option<String> {
         let entries = std::fs::read_dir(calling_dir).ok()?;
-        let calling_basename = std::path::Path::new(calling_file).file_name().unwrap_or_default();
+        let calling_path = std::path::Path::new(calling_file);
+        let calling_ext = calling_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        let calling_basename = calling_path.file_name().unwrap_or_default();
 
         for entry in entries.flatten() {
             let os_file_name = entry.file_name();
             let Some(file_name) = os_file_name.to_str() else {
                 continue;
             };
-            if !file_name.ends_with(".py") || file_name == calling_basename {
+            let ext =
+                std::path::Path::new(file_name).extension().and_then(|e| e.to_str()).unwrap_or("");
+            if ext != calling_ext || file_name == calling_basename {
                 continue;
             }
             let candidate_path = format!("{}/{}", calling_dir, file_name);
@@ -1167,8 +1171,8 @@ impl DataFlowTracer {
             {
                 Self::find_in_module_b(calling_dir, function_name)
             }
-            // Try to find in any Python file in the same directory
-            _ => self.find_in_sibling_python_files(calling_dir, calling_file, function_name),
+            // Try to find in any sibling source file in the same directory
+            _ => self.find_in_sibling_source_files(calling_dir, calling_file, function_name),
         };
 
         if found.is_none() {
@@ -1180,11 +1184,31 @@ impl DataFlowTracer {
         found
     }
 
-    /// Check if a file contains a function definition
+    /// Helper to check if a source line declares a callable function definition
+    fn is_function_definition_line(line: &str, function_name: &str) -> bool {
+        let trimmed = line.trim();
+        trimmed.starts_with(&format!("def {}(", function_name))
+            || trimmed.starts_with(&format!("async def {}(", function_name))
+            || trimmed.starts_with(&format!("def {} ", function_name))
+            || trimmed.starts_with(&format!("function {}(", function_name))
+            || trimmed.starts_with(&format!("async function {}(", function_name))
+            || trimmed.starts_with(&format!("const {} = (", function_name))
+            || trimmed.starts_with(&format!("const {} = async (", function_name))
+            || trimmed.starts_with(&format!("let {} = (", function_name))
+            || trimmed.starts_with(&format!("let {} = async (", function_name))
+            || trimmed.starts_with(&format!("var {} = (", function_name))
+            || trimmed.starts_with(&format!("var {} = async (", function_name))
+            || trimmed.starts_with(&format!("fn {}(", function_name))
+            || trimmed.starts_with(&format!("pub fn {}(", function_name))
+            || trimmed.starts_with(&format!("pub(crate) fn {}(", function_name))
+            || trimmed.starts_with(&format!("async fn {}(", function_name))
+            || trimmed.starts_with(&format!("func {}(", function_name))
+    }
+
+    /// Check if a file contains a callable function definition
     fn file_contains_function(&self, file_path: &str, function_name: &str) -> bool {
         if let Ok(content) = std::fs::read_to_string(file_path) {
-            let pattern = format!("def {}(", function_name);
-            content.contains(&pattern)
+            content.lines().any(|line| Self::is_function_definition_line(line, function_name))
         } else {
             false
         }
@@ -1531,7 +1555,7 @@ impl DataFlowTracer {
         log::debug!("[EXTRACT_FUNCTION_BODY] Looking for function: {}", function_name);
 
         for (line_num, line) in lines.iter().enumerate() {
-            if line.trim().starts_with(&format!("def {}(", function_name)) {
+            if Self::is_function_definition_line(line, function_name) {
                 log::debug!(
                     "[EXTRACT_FUNCTION_BODY] Found function definition at line {}: {}",
                     line_num + 1,
