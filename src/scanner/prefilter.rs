@@ -216,11 +216,56 @@ impl PreFilter {
         }
     }
 
-    /// Simple pattern matching for test frameworks
+    /// Helper to check if a token or module pattern matches on identifier boundaries
+    fn is_identifier_character(c: char) -> bool {
+        c.is_alphanumeric() || c == '_'
+    }
+
+    fn matches_token_or_module(text: &str, pattern: &str) -> bool {
+        if pattern.contains('.')
+            || pattern.contains('@')
+            || pattern.contains('/')
+            || pattern.contains('-')
+        {
+            return text.contains(pattern);
+        }
+
+        let mut search_idx = 0;
+        while let Some(pos) = text[search_idx..].find(pattern) {
+            let abs_pos = search_idx + pos;
+            let before_ok = if abs_pos == 0 {
+                true
+            } else {
+                let prev_char = text[..abs_pos].chars().next_back().unwrap();
+                !Self::is_identifier_character(prev_char)
+            };
+
+            let end_pos = abs_pos + pattern.len();
+            let after_ok = if end_pos >= text.len() {
+                true
+            } else {
+                let next_char = text[end_pos..].chars().next().unwrap();
+                !Self::is_identifier_character(next_char)
+            };
+
+            if before_ok && after_ok {
+                return true;
+            }
+
+            search_idx = abs_pos + pattern.len();
+        }
+
+        false
+    }
+
+    /// Pattern matching for test frameworks on token boundaries
     fn has_test_patterns(&self, imports_text: &str) -> bool {
         let test_patterns = [
             // Universal test indicators
             "test",
+            "testing",
+            "testify",
+            "vitest",
             "mock",
             "spec",
             "jest",
@@ -235,30 +280,32 @@ impl PreFilter {
             "django.test",
             "flask.testing",
             "@testing-library",
+            "github.com/stretchr/testify",
             "org.junit",
             "org.mockito",
             "org.testng",
         ];
 
-        test_patterns.iter().any(|pattern| imports_text.contains(pattern))
+        test_patterns.iter().any(|pattern| Self::matches_token_or_module(imports_text, pattern))
     }
 
-    /// Simple pattern matching for migration frameworks
+    /// Pattern matching for migration frameworks on token boundaries
     fn has_migration_patterns(&self, imports_text: &str) -> bool {
         let migration_patterns = [
             "migration",
             "migrations",
-            "migrate",
+            "django.db.migrations",
             "alembic",
             "flyway",
             "liquibase",
-            "django.db.migrations",
             "sequelize",
             "knex",
             "typeorm",
         ];
 
-        migration_patterns.iter().any(|pattern| imports_text.contains(pattern))
+        migration_patterns
+            .iter()
+            .any(|pattern| Self::matches_token_or_module(imports_text, pattern))
     }
 
     pub fn filter_files(
