@@ -151,8 +151,19 @@ impl PythonAstProvenance {
             return Some(AstResolution::Assignments(assignments));
         }
 
-        let index = function.parameters.iter().position(|name| name == variable_name)?;
-        Some(AstResolution::Parameter { index })
+        if let Some(index) = function.parameters.iter().position(|name| name == variable_name) {
+            return Some(AstResolution::Parameter { index });
+        }
+
+        // When multiple same-named definitions exist in the file and the selected
+        // definition has no local assignments or parameters for this variable,
+        // report Ambiguous explicitly so the caller does not fall back to a text
+        // scan that would match a different same-named definition.
+        if function_list.len() > 1 {
+            return Some(AstResolution::Ambiguous);
+        }
+
+        None
     }
 
     fn file_facts(&mut self, file_path: &str) -> Option<&FileFacts> {
@@ -965,6 +976,21 @@ mod tests {
         );
         assert_eq!(safe_run.len(), 1);
         assert_eq!(safe_run[0].rhs, "\"uptime\"");
+    }
+
+    #[test]
+    fn duplicate_function_names_without_local_facts_resolve_as_ambiguous() {
+        let (_dir, path) = staged(
+            "class First:\n    def run(self):\n        cmd = input()\nclass Second:\n    def run(self):\n        pass\n",
+        );
+        let mut provenance = PythonAstProvenance::default();
+
+        // Line 5 is inside Second.run, which defines no `cmd` variable or parameter.
+        // It must resolve as Ambiguous so text fallback does not attribute First.run's facts to it.
+        assert!(matches!(
+            provenance.resolve_variable_reaching(&path, "run", "cmd", Some(5)),
+            Some(AstResolution::Ambiguous)
+        ));
     }
 
     #[test]
