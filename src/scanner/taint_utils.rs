@@ -112,7 +112,11 @@ impl TaintRuleDeduplicator {
     }
 
     /// Check if a pattern matches a source that is paired with the active sink
-    pub(crate) fn matches_source_pattern_for_sink(&self, text: &str, sink_pattern: &str) -> Option<String> {
+    pub(crate) fn matches_source_pattern_for_sink(
+        &self,
+        text: &str,
+        sink_pattern: &str,
+    ) -> Option<String> {
         if sink_pattern.is_empty() {
             return self.matches_source_pattern(text);
         }
@@ -128,12 +132,20 @@ impl TaintRuleDeduplicator {
             if CommonUtils::matches_taint_pattern(pattern, text) {
                 // Verify this source-sink combination is valid in the deduplicator rules
                 if self.get_rule_for_combination(pattern, sink_pattern).is_some() {
-                    log::debug!("[SOURCE_MATCH] Matched pattern: '{}' for sink: '{}'", pattern, sink_pattern);
+                    log::debug!(
+                        "[SOURCE_MATCH] Matched pattern: '{}' for sink: '{}'",
+                        pattern,
+                        sink_pattern
+                    );
                     return Some(pattern.clone());
                 }
-            } 
+            }
         }
-        log::debug!("[SOURCE_MATCH] No patterns matched for text: '{}' and sink: '{}'", text, sink_pattern);
+        log::debug!(
+            "[SOURCE_MATCH] No patterns matched for text: '{}' and sink: '{}'",
+            text,
+            sink_pattern
+        );
         None
     }
 
