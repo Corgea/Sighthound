@@ -75,11 +75,20 @@ mod exclusion_patterns_tests {
         };
 
         rules.apply_centralized_exclusions(&patterns(), "backend");
-        let file_types = rules.rules[0].file_types.as_ref().unwrap();
-        assert!(file_types.extensions.is_none());
+        let file_types = rules.rules[0].file_types.as_ref();
+        assert!(file_types.unwrap().extensions.is_none());
         assert_eq!(
-            file_types.exclude_patterns.as_ref().unwrap(),
+            file_types.unwrap().exclude_patterns.as_ref().unwrap(),
             &vec!["*.min.js".to_string(), "*_test.go".to_string()]
         );
+
+        // Exercise applicability: non-JS files match, but excluded files are skipped
+        assert!(sighthound::scanner::utils::rule_applies_to_file(file_types, "src/main.py"));
+        assert!(sighthound::scanner::utils::rule_applies_to_file(file_types, "src/service.go"));
+        assert!(!sighthound::scanner::utils::rule_applies_to_file(file_types, "src/app.min.js"));
+        assert!(!sighthound::scanner::utils::rule_applies_to_file(
+            file_types,
+            "src/handler_test.go"
+        ));
     }
 }
