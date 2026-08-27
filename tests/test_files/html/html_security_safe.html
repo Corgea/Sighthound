@@ -13,6 +13,14 @@
 <a href="data:text/plain,hello">Data</a>
 <button onclick="submitForm()">Run</button>
 <button onclick="greet(userName)">Greet</button>
+<button onclick="safe()" data-note="${x}">Sibling marker</button>
+<div data-onclick="${analyticsValue}">Analytics metadata</div>
+<a href="javascript:void(0)">Void</a>
+<a href="javascript:history.back()">Back</a>
+<a href="javascript:alert(1)" data-note="${x}">Sibling marker href</a>
+<form action="javascript:submitForm()" data-note="${x}"></form>
+<img src="javascript:loadImage()" data-note="${x}">
+<a href="javascript:(function(){if(typeof XMLHttpRequest!='undefined'){x=new XMLHttpRequest()}else{return;}x.open('HEAD',location.href,false);x.send(null);try{view=x.getResponseHeader('x-view');}catch(e){alert('No view found for this page');return;}if(view=='undefined'){alert('No view found for this page');}document.location='{% url 'django-admindocs-views-index' %}'+view+'/';})()">Bookmarklet</a>
 <iframe srcdoc="Static content only"></iframe>
 <div style="width:120px">Sized</div>
 <script>document.write("static banner");</script>
