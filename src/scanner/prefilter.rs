@@ -217,6 +217,10 @@ impl PreFilter {
     }
 
     /// Helper to check if a token or module pattern matches on identifier boundaries
+    fn is_identifier_character(c: char) -> bool {
+        c.is_alphanumeric() || c == '_'
+    }
+
     fn matches_token_or_module(text: &str, pattern: &str) -> bool {
         if pattern.contains('.')
             || pattern.contains('@')
@@ -233,7 +237,7 @@ impl PreFilter {
                 true
             } else {
                 let prev_char = text[..abs_pos].chars().next_back().unwrap();
-                !prev_char.is_alphabetic()
+                !Self::is_identifier_character(prev_char)
             };
 
             let end_pos = abs_pos + pattern.len();
@@ -241,7 +245,7 @@ impl PreFilter {
                 true
             } else {
                 let next_char = text[end_pos..].chars().next().unwrap();
-                !next_char.is_alphabetic()
+                !Self::is_identifier_character(next_char)
             };
 
             if before_ok && after_ok {
@@ -259,6 +263,9 @@ impl PreFilter {
         let test_patterns = [
             // Universal test indicators
             "test",
+            "testing",
+            "testify",
+            "vitest",
             "mock",
             "spec",
             "jest",
@@ -273,6 +280,7 @@ impl PreFilter {
             "django.test",
             "flask.testing",
             "@testing-library",
+            "github.com/stretchr/testify",
             "org.junit",
             "org.mockito",
             "org.testng",
@@ -284,6 +292,8 @@ impl PreFilter {
     /// Pattern matching for migration frameworks on token boundaries
     fn has_migration_patterns(&self, imports_text: &str) -> bool {
         let migration_patterns = [
+            "migration",
+            "migrations",
             "django.db.migrations",
             "alembic",
             "flyway",
