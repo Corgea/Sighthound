@@ -394,22 +394,87 @@ pub fn match_any_pattern(patterns: &[String], text: &str) -> bool {
     CommonUtils::matches_any_pattern(patterns, text)
 }
 
+/// True when the rule matches `text` and no `unless` entry vetoes the match.
+///
+/// A veto is *match-scoped*: each `unless` entry is tested against the byte span the
+/// matching pattern covers, never against the whole line. Scoping matters —
+/// `el.addEventListener('x', h); div.innerHTML = userInput;` must still report the
+/// innerHTML sink even though `addEventListener` is an `unless` entry of that rule.
 pub fn rule_matches_pattern_unified(rule: &UnifiedRule, text: &str) -> bool {
-    if let Some(pattern) = &rule.pattern
-        && match_pattern(pattern, text)
-    {
+    let mut matched = matching_patterns(rule, text).peekable();
+    if matched.peek().is_none() {
+        return false;
+    }
+
+    let Some(unless) = rule.unless.as_ref() else {
         return true;
+    };
+
+    // Every pattern that matched gets its span checked: a rule's patterns overlap, and a
+    // sanitizer sitting outside the narrowest match still belongs to the same expression.
+    !matched.any(|pattern| {
+        let scope = unless_scope_range(pattern, text).map_or(text, |range| &text[range]);
+        match_any_pattern(unless, scope)
+    })
+}
+
+/// The rule's patterns that match `text`: `pattern` before `patterns`, in file order.
+fn matching_patterns<'a>(
+    rule: &'a UnifiedRule,
+    text: &'a str,
+) -> impl Iterator<Item = &'a str> + 'a {
+    rule.pattern
+        .as_deref()
+        .into_iter()
+        .chain(rule.patterns.as_deref().unwrap_or_default().iter().map(String::as_str))
+        .filter(move |pattern| match_pattern(pattern, text))
+}
+
+/// Byte span of `pattern`'s match inside `text`, used *only* to scope `unless`.
+///
+/// `None` means "no span recoverable for this pattern form"; the caller then widens the
+/// scope to the whole `text`, which is how `unless` behaved before match scoping.
+///
+/// Deliberately separate from `pattern_match_range` below: that one feeds markup line
+/// attribution and must keep mirroring `matches_unified_pattern`'s "no range for glob"
+/// behaviour, or findings move lines.
+fn unless_scope_range(pattern: &str, text: &str) -> Option<std::ops::Range<usize>> {
+    if pattern == text {
+        return Some(0..text.len());
+    }
+    if let Some(stripped) = pattern.strip_prefix("regex:") {
+        return Regex::new(stripped).ok()?.find(text).map(|m| m.range());
+    }
+    if pattern.contains("\\\\") || pattern.contains("\\.") {
+        return Regex::new(pattern).ok()?.find(text).map(|m| m.range());
+    }
+    if pattern.contains('\\') {
+        // Escaped taint form: matched by string surgery, no span to recover.
+        return None;
+    }
+    tightest_segment_span(pattern, text)
+}
+
+/// Tightest in-order span of a glob/substring pattern's literal segments.
+///
+/// Anchored right-to-left: the last segment is taken at its *last* occurrence and each
+/// earlier segment at its last occurrence before the one that follows it. Leftmost-first
+/// would stretch the span across unrelated code — for `document.write(*user*` against
+/// `document.write("safe"); document.write(userInput);` it would swallow the quoted first
+/// call and let the `document\.write\(['\"]` exclusion veto the real finding.
+fn tightest_segment_span(pattern: &str, text: &str) -> Option<std::ops::Range<usize>> {
+    let mut end = text.len();
+    let mut span_end = None;
+    let mut start = None;
+
+    for segment in pattern.split('*').filter(|segment| !segment.is_empty()).rev() {
+        let found = text[..end].rfind(segment)?;
+        span_end.get_or_insert(found + segment.len());
+        start = Some(found);
+        end = found;
     }
 
-    if let Some(patterns) = &rule.patterns {
-        for pattern in patterns {
-            if match_pattern(pattern, text) {
-                return true;
-            }
-        }
-    }
-
-    false
+    Some(start?..span_end?)
 }
 
 /// Byte range of the first match of `pattern` inside `text`, when the pattern form can
