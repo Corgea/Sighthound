@@ -254,13 +254,20 @@ impl CodeTypeDetector {
         }
     }
 
-    fn extract_imports(&self, content: &str, _language: &str) -> Vec<String> {
+    fn extract_imports(&self, content: &str, language: &str) -> Vec<String> {
+        let lang = language.to_lowercase();
+        if !matches!(lang.as_str(), "javascript" | "typescript" | "tsx" | "jsx" | "js" | "ts") {
+            return Vec::new();
+        }
+
         let mut imports = Vec::new();
 
-        // Extract require() calls and ES import statements (including multiline and side-effect imports)
+        // Extract require() calls and ES import statements (including multiline and side-effect imports).
+        // The import ... from pattern is constrained to not match across statement boundaries (semicolons).
         let require_patterns = vec![
             regex::Regex::new(r#"require\(\s*['"]([^'"]+)['"]\s*\)"#).unwrap(),
-            regex::Regex::new(r#"(?s)import\s+.*?from\s+['"]([^'"]+)['"]"#).unwrap(),
+            regex::Regex::new(r#"(?s)import\s+(?:\{[^};]*\}|[^;]+?)\s+from\s*['"]([^'"]+)['"]"#)
+                .unwrap(),
             regex::Regex::new(r#"import\s*\(\s*['"]([^'"]+)['"]\s*\)"#).unwrap(),
             regex::Regex::new(r#"import\s+['"]([^'"]+)['"]"#).unwrap(),
         ];
@@ -538,5 +545,22 @@ mod tests {
             export const app = {};
         "#;
         assert_eq!(detector.detect_code_type("server.ts", code, "typescript"), CodeType::Backend);
+    }
+
+    #[test]
+    fn import_regex_does_not_capture_across_statement_boundaries() {
+        let detector = CodeTypeDetector::new();
+        // Semicolon ends the import statement; subsequent `from` in unrelated code must not form a match with `import`
+        let code = "import foo;\nlet x = calculate(from, 'react');\n";
+        let imports = detector.extract_imports(code, "javascript");
+        assert!(!imports.contains(&"react".to_string()));
+    }
+
+    #[test]
+    fn non_js_imports_do_not_override_backend_default() {
+        let detector = CodeTypeDetector::new();
+        // A Go file importing rxgo should not match JS frontend react signature
+        let code = "package main\n\nimport \"github.com/reactivex/rxgo\"\n";
+        assert_eq!(detector.detect_code_type("main.go", code, "go"), CodeType::Backend);
     }
 }
