@@ -10,9 +10,11 @@ use crate::scanner::taint_utils::{TaintExpressionUtils, TaintRuleDeduplicator};
 
 #[derive(Debug, Default)]
 pub(crate) struct DataFlowTracer {
-    /// Cache of analyzed variable sources to avoid re-computation (keyed by file, function, variable, sink line, and rule fingerprint u64).
+    /// Cache of analyzed variable sources to avoid re-computation (keyed by file, function, variable, sink line, and active sink pattern).
     variable_source_cache:
-        std::collections::HashMap<(String, String, String, usize, u64), VariableSource>,
+        std::collections::HashMap<(String, String, String, usize, String), VariableSource>,
+    /// Active sink pattern to isolate cache by rule/sink pattern
+    active_sink_pattern: String,
     /// In-flight variables currently being analyzed to prevent stack overflow on cyclic dependencies
     in_flight_variables: std::collections::BTreeSet<(String, String, String)>,
     /// Verified taint flows that have been fully validated
@@ -30,6 +32,7 @@ impl DataFlowTracer {
     pub(crate) fn new() -> Self {
         Self {
             variable_source_cache: std::collections::HashMap::new(),
+            active_sink_pattern: String::new(),
             in_flight_variables: std::collections::BTreeSet::new(),
             verified_flows: Vec::new(),
             import_map: std::collections::BTreeMap::new(),
@@ -117,6 +120,11 @@ impl DataFlowTracer {
             sink_file,
             sink_function
         );
+
+        let is_top_level = self.in_flight_variables.is_empty();
+        if is_top_level {
+            self.active_sink_pattern = sink_pattern.to_string();
+        }
 
         let sink_var_key =
             (sink_file.to_string(), sink_function.to_string(), sink_variable.to_string());
@@ -219,13 +227,12 @@ impl DataFlowTracer {
         sink_line: usize,
         rule_deduplicator: &TaintRuleDeduplicator,
     ) -> VariableSource {
-        let rule_fingerprint = rule_deduplicator.fingerprint();
         let cache_key = (
             file_path.to_string(),
             function_name.to_string(),
             variable_name.to_string(),
             sink_line,
-            rule_fingerprint,
+            self.active_sink_pattern.clone(),
         );
 
         // Check cache first
@@ -316,7 +323,7 @@ impl DataFlowTracer {
         }
 
         // Check if RHS is a direct taint source
-        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(rhs) {
+        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern_for_sink(rhs, &self.active_sink_pattern) {
             log::debug!("[COMPUTE_VARIABLE_SOURCE] Direct taint source: '{}'", source_pattern);
             return VariableSource::DirectTaintSource { pattern: source_pattern, line: file_line };
         }
@@ -598,6 +605,7 @@ impl DataFlowTracer {
     /// Classify an expression that reads an environment variable: user-controlled keys are
     /// tainted, known config keys are safe, anything else falls through (`None`).
     fn classify_env_key_expression(
+        &self,
         expr: &str,
         rule_deduplicator: &TaintRuleDeduplicator,
     ) -> Option<ValueSourceClassification> {
@@ -605,7 +613,7 @@ impl DataFlowTracer {
 
         if Self::is_user_controlled_env_key(&env_key) {
             let source_pattern = rule_deduplicator
-                .matches_source_pattern(expr)
+                .matches_source_pattern_for_sink(expr, &self.active_sink_pattern)
                 .unwrap_or_else(|| format!("env:{}", env_key));
             return Some(ValueSourceClassification::Tainted(source_pattern));
         }
@@ -624,6 +632,7 @@ impl DataFlowTracer {
     /// `sys.argv`, `request.`, ...) as tainted when it also matches a configured source
     /// pattern; falls through (`None`) otherwise.
     fn classify_known_source_indicators(
+        &self,
         expr: &str,
         rule_deduplicator: &TaintRuleDeduplicator,
     ) -> Option<ValueSourceClassification> {
@@ -637,7 +646,7 @@ impl DataFlowTracer {
             return None;
         }
 
-        rule_deduplicator.matches_source_pattern(expr).map(ValueSourceClassification::Tainted)
+        rule_deduplicator.matches_source_pattern_for_sink(expr, &self.active_sink_pattern).map(ValueSourceClassification::Tainted)
     }
 
     fn classify_value_source(
@@ -673,17 +682,17 @@ impl DataFlowTracer {
             return ValueSourceClassification::Safe("static config/template file read".to_string());
         }
 
-        if let Some(classification) = Self::classify_env_key_expression(expr, rule_deduplicator) {
+        if let Some(classification) = self.classify_env_key_expression(expr, rule_deduplicator) {
             return classification;
         }
 
         if let Some(classification) =
-            Self::classify_known_source_indicators(expr, rule_deduplicator)
+            self.classify_known_source_indicators(expr, rule_deduplicator)
         {
             return classification;
         }
 
-        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(expr) {
+        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern_for_sink(expr, &self.active_sink_pattern) {
             return ValueSourceClassification::Tainted(source_pattern);
         }
 
@@ -1048,7 +1057,7 @@ impl DataFlowTracer {
         }
 
         // Check if the source expression is a direct taint source
-        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(source_expression) {
+        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern_for_sink(source_expression, &self.active_sink_pattern) {
             log::debug!("[TRACE_LOCAL] Direct taint source found: '{}'", source_pattern);
             return self.record_direct_taint_flow(&site, source_pattern, assignment_line);
         }
@@ -1357,7 +1366,7 @@ impl DataFlowTracer {
         }
 
         // Check if return expression is a direct taint source
-        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern(return_expr) {
+        if let Some(source_pattern) = rule_deduplicator.matches_source_pattern_for_sink(return_expr, &self.active_sink_pattern) {
             log::debug!(
                 "[ANALYZE_FUNCTION] Function returns direct taint source: \"{}\"",
                 source_pattern
