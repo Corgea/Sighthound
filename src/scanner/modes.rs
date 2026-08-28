@@ -181,11 +181,7 @@ fn load_explicit_scan_rules(cli: &Cli, language: &str) -> Result<Rules> {
         all_rules.push(backend_rules);
     }
 
-    if all_rules.len() == 1 {
-        Ok(all_rules.into_iter().next().unwrap())
-    } else {
-        Rules::merge_rules(all_rules)
-    }
+    Rules::merge_rules(all_rules)
 }
 
 /// Print the banner shown at the start of an explicit scan.
@@ -313,11 +309,7 @@ fn load_rules_for_detected_language(cli: &Cli, language: &str) -> Result<Option<
         return Ok(None); // Skip if no rules found
     }
 
-    let rules = if all_rules.len() == 1 {
-        all_rules.into_iter().next().unwrap()
-    } else {
-        Rules::merge_rules(all_rules)?
-    };
+    let rules = Rules::merge_rules(all_rules)?;
     Ok(Some(rules))
 }
 
@@ -733,5 +725,34 @@ mod tests {
         let context = base_context(&["python"]);
 
         assert!(load_rules(&cli, &context).is_err());
+    }
+
+    #[test]
+    fn load_explicit_scan_rules_loads_and_merges_rules() {
+        let cli = base_cli();
+        let rules = load_explicit_scan_rules(&cli, "python").expect("explicit rules should load");
+        assert!(!rules.rules.is_empty());
+    }
+
+    #[test]
+    fn load_explicit_scan_rules_handles_nonexistent_rules_gracefully() {
+        let mut cli = base_cli();
+        cli.use_file_rules = true;
+        cli.language = Some("python".to_string());
+        cli.rules_path = Some("non_existent_rules_path.ron".to_string());
+
+        let res = load_explicit_scan_rules(&cli, "python");
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn load_rules_for_detected_language_returns_none_when_no_rules_found() {
+        let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+        let mut cli = base_cli();
+        cli.use_file_rules = true;
+        cli.rules_dir = Some(temp_dir.path().to_str().unwrap().to_string());
+
+        let res = load_rules_for_detected_language(&cli, "python").expect("should return Ok");
+        assert!(res.is_none());
     }
 }
