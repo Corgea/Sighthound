@@ -1,5 +1,6 @@
-use crate::language::{get_language_support, LanguageSupport};
+use crate::language::{LanguageSupport, get_language_support, get_language_support_for_path};
 use anyhow::{Context, Result};
+use std::path::Path;
 use tree_sitter::{Node, Parser as TSParser, Tree};
 
 pub struct LanguageParser {
@@ -10,6 +11,15 @@ pub struct LanguageParser {
 impl LanguageParser {
     pub fn new(language_name: &str) -> Result<Self> {
         let language_support = get_language_support(language_name)?;
+        Self::with_support(language_support)
+    }
+
+    pub fn new_for_path(language_name: &str, path: &Path) -> Result<Self> {
+        let language_support = get_language_support_for_path(language_name, path)?;
+        Self::with_support(language_support)
+    }
+
+    fn with_support(language_support: Box<dyn LanguageSupport>) -> Result<Self> {
         let language = language_support.tree_sitter_language();
         let mut parser = TSParser::new();
         parser.set_language(&language).context("Failed to set language")?;

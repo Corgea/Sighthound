@@ -1,5 +1,5 @@
 use sighthound::language::get_language_support;
-use sighthound::parser::{get_node_text, LanguageParser};
+use sighthound::parser::{LanguageParser, get_node_text};
 use tree_sitter::Node;
 
 #[cfg(test)]
@@ -189,6 +189,55 @@ mod language_support_tests {
             find_node_of_kind(tree.root_node(), "element").expect("expected an element node");
         // `element` has no `value` field in the HTML grammar.
         assert_eq!(support.get_arguments_node(&node), None);
+    }
+
+    // ---- SQL registry wiring ----
+    //
+    // SQL vanished from `main` once already because nothing under `tests/` referenced
+    // it. These three tests pin the registries themselves — language lookup, extension
+    // detection, and the embedded rule pack — so a second silent disappearance fails
+    // here rather than in production.
+
+    #[cfg(feature = "sql")]
+    #[test]
+    fn sql_language_support_reports_text_matching_shape() {
+        let support = get_language_support("sql").expect("sql language support available");
+        assert_eq!(support.name(), "sql");
+        assert_eq!(support.file_extension(), ".sql");
+        // Naming the parse-tree root makes `traverse_calls_only` yield exactly one node
+        // per file, which is what turns the AST scanner into a whole-file text scanner.
+        assert_eq!(support.call_node_types(), ["program"]);
+    }
+
+    #[cfg(feature = "sql")]
+    #[test]
+    fn sql_extensions_detect_as_sql() {
+        use sighthound::scanner::utils::detect_language_from_path;
+        use std::path::Path;
+
+        for name in ["a.sql", "a.ddl", "a.dml"] {
+            assert_eq!(
+                detect_language_from_path(Path::new(name)),
+                Some("sql"),
+                "{name} should be detected as sql"
+            );
+        }
+    }
+
+    #[cfg(feature = "sql")]
+    #[test]
+    fn sql_embedded_rules_include_both_injection_rules() {
+        use sighthound::rules::Rules;
+
+        let rules =
+            Rules::load_embedded_rules("sql", None).expect("embedded sql rules should load");
+        let ids: Vec<&str> = rules.rules.iter().filter_map(|r| r.id.as_deref()).collect();
+        // Assert on identity, not on a count: the pack may grow, but losing either of
+        // these is the regression worth catching. `sql-injection-002` carries the `||`
+        // pattern at Low/Low that `sql-injection-001` used to report as Critical.
+        for id in ["sql-injection-001", "sql-injection-002"] {
+            assert!(ids.contains(&id), "embedded sql rules should contain {id}, got {ids:?}");
+        }
     }
 
     // ---- HTML `get_arguments_node` ----

@@ -25,6 +25,11 @@ def safe(params)
   system({"ENV_VAR" => "val"}, ["ls", params[:cmd]]) # Safe because array literal with env hash
   system(["ls", params[:cmd]], {chdir: "/tmp"}) # Safe because array literal with options hash
   system({"ENV_VAR" => "val"}, ["ls", params[:cmd]], {chdir: "/tmp"}) # Safe because array literal with env and options hash
+  system("bash", "--version") # Safe because --version is not a shell command flag
+  system("bash", "-l") # Safe because -l alone does not execute a command string
+  system("ls", "-la", params[:cmd]) # Safe because multi-argument with flag
+  system("ls", "#{params[:cmd]}") # Safe because multi-argument argv execution (first arg is not a shell)
+  Open3.capture2("echo", "#{params[:cmd]}") # Safe because multi-argument argv execution
   
   User.where("id = ?", params[:id].to_i)
 end

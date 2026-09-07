@@ -1,0 +1,21 @@
+(
+    rules: [
+        (
+            id: Some("objectscript-sql-injection-execdirect"),
+            name: Some("Dynamic SQL passed to %ExecDirect"),
+            category: Some("sql-injection"),
+            mode: "search",
+            patterns: Some([
+                "*%ExecDirect(*_*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-89"),
+            description: Some("A dynamically concatenated SQL statement is executed directly. Use placeholders and bind values as parameters."),
+            file_types: Some((extensions: Some([".cls", ".mac", ".inc", ".int", ".rtn"]))),
+            tags: Some(["sql-injection", "cwe-89", "objectscript"])
+        )
+    ]
+)

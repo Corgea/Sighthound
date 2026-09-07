@@ -1,0 +1,22 @@
+(
+    rules: [
+        (
+            id: Some("objectscript-ssrf-http-get"),
+            name: Some("Request data used as an outbound HTTP target"),
+            category: Some("ssrf"),
+            mode: "search",
+            patterns: Some([
+                "*Get(*%request.Data(*",
+                "*Get(*%request.Get(*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Server-Side Request Forgery"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-918"),
+            description: Some("Untrusted HTTP request data is passed directly to an outbound HTTP request."),
+            file_types: Some((extensions: Some([".cls", ".mac", ".inc", ".int", ".rtn"]))),
+            tags: Some(["ssrf", "cwe-918", "objectscript"])
+        )
+    ]
+)

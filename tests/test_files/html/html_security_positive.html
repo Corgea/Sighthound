@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HTML security positives</title>
+<!-- EXPECT html-xss-011 -->
+<meta http-equiv="refresh" content="0;url=javascript:alert(1)">
+</head>
+<body>
+<!-- EXPECT html-xss-001 -->
+<a href="javascript:{{ user_var }}">Click</a>
+<!-- EXPECT html-xss-002 -->
+<form action="javascript:${xss}"></form>
+<!-- EXPECT html-xss-019 -->
+<img src="javascript:{{ user_var }}">
+<!-- EXPECT html-xss-020 -->
+<a href="data:text/html,<script>alert(1)</script>">Data</a>
+<!-- EXPECT html-xss-014 -->
+<button onclick="greet('${userName}')">Greet</button>
+<!-- EXPECT html-xss-008 -->
+<iframe srcdoc="${userContent}"></iframe>
+<!-- EXPECT html-xss-010 -->
+<div style="width:expression(alert(1))">Legacy</div>
+<!-- EXPECT html-xss-012 -->
+<script>document.write(userInput);</script>
+<!-- EXPECT html-xss-013 -->
+<script>eval(userInput);</script>
+<!-- EXPECT html-sec-001 -->
+<script>window.postMessage(payload, "*");</script>
+<!-- EXPECT html-xss-014: unquoted handler -->
+<button onclick=render(${userName})>Render</button>
+<!-- EXPECT html-xss-014: templated eval in onfocus -->
+<input onfocus="eval('${focusValue}')">
+<!-- EXPECT html-xss-014: templated eval in onblur -->
+<input onblur="eval('${blurValue}')">
+<!-- EXPECT html-xss-014: templated eval in onsubmit -->
+<form onsubmit="eval('${submission}')"></form>
+</body>
+</html>

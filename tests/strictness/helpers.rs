@@ -1,8 +1,9 @@
+use sighthound::VulnerabilityScanner;
 use sighthound::models::Finding;
 use sighthound::rules::Rules;
-use sighthound::VulnerabilityScanner;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use tempfile::TempDir;
 
 pub fn manifest_dir() -> PathBuf {
@@ -185,9 +186,7 @@ pub fn assert_findings_in_range(
         hits.len() >= min_count,
         "{context}: expected at least {min_count} findings between lines {min_line}-{max_line}, got {}: {:?}",
         hits.len(),
-        hits.iter()
-            .map(|f| (f.line, &f.finding_type))
-            .collect::<Vec<_>>()
+        hits.iter().map(|f| (f.line, &f.finding_type)).collect::<Vec<_>>()
     );
 }
 
@@ -216,9 +215,48 @@ pub fn assert_has_cross_file_finding_near(
     assert!(
         !hits.is_empty(),
         "{context}: expected cross-file finding in {filename} near line {line} (±{tolerance}), got: {:?}",
-        cross_file_findings(findings)
-            .iter()
-            .map(|f| (f.file.as_str(), f.line))
-            .collect::<Vec<_>>()
+        cross_file_findings(findings).iter().map(|f| (f.file.as_str(), f.line)).collect::<Vec<_>>()
     );
+}
+
+/// Raw process output from the shipped `sighthound` binary — exit code, stdout, and
+/// stderr kept separate. Lives here so several strictness suites can drive the CLI.
+#[allow(dead_code)]
+pub fn run_cli_raw(args: &[&str]) -> std::process::Output {
+    Command::new(sighthound_binary()).args(args).output().expect("failed to run sighthound binary")
+}
+
+/// Run the shipped `sighthound` binary and parse its JSON output.
+///
+/// The `status.success()` assert is load-bearing: it fires *before* the empty-stdout
+/// fallback below, so a non-zero exit surfaces as a loud panic instead of an empty
+/// finding set. Do not replace it with a silent `Vec::new()`.
+#[allow(dead_code)]
+pub fn run_cli_json(args: &[&str]) -> Vec<serde_json::Value> {
+    let output = run_cli_raw(args);
+    assert!(
+        output.status.success(),
+        "sighthound failed with status {:?}: {}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    match serde_json::from_slice(&output.stdout) {
+        Ok(findings) => findings,
+        Err(_) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.trim().is_empty() || stdout.trim_start().starts_with("No ") {
+                Vec::new()
+            } else {
+                panic!("failed to parse scanner JSON output: {stdout}");
+            }
+        }
+    }
+}
+
+#[allow(dead_code)]
+pub fn sighthound_binary() -> PathBuf {
+    if let Ok(path) = std::env::var("CARGO_BIN_EXE_sighthound") {
+        return PathBuf::from(path);
+    }
+    fixture_path("target/debug/sighthound")
 }

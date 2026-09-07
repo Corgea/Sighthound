@@ -26,10 +26,7 @@ fn cross_file_accuracy_fixtures_report_real_vulnerabilities() {
         module_c.len() >= 4,
         "cross_file/module_c.py should have multiple cross-file command-injection flows, got {}: {:?}",
         module_c.len(),
-        module_c
-            .iter()
-            .map(|f| (f.line, f.finding_type.as_str()))
-            .collect::<Vec<_>>()
+        module_c.iter().map(|f| (f.line, f.finding_type.as_str())).collect::<Vec<_>>()
     );
 }
 

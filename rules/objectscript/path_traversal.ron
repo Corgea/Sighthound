@@ -1,0 +1,22 @@
+(
+    rules: [
+        (
+            id: Some("objectscript-path-traversal-file-open"),
+            name: Some("Dynamic path passed to file API"),
+            category: Some("path-traversal"),
+            mode: "search",
+            patterns: Some([
+                "*%Library.File*Open(*_*",
+                "*%Stream.FileBinary*%New(*_*",
+                "=__sh_fullctx__"
+            ]),
+            finding_type: Some("Path Traversal"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-22"),
+            description: Some("A file path is assembled dynamically before use. Resolve and allowlist the final path."),
+            file_types: Some((extensions: Some([".cls", ".mac", ".inc", ".int", ".rtn"]))),
+            tags: Some(["path-traversal", "cwe-22", "objectscript"])
+        )
+    ]
+)

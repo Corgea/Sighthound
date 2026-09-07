@@ -1,7 +1,9 @@
 use sighthound::models::UnifiedRule;
 use sighthound::rules::{
-    match_any_pattern, match_pattern, rule_matches_pattern_unified, validate_unified_rule_patterns,
+    Rules, match_any_pattern, match_pattern, rule_matches_pattern_unified,
+    validate_unified_rule_patterns,
 };
+use std::collections::BTreeSet;
 
 // Build a search-mode UnifiedRule carrying the given pattern/patterns.
 // UnifiedRule does not derive Default, so this helper fills the remaining fields.
@@ -240,6 +242,43 @@ mod pattern_matching_tests {
         assert!(match_any_pattern(&crypto_patterns, "crypto.SHA1"));
         assert!(match_any_pattern(&crypto_patterns, "file.md5"));
         assert!(match_any_pattern(&crypto_patterns, "hashlib.md5"));
+    }
+
+    #[test]
+    fn html_security_pack_declares_exactly_the_eleven_rule_ids() {
+        // Relative path works from a test — tests/strictness/helpers.rs already does
+        // Rules::load_from_directory("rules/python/").
+        let rules = Rules::load_from_file("rules/html/html_security.ron")
+            .expect("failed to load rules/html/html_security.ron");
+
+        let ids: BTreeSet<&str> =
+            rules.rules.iter().filter_map(|rule| rule.id.as_deref()).collect();
+        // html-xss-004 was removed because an eval call alone carried no taint signal.
+        let expected: BTreeSet<&str> = [
+            "html-xss-001",
+            "html-xss-002",
+            "html-xss-008",
+            "html-xss-010",
+            "html-xss-011",
+            "html-xss-012",
+            "html-xss-013",
+            "html-xss-014",
+            "html-xss-019",
+            "html-xss-020",
+            "html-sec-001",
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(ids, expected, "html_security.ron must declare exactly the eleven rule ids");
+        assert_eq!(rules.rules.len(), 11, "every rule in the pack must carry an id");
+
+        // validate_unified_rule_patterns has no production call site (src/rules.rs), so a
+        // malformed `regex:` would otherwise fail silently at scan time.
+        for rule in &rules.rules {
+            validate_unified_rule_patterns(rule)
+                .unwrap_or_else(|e| panic!("invalid pattern in {:?}: {e}", rule.id));
+        }
     }
 }
 

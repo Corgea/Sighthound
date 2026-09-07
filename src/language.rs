@@ -1,6 +1,19 @@
 use crate::parser::get_node_text_slice;
 use anyhow::Result;
+use std::path::Path;
 use tree_sitter::{Language, Node};
+
+/// How search-mode rules are matched against the parse tree.
+///
+/// `Ast` is the default every language inherits: the prefilter and the final match both
+/// run against the resolved "function" name. `Markup` matches against the full text of
+/// the candidate node instead, which is what lets a pattern span two attributes or sit
+/// inside a `<script>` body — neither of which a name is able to express.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchSemantics {
+    Ast,
+    Markup,
+}
 
 pub trait LanguageSupport: Send + Sync {
     fn name(&self) -> &'static str;
@@ -9,6 +22,9 @@ pub trait LanguageSupport: Send + Sync {
     fn call_node_types(&self) -> &[&'static str];
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str>;
     fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>>;
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Ast
+    }
 }
 
 pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSupport>> {
@@ -35,6 +51,10 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
         "django" | "django-html" => Ok(Box::new(DjangoTemplateLanguage)),
         #[cfg(feature = "php")]
         "php" => Ok(Box::new(PHPLanguage)),
+        #[cfg(feature = "objectscript")]
+        "objectscript" => Ok(Box::new(ObjectScriptLanguage::udl())),
+        #[cfg(feature = "sql")]
+        "sql" => Ok(Box::new(SQLLanguage)),
         _ => {
             let mut supported = Vec::new();
             #[cfg(feature = "python")]
@@ -59,6 +79,10 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
             supported.push("django");
             #[cfg(feature = "php")]
             supported.push("php");
+            #[cfg(feature = "objectscript")]
+            supported.push("objectscript");
+            #[cfg(feature = "sql")]
+            supported.push("sql");
 
             anyhow::bail!(
                 "Unsupported language: {}. Supported languages: {}",
@@ -67,6 +91,31 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
             )
         }
     }
+}
+
+pub fn get_language_support_for_path(
+    language_name: &str,
+    path: &Path,
+) -> Result<Box<dyn LanguageSupport>> {
+    #[cfg(feature = "objectscript")]
+    if language_name.eq_ignore_ascii_case("objectscript") {
+        let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or_default();
+        let grammar =
+            if matches!(extension.to_ascii_lowercase().as_str(), "mac" | "inc" | "int" | "rtn") {
+                ObjectScriptGrammar::Routine
+            } else {
+                ObjectScriptGrammar::Udl
+            };
+        return Ok(Box::new(ObjectScriptLanguage { grammar }));
+    }
+
+    get_language_support(language_name)
+}
+
+fn direct_named_child_of_kind<'a>(node: &Node<'a>, kind: &str) -> Option<Node<'a>> {
+    let mut cursor = node.walk();
+
+    node.named_children(&mut cursor).find(|child| child.kind() == kind)
 }
 
 // Python Implementation
@@ -410,12 +459,98 @@ impl LanguageSupport for PHPLanguage {
     }
 }
 
+#[cfg(feature = "objectscript")]
+#[derive(Clone, Copy)]
+enum ObjectScriptGrammar {
+    Udl,
+    Routine,
+}
+
+#[cfg(feature = "objectscript")]
+pub struct ObjectScriptLanguage {
+    grammar: ObjectScriptGrammar,
+}
+
+#[cfg(feature = "objectscript")]
+impl ObjectScriptLanguage {
+    fn udl() -> Self {
+        Self { grammar: ObjectScriptGrammar::Udl }
+    }
+}
+
+#[cfg(feature = "objectscript")]
+impl LanguageSupport for ObjectScriptLanguage {
+    fn name(&self) -> &'static str {
+        "objectscript"
+    }
+
+    fn file_extension(&self) -> &'static str {
+        ".cls"
+    }
+
+    fn tree_sitter_language(&self) -> Language {
+        match self.grammar {
+            ObjectScriptGrammar::Udl => tree_sitter_objectscript::LANGUAGE_OBJECTSCRIPT_UDL.into(),
+            ObjectScriptGrammar::Routine => {
+                tree_sitter_objectscript_routine::LANGUAGE_OBJECTSCRIPT_ROUTINE.into()
+            }
+        }
+    }
+
+    fn call_node_types(&self) -> &[&'static str] {
+        &[
+            "class_method_call",
+            "oref_method",
+            "superclass_method_call",
+            "extrinsic_function",
+            "system_defined_function",
+            "routine_tag_call",
+            "command_xecute",
+        ]
+    }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        match node.kind() {
+            "class_method_call" | "oref_method" => direct_named_child_of_kind(node, "method_name")
+                .map(|child| get_node_text_slice(&child, source)),
+            "extrinsic_function" | "routine_tag_call" => {
+                direct_named_child_of_kind(node, "line_ref")
+                    .map(|child| get_node_text_slice(&child, source))
+            }
+            "superclass_method_call" => Some("##SUPER"),
+            "command_xecute" => Some("XECUTE"),
+            "system_defined_function" => {
+                let text = get_node_text_slice(node, source);
+                Some(text.split_once('(').map_or(text, |(name, _)| name))
+            }
+            _ => None,
+        }
+    }
+
+    fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>> {
+        match node.kind() {
+            "class_method_call"
+            | "oref_method"
+            | "superclass_method_call"
+            | "extrinsic_function"
+            | "routine_tag_call" => direct_named_child_of_kind(node, "method_args"),
+            "command_xecute" => direct_named_child_of_kind(node, "xecute_argument"),
+            "system_defined_function" => node.named_child(0),
+            _ => None,
+        }
+    }
+}
+
 // HTML Implementation
 #[cfg(feature = "html")]
 pub struct HTMLLanguage;
 
 #[cfg(feature = "html")]
 impl LanguageSupport for HTMLLanguage {
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Markup
+    }
+
     fn name(&self) -> &'static str {
         "html"
     }
@@ -482,6 +617,10 @@ pub struct DjangoTemplateLanguage;
 
 #[cfg(feature = "django")]
 impl LanguageSupport for DjangoTemplateLanguage {
+    fn search_semantics(&self) -> SearchSemantics {
+        SearchSemantics::Markup
+    }
+
     fn name(&self) -> &'static str {
         "django"
     }
@@ -546,5 +685,37 @@ impl LanguageSupport for DjangoTemplateLanguage {
             }
             _ => node.child_by_field_name("value"),
         }
+    }
+}
+
+// SQL Implementation — text-based matching; the JS grammar is a no-op host.
+// `call_node_types()` names the parse-tree root, so `traverse_calls_only` yields
+// exactly one node per file and `get_function_name` hands rules the whole file
+// as the text to match against.
+#[cfg(feature = "sql")]
+pub struct SQLLanguage;
+
+#[cfg(feature = "sql")]
+impl LanguageSupport for SQLLanguage {
+    fn name(&self) -> &'static str {
+        "sql"
+    }
+    fn file_extension(&self) -> &'static str {
+        ".sql"
+    }
+    fn tree_sitter_language(&self) -> Language {
+        tree_sitter_javascript::LANGUAGE.into()
+    }
+    fn call_node_types(&self) -> &[&'static str] {
+        &["program"]
+    }
+
+    fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
+        let text = &source[node.start_byte()..node.end_byte()];
+        std::str::from_utf8(text).ok()
+    }
+
+    fn get_arguments_node<'a>(&self, _node: &'a Node) -> Option<Node<'a>> {
+        None // Not used for simple text matching
     }
 }

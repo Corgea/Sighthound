@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::{BufWriter, Write};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use syntect::easy::HighlightLines;
@@ -229,18 +229,19 @@ fn build_sarif_log(findings: &[Finding]) -> serde_json::Value {
                 "text": finding.description.clone().unwrap_or_else(|| finding.finding_type.clone())
             },
         });
-        if let Some(cwe) = &finding.cwe_id {
-            if !cwe.is_empty() {
-                tags.push(serde_json::json!(format!("external/cwe/{}", id)));
-                // cwe ids look like "cwe-78"; derive the numeric part for the help URI.
-                if let Some(num) = cwe.rsplit('-').next() {
-                    if num.chars().all(|c| c.is_ascii_digit()) && !num.is_empty() {
-                        rule["helpUri"] = serde_json::json!(format!(
-                            "https://cwe.mitre.org/data/definitions/{}.html",
-                            num
-                        ));
-                    }
-                }
+        if let Some(cwe) = &finding.cwe_id
+            && !cwe.is_empty()
+        {
+            tags.push(serde_json::json!(format!("external/cwe/{}", id)));
+            // cwe ids look like "cwe-78"; derive the numeric part for the help URI.
+            if let Some(num) = cwe.rsplit('-').next()
+                && num.chars().all(|c| c.is_ascii_digit())
+                && !num.is_empty()
+            {
+                rule["helpUri"] = serde_json::json!(format!(
+                    "https://cwe.mitre.org/data/definitions/{}.html",
+                    num
+                ));
             }
         }
         rule["properties"] = serde_json::json!({
@@ -315,12 +316,21 @@ pub fn print_findings_sarif(findings: &[Finding]) -> Result<()> {
 }
 
 /// Print findings in CSV format
+fn csv_quoted_field(value: &str) -> String {
+    format!("\"{}\"", value.replace('"', "\"\""))
+}
+
+fn csv_field(value: &str) -> String {
+    if value.contains([',', '"', '\r', '\n']) { csv_quoted_field(value) } else { value.to_string() }
+}
 pub fn print_findings_csv(findings: &[Finding]) -> Result<()> {
     let stdout = std::io::stdout();
     let mut out = BufWriter::new(stdout.lock());
-    writeln!(out, "file,line,function,finding_type,code,severity,confidence,cwe_id,source_type,source_context,sink_type,sink_function,traces")?;
+    writeln!(
+        out,
+        "file,line,function,finding_type,code,severity,confidence,cwe_id,source_type,source_context,sink_type,sink_function,traces"
+    )?;
     for finding in findings {
-        let code = finding.snippet.replace('"', "\"\"");
         let source_type =
             finding.source_info.as_ref().map(|s| s.source_type.as_str()).unwrap_or("");
         let source_context = finding.source_info.as_ref().map(|s| s.context.as_str()).unwrap_or("");
@@ -339,23 +349,22 @@ pub fn print_findings_csv(findings: &[Finding]) -> Result<()> {
             String::new()
         };
 
-        writeln!(
-            out,
-            "{},{},{},{},\"{}\",{},{},{},{},{},{},{},\"{}\"",
-            finding.file,
-            finding.line,
-            finding.function,
-            finding.finding_type,
-            code,
-            finding.severity,
-            finding.confidence,
-            cwe_id,
-            source_type,
-            source_context,
-            sink_type,
-            sink_function,
-            traces
-        )?;
+        let record = [
+            csv_field(&finding.file),
+            finding.line.to_string(),
+            csv_field(&finding.function),
+            csv_field(&finding.finding_type),
+            csv_quoted_field(&finding.snippet),
+            csv_field(&finding.severity),
+            csv_field(&finding.confidence),
+            csv_field(cwe_id),
+            csv_field(source_type),
+            csv_field(source_context),
+            csv_field(sink_type),
+            csv_field(sink_function),
+            csv_quoted_field(&traces),
+        ];
+        writeln!(out, "{}", record.join(","))?;
     }
     out.flush()?;
     Ok(())

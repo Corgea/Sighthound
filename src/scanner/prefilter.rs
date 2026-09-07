@@ -1,5 +1,5 @@
 use crate::config::filters::SKIP_MINIFIED_PATTERNS;
-use crate::parser::{get_node_text, LanguageParser};
+use crate::parser::{LanguageParser, get_node_text};
 use crate::rules::Rules;
 use crate::scanner::utils::matches_glob_pattern;
 use anyhow::Result;
@@ -52,10 +52,10 @@ impl PreFilter {
 
     pub fn should_scan_file(&self, file_path: &str) -> bool {
         // Skip empty files
-        if let Ok(metadata) = fs::metadata(file_path) {
-            if metadata.len() == 0 {
-                return false;
-            }
+        if let Ok(metadata) = fs::metadata(file_path)
+            && metadata.len() == 0
+        {
+            return false;
         }
 
         // For malicious scanning, scan everything else (including text/doc and
@@ -185,17 +185,17 @@ impl PreFilter {
     /// Extract all import statements as a single text blob
     fn extract_imports(&self, file_path: &str) -> Result<String> {
         let source = fs::read(file_path)?;
-        let mut parser = LanguageParser::new(&self.language)?;
+        let mut parser = LanguageParser::new_for_path(&self.language, Path::new(file_path))?;
         let tree = parser.parse(&source)?;
 
         let mut imports_text = String::new();
-        self.collect_imports(&tree.root_node(), &source, &mut imports_text);
+        Self::collect_imports(&tree.root_node(), &source, &mut imports_text);
 
         Ok(imports_text.to_lowercase())
     }
 
     /// Recursively collect all import-like text
-    fn collect_imports(&self, node: &Node, source: &[u8], imports_text: &mut String) {
+    fn collect_imports(node: &Node, source: &[u8], imports_text: &mut String) {
         // Check if this looks like an import statement
         let node_kind = node.kind();
         if node_kind.contains("import") {
@@ -208,7 +208,7 @@ impl PreFilter {
         let mut cursor = node.walk();
         if cursor.goto_first_child() {
             loop {
-                self.collect_imports(&cursor.node(), source, imports_text);
+                Self::collect_imports(&cursor.node(), source, imports_text);
                 if !cursor.goto_next_sibling() {
                     break;
                 }
@@ -311,10 +311,10 @@ impl PreFilter {
     /// Single-pass filtering with reason tracking to avoid duplicate checks
     fn check_file_with_reason(&self, file_path: &str) -> FilterReason {
         // Skip empty files first (fastest check)
-        if let Ok(metadata) = fs::metadata(file_path) {
-            if metadata.len() == 0 {
-                return FilterReason::Doc; // Treat empty files as doc files
-            }
+        if let Ok(metadata) = fs::metadata(file_path)
+            && metadata.len() == 0
+        {
+            return FilterReason::Doc; // Treat empty files as doc files
         }
 
         // For malicious scanning, include everything else (skip other checks),

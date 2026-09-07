@@ -40,3 +40,7 @@ Pytest and scan fixtures both live under these trees — do not put Python/Djang
    - Name by topic: `sql_injection.py`, `command_injection.py`, `views.py`
    - Avoid `test_*.py` / `*_test.py` and `def test_*` so fixtures are not collected by pytest and do not collide with scanner test-skip patterns.
    - Django app samples use app-like names (`views.py`, `migration_sample.py`).
+
+## Agent skill
+
+CLI flag or output-format changes must also update the agent skill at https://github.com/Corgea/skills (`plugins/sighthound/skills/sighthound/SKILL.md`).

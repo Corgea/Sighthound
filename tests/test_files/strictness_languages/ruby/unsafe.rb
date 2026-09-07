@@ -29,6 +29,8 @@ def unsafe(params)
   system({"ENV_VAR" => "val"}, "sh", "-c", params[:cmd]) # Unsafe (explicit shell with env hash)
   system("sh", "-c", params[:cmd], {chdir: "/tmp"}) # Unsafe (explicit shell with options hash)
   system({"ENV_VAR" => "val"}, "sh", "-c", params[:cmd], {chdir: "/tmp"}) # Unsafe (explicit shell with env and options hash)
+  system({"ENV_VAR" => "val"}, "bash", "-lc", params[:cmd]) # Unsafe (explicit shell with clustered -lc flag)
+  system({"ENV_VAR" => "val"}, "sh", "-ec", params[:cmd]) # Unsafe (explicit shell with clustered -ec flag)
   
   User.where("id = #{params[:id]}")
 end

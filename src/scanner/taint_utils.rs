@@ -55,11 +55,19 @@ impl TaintRuleDeduplicator {
         let result = self.rule_mapping.get(&key);
 
         if let Some(rule) = result {
-            log::debug!("[RULE_SELECTION] Found rule for source='{}' + sink='{}' -> rule_id={:?}, finding_type={:?}", 
-                source_pattern, sink_pattern, rule.id, rule.finding_type);
+            log::debug!(
+                "[RULE_SELECTION] Found rule for source='{}' + sink='{}' -> rule_id={:?}, finding_type={:?}",
+                source_pattern,
+                sink_pattern,
+                rule.id,
+                rule.finding_type
+            );
         } else {
-            log::debug!("[RULE_SELECTION] No rule found for source='{}' + sink='{}'. Showing up to 5 mappings", 
-                source_pattern, sink_pattern);
+            log::debug!(
+                "[RULE_SELECTION] No rule found for source='{}' + sink='{}'. Showing up to 5 mappings",
+                source_pattern,
+                sink_pattern
+            );
             for ((src, snk), rule) in self.rule_mapping.iter().take(5) {
                 log::debug!("   - ('{}', '{}') -> {:?}", src, snk, rule.finding_type);
             }
@@ -160,11 +168,7 @@ impl TaintExpressionUtils {
         let name: String =
             trimmed.chars().take_while(|c| c.is_ascii_alphanumeric() || "_".contains(*c)).collect();
 
-        if CommonUtils::is_valid_variable_name(&name) {
-            name
-        } else {
-            String::new()
-        }
+        if CommonUtils::is_valid_variable_name(&name) { name } else { String::new() }
     }
 
     pub(crate) fn extract_php_variables(expression: &str) -> Vec<String> {

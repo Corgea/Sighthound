@@ -1,8 +1,110 @@
 (
     rules: [
-        // Raw-SQL execution helpers and inline string-built queries.
-        // The "%"/"+"/"=" bearing patterns force full-call-text matching, so the
-        // whole list is evaluated against the call text (not just the function name).
+        // Covers `"..." % x` and `"..." + x` passed to cursor.execute.
+        // Parameterized execute("...%s", params) has a string as arg0, not
+        // a binary_operator, so it is not matched.
+        (
+            id: Some("python-sql-raw-binop"),
+            name: Some("Raw SQL Execution (binary-built query)"),
+            category: Some("database"),
+            mode: "search",
+            patterns: Some([
+                "cursor.execute",
+            ]),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "matches",
+                    value: "",
+                    condition_type: Some("has_argument"),
+                    argument_position: Some(0),
+                    node_type: Some("binary_operator"),
+                ),
+                (
+                    field: "argument",
+                    operator: "not_contains",
+                    value: "",
+                    condition_type: Some("argument_not_sanitized"),
+                    patterns: Some([
+                        "*sql.SQL(*",
+                        "*psql.SQL(*",
+                    ]),
+                ),
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-89"),
+            description: Some("Raw SQL query executed from a dynamically-built string (string formatting/concatenation)"),
+            file_types: Some((
+                extensions: Some([".py"])
+            )),
+            tags: Some(["sql", "injection", "database"])
+        ),
+
+        // Covers f-strings and str.format called directly as the query argument
+        // of cursor.execute. Checks the 0th argument specifically to avoid false
+        // positives on parameterized values that happen to be f-strings/format.
+        (
+            id: Some("python-sql-raw-format"),
+            name: Some("Raw SQL Execution (format-built query)"),
+            category: Some("database"),
+            mode: "search",
+            patterns: Some([
+                "cursor.execute",
+            ]),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "matches",
+                    value: "",
+                    condition_type: Some("has_argument"),
+                    argument_position: Some(0),
+                    patterns: Some([
+                        "f\"*",
+                        "f'*",
+                        "F\"*",
+                        "F'*",
+                        "fr\"*",
+                        "fr'*",
+                        "rf\"*",
+                        "rf'*",
+                        "Fr\"*",
+                        "Fr'*",
+                        "fR\"*",
+                        "fR'*",
+                        "FR\"*",
+                        "FR'*",
+                        "Rf\"*",
+                        "Rf'*",
+                        "rF\"*",
+                        "rF'*",
+                        "*.format(*",
+                    ]),
+                ),
+                (
+                    field: "argument",
+                    operator: "not_contains",
+                    value: "",
+                    condition_type: Some("argument_not_sanitized"),
+                    patterns: Some([
+                        "*sql.SQL(*",
+                        "*psql.SQL(*",
+                    ]),
+                ),
+            ]),
+            finding_type: Some("SQL Injection"),
+            severity: Some("Critical"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-89"),
+            description: Some("Raw SQL query executed from a dynamically-built string (f-string or format)"),
+            file_types: Some((
+                extensions: Some([".py"])
+            )),
+            tags: Some(["sql", "injection", "database"])
+        ),
+
+        // Unsafe raw SQL helper functions and executing scripts.
         (
             id: Some("python-sql-raw-001"),
             name: Some("Raw SQL Execution"),
@@ -10,18 +112,25 @@
             mode: "search",
             patterns: Some([
                 "execute_raw_query(",
-                "*cursor.execute(*%*",
-                "*cursor.execute(*.format(*",
-                "*cursor.execute(f\"*",
-                "*cursor.execute(f'*",
-                "*cursor.execute(*+*",
                 "*.executescript(*",
+            ]),
+            conditions: Some([
+                (
+                    field: "argument",
+                    operator: "not_contains",
+                    value: "",
+                    condition_type: Some("argument_not_sanitized"),
+                    patterns: Some([
+                        "*sql.SQL(*",
+                        "*psql.SQL(*",
+                    ]),
+                ),
             ]),
             finding_type: Some("SQL Injection"),
             severity: Some("Critical"),
             confidence: Some("Medium"),
             cwe_id: Some("cwe-89"),
-            description: Some("Raw SQL query executed from a dynamically-built string (string formatting/concatenation)"),
+            description: Some("Raw SQL query executed via unsafe helper function"),
             file_types: Some((
                 extensions: Some([".py"])
             )),

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::cli::Cli;
 use crate::rules::Rules;
@@ -123,18 +123,15 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
                 }
 
                 // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
-                if matches!(language.as_str(), "javascript" | "tsx") {
-                    if let Some(code_type) = &cli.code_type {
-                        if code_type != "frontend" {
-                            let base_rules_dir = cli.rules_dir.as_deref().unwrap_or("rules");
-                            let backend_rules_file = format!(
-                                "{}/backend_javascript/backend_security.ron",
-                                base_rules_dir
-                            );
-                            if let Ok(backend_rules) = Rules::load_from_file(&backend_rules_file) {
-                                all_rules.push(backend_rules);
-                            }
-                        }
+                if matches!(language.as_str(), "javascript" | "tsx")
+                    && let Some(code_type) = &cli.code_type
+                    && code_type != "frontend"
+                {
+                    let base_rules_dir = cli.rules_dir.as_deref().unwrap_or("rules");
+                    let backend_rules_file =
+                        format!("{}/backend_javascript/backend_security.ron", base_rules_dir);
+                    if let Ok(backend_rules) = Rules::load_from_file(&backend_rules_file) {
+                        all_rules.push(backend_rules);
                     }
                 }
             }
@@ -178,10 +175,10 @@ fn load_explicit_scan_rules(cli: &Cli, language: &str) -> Result<Rules> {
 
     // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
     // (Note: For embedded rules, backend rules are already loaded in load_embedded_rules)
-    if !should_use_embedded_rules(cli) {
-        if let Some(backend_rules) = load_backend_js_rules_if_needed(cli, language) {
-            all_rules.push(backend_rules);
-        }
+    if !should_use_embedded_rules(cli)
+        && let Some(backend_rules) = load_backend_js_rules_if_needed(cli, language)
+    {
+        all_rules.push(backend_rules);
     }
 
     if all_rules.len() == 1 {
@@ -528,7 +525,7 @@ pub fn run_taint_analysis_with_verbosity(
     verbose_mode: bool,
 ) -> Result<Vec<Finding>> {
     // When taint runs as the second pass of a combined scan (verbose_mode = false),
-    // stay completely silent so we don't duplicate the banner, progress bar, or tallies.
+    // suppress the banner, progress bar, and tallies so we don't duplicate the first pass.
     let report = show_progress && verbose_mode;
     let scan_start = std::time::Instant::now();
 
@@ -541,12 +538,18 @@ pub fn run_taint_analysis_with_verbosity(
     // Check if we have taint flow rules
     let taint_rules_count = rules.rules.iter().filter(|r| r.is_taint_rule()).count();
 
+    // Some rule packs ship search-mode rules only (e.g. html, objectscript, sql). Skip the taint
+    // pass instead of failing the scan and discarding the search-pass findings.
     if taint_rules_count == 0 {
-        return Err(anyhow::anyhow!(
-            "No taint flow rules found. Please ensure your rules contain rules with mode='taint'."
-        ));
+        if show_progress {
+            crate::ui::warn(&format!(
+                "no taint-mode rules for {} - skipping taint analysis",
+                context.detected_languages.join(", ")
+            ));
+        }
+        return Ok(Vec::new());
     }
-    if show_progress && verbose_mode {
+    if report {
         print_taint_analysis_intro(root_dir, taint_rules_count, context.total_files);
     }
     // Use the unified VulnerabilityScanner infrastructure for massive speedup!
@@ -590,7 +593,7 @@ pub fn run_taint_analysis_with_verbosity(
 
     let scan_duration = scan_start.elapsed();
 
-    if show_progress && verbose_mode {
+    if report {
         print_taint_analysis_summary(&context, taint_rules_count, scan_duration, &taint_findings);
     }
 

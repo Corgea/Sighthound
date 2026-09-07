@@ -1,4 +1,4 @@
-use sighthound::rules::{rule_matches_pattern_unified, validate_unified_rule_patterns, Rules};
+use sighthound::rules::{Rules, rule_matches_pattern_unified, validate_unified_rule_patterns};
 use std::io::Write;
 use tempfile::NamedTempFile;
 
@@ -436,6 +436,46 @@ def malicious_functions():
         assert!(rule_matches_pattern_unified(url_rule, "tinyurl"));
         assert!(rule_matches_pattern_unified(url_rule, "t.co"));
         assert!(!rule_matches_pattern_unified(url_rule, "github.com"));
+    }
+
+    #[test]
+    fn test_csv_quotes_file_paths_with_commas() {
+        let bin_path = if let Ok(path) = std::env::var("CARGO_BIN_EXE_sighthound") {
+            std::path::PathBuf::from(path)
+        } else {
+            std::path::PathBuf::from("target/debug/sighthound")
+        };
+
+        if !bin_path.exists() {
+            return;
+        }
+
+        let mut python_file = tempfile::Builder::new()
+            .prefix("vulnerable,")
+            .suffix(".py")
+            .tempfile()
+            .expect("Failed to create temp file");
+        writeln!(python_file, "import os\nos.system(input())")
+            .expect("Failed to write to temp file");
+
+        let output = std::process::Command::new(&bin_path)
+            .args([
+                python_file.path().to_str().unwrap(),
+                "python",
+                "--simple-analysis",
+                "--output-format",
+                "csv",
+            ])
+            .output()
+            .expect("failed to run sighthound");
+
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout).expect("CSV output should be UTF-8");
+        let expected_prefix = format!("\"{}\",", python_file.path().display());
+        assert!(
+            stdout.lines().skip(1).any(|line| line.starts_with(&expected_prefix)),
+            "CSV path containing a comma was not quoted:\n{stdout}"
+        );
     }
 
     #[test]

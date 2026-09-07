@@ -1,0 +1,234 @@
+(
+    rules: [
+        // Generic HTML security patterns: dangerous markup that is unsafe on its own,
+        // independent of any template engine. Eleven rules, all `mode: "search"`, all
+        // scoped to `.html` / `.htm`.
+        //
+        // ENGINE NOTE: `.html` files are matched with `SearchSemantics::Markup`
+        // (src/language.rs), so both the prefilter and the final match run against the
+        // full text of each candidate node — `attribute`, `start_tag`, `script_element`
+        // and `element` — rather than against the resolved "function" name. That is what
+        // lets a pattern span two attributes (`html-xss-011`) or sit inside a `<script>`
+        // body (`html-xss-012`, `html-xss-013`, `html-sec-001`), neither of which the
+        // name-based prefilter can reach.
+        //
+        // PATTERN FORM: every pattern must be a plain literal (no `\`, no `*`) or
+        // `regex:`-prefixed. `rules::first_positive_match_range` resolves a byte range
+        // only for those two forms, and that range is what lands a finding on the source
+        // line the offending markup actually sits on. A glob or escaped pattern would
+        // still match but would silently fall back to heuristic line attribution.
+        //
+        // SCOPING: `html-xss-012` and `html-xss-013` carry a `node_kind` condition
+        // pinning them to `script_element`. Without it, both patterns would also match
+        // against `attribute`/`start_tag` node text exposed by markup search semantics
+        // (e.g. an `onclick` handler whose value happens to contain `document.write(` or
+        // `eval(` text), firing outside any actual `<script>` body.
+        //
+        // PRECISION (2026-08): `html-xss-001`/`-002`/`-019` require `{{`, `${`, or
+        // `<%=` in their configured javascript: URL forms. `html-xss-014` requires only
+        // `${`, bounded to a quoted or valid unquoted inline-handler value. `{%` is
+        // excluded because it is a Django/Jinja control tag, not value interpolation.
+        // `html-xss-004` was removed because its eval-in-handler check had no taint
+        // signal; bounded `-014` covers the same eight handlers with interpolation.
+        (
+            id: Some("html-xss-001"),
+            name: Some("JavaScript URL in href Attribute"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "regex:(?i)href\\s*=\\s*\"javascript:[^\"]*(?:\\{\\{|\\$\\{|<%=)",
+                "regex:(?i)href\\s*=\\s*'javascript:[^']*(?:\\{\\{|\\$\\{|<%=)",
+                "regex:(?i)href\\s*=\\s*javascript:[^\\s>]*(?:\\{\\{|\\$\\{|<%=)",
+            ]),
+            finding_type: Some("Cross-Site Scripting (XSS)"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("JavaScript URLs in href attributes can execute arbitrary code when clicked"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["xss", "html", "javascript-url", "cwe-79"])
+        ),
+        (
+            id: Some("html-xss-002"),
+            name: Some("JavaScript URL in form action"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "regex:(?i)action\\s*=\\s*\"javascript:[^\"]*(?:\\{\\{|\\$\\{|<%=)",
+                "regex:(?i)action\\s*=\\s*'javascript:[^']*(?:\\{\\{|\\$\\{|<%=)",
+                "regex:(?i)action\\s*=\\s*javascript:[^\\s>]*(?:\\{\\{|\\$\\{|<%=)",
+            ]),
+            finding_type: Some("Cross-Site Scripting (XSS)"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("JavaScript URLs in form action attributes can execute arbitrary code on form submission"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["xss", "html", "javascript-url", "cwe-79"])
+        ),
+        (
+            id: Some("html-xss-008"),
+            name: Some("Dangerous srcdoc Attribute"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "regex:srcdoc\\s*=\\s*[\"'][^\"']*(?:<script|\\$\\{|\\{\\{)",
+            ]),
+            finding_type: Some("Cross-Site Scripting (XSS)"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("The srcdoc attribute can inject HTML/JavaScript into an iframe, creating XSS vulnerabilities"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["xss", "html", "iframe", "cwe-79"])
+        ),
+        (
+            id: Some("html-xss-010"),
+            name: Some("CSS Expression (IE Legacy)"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "regex:style\\s*=\\s*[\"'][^\"']*\\bexpression\\s*\\(",
+            ]),
+            finding_type: Some("Cross-Site Scripting (XSS)"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("CSS expressions in IE can execute JavaScript code (legacy vulnerability but still relevant)"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["xss", "html", "css-expression", "ie", "cwe-79"])
+        ),
+        (
+            id: Some("html-xss-011"),
+            name: Some("Meta Refresh with JavaScript URL"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "regex:(?i)http-equiv\\s*=\\s*[\"']refresh[\"'][^>]*url\\s*=\\s*javascript:",
+            ]),
+            finding_type: Some("Cross-Site Scripting (XSS)"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Meta refresh tags with JavaScript URLs can execute arbitrary code"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["xss", "html", "meta-refresh", "cwe-79"])
+        ),
+        (
+            id: Some("html-xss-012"),
+            name: Some("Script Tag with document.write"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "regex:document\\.write(?:ln)?\\s*\\([^)]*(?:user|input|data|param|location|\\$\\{)",
+            ]),
+            conditions: Some([(
+                field: "",
+                operator: "",
+                value: "",
+                condition_type: Some("node_kind"),
+                node_type: Some("script_element"),
+            )]),
+            finding_type: Some("DOM XSS"),
+            severity: Some("High"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-79"),
+            description: Some("document.write can inject HTML/JavaScript into the page, potentially leading to XSS"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["xss", "html", "dom", "document-write", "cwe-79"])
+        ),
+        (
+            id: Some("html-xss-013"),
+            name: Some("eval() in Script Tag"),
+            category: Some("code-injection"),
+            mode: "search",
+            patterns: Some([
+                "regex:\\beval\\s*\\([^)]*(?:user|input|data|param|location|\\$\\{)",
+            ]),
+            conditions: Some([(
+                field: "",
+                operator: "",
+                value: "",
+                condition_type: Some("node_kind"),
+                node_type: Some("script_element"),
+            )]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
+            description: Some("eval() can execute arbitrary JavaScript code, especially dangerous with user input"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["html", "code-injection", "eval", "cwe-95"])
+        ),
+        (
+            id: Some("html-sec-001"),
+            name: Some("postMessage with Wildcard Origin"),
+            category: Some("security-misconfiguration"),
+            mode: "search",
+            patterns: Some([
+                "regex:postMessage\\s*\\([^,]+,\\s*[\"']\\*[\"']\\s*\\)",
+            ]),
+            finding_type: Some("Insecure postMessage"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-346"),
+            description: Some("Using wildcard (*) as targetOrigin in postMessage allows any site to receive the message"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["security", "html", "postmessage", "origin", "cwe-346"])
+        ),
+        (
+            id: Some("html-xss-014"),
+            name: Some("Inline Event Handler with Template Syntax"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                // Attribute-node anchoring rejects names such as `data-onclick`;
+                // separate variants bound quoted and valid unquoted values.
+                "regex:(?i)^on(?:click|mouseover|load|error|change|focus|blur|submit)\\s*=\\s*\"[^\"]*\\$\\{",
+                "regex:(?i)^on(?:click|mouseover|load|error|change|focus|blur|submit)\\s*=\\s*'[^']*\\$\\{",
+                "regex:(?i)^on(?:click|mouseover|load|error|change|focus|blur|submit)\\s*=\\s*[^\\s\"'`=<>]*\\$\\{",
+            ]),
+            finding_type: Some("Cross-Site Scripting (XSS)"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Template expressions in event handlers can inject user-controlled data, leading to XSS"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["xss", "html", "inline-event", "template-injection", "cwe-79"])
+        ),
+        (
+            id: Some("html-xss-019"),
+            name: Some("JavaScript URL in src Attribute"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "regex:(?i)src\\s*=\\s*\"javascript:[^\"]*(?:\\{\\{|\\$\\{|<%=)",
+                "regex:(?i)src\\s*=\\s*'javascript:[^']*(?:\\{\\{|\\$\\{|<%=)",
+            ]),
+            finding_type: Some("Cross-Site Scripting (XSS)"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("JavaScript URLs in src attributes can execute arbitrary code"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["xss", "html", "javascript-url", "cwe-79"])
+        ),
+        (
+            id: Some("html-xss-020"),
+            name: Some("Data URL with Script"),
+            category: Some("xss"),
+            mode: "search",
+            patterns: Some([
+                "regex:data:text/html[^\\s\"']*<script",
+                "regex:data:[^\\s\"']*<script",
+            ]),
+            finding_type: Some("Cross-Site Scripting (XSS)"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-79"),
+            description: Some("Data URLs containing script tags can execute arbitrary JavaScript"),
+            file_types: Some((extensions: Some([".html", ".htm"]))),
+            tags: Some(["xss", "html", "data-url", "script", "cwe-79"])
+        ),
+    ]
+)

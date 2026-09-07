@@ -293,7 +293,9 @@ pub struct Cli {
     pub root_dir: Option<String>,
 
     /// Language to scan (optional - triggers explicit mode when used with rules_path)
-    #[arg(help = "Programming language to scan (python, java, javascript, tsx, html, django)")]
+    #[arg(
+        help = "Programming language to scan (python, java, javascript, tsx, html, django, objectscript, sql)"
+    )]
     pub language: Option<String>,
 
     /// Rules file or directory path (optional - triggers explicit mode when used with language)

@@ -212,4 +212,51 @@ mod ast_conditions_tests {
 
         assert!(!check_has_sibling_pattern_condition(&root, &source, &condition));
     }
+
+    #[cfg(feature = "ruby")]
+    fn parse_ruby(source: &str) -> (tree_sitter::Tree, Vec<u8>) {
+        let mut parser = LanguageParser::new("ruby").expect("ruby support available");
+        let bytes = source.as_bytes().to_vec();
+        let tree = parser.parse(&bytes).expect("parse should succeed");
+        (tree, bytes)
+    }
+
+    #[cfg(feature = "ruby")]
+    #[test]
+    fn ruby_unsafe_command_injection_detects_clustered_posix_flags() {
+        use sighthound::scanner::conditions::check_ruby_unsafe_command_injection;
+
+        let support = get_language_support("ruby").unwrap();
+
+        for unsafe_call in [
+            "system(\"bash\", \"-lc\", cmd)",
+            "system(\"sh\", \"-ec\", cmd)",
+            "system(\"/bin/sh\", \"-elc\", cmd)",
+            "system([\"bash\", \"-lc\", cmd])",
+            "exec(\"zsh\", \"-ic\", cmd)",
+            "spawn(\"bash\", \"-c\", cmd)",
+        ] {
+            let (tree, source) = parse_ruby(unsafe_call);
+            let call = find_node_of_kind(tree.root_node(), "call").expect("expected call node");
+            assert!(
+                check_ruby_unsafe_command_injection(&call, &source, support.as_ref()),
+                "expected {unsafe_call} to be classified as unsafe",
+            );
+        }
+
+        for safe_call in [
+            "system(\"ls\", \"-l\", cmd)",
+            "system(\"ls\", \"-la\", cmd)",
+            "system(\"bash\", \"--version\")",
+            "system(\"bash\", \"-l\")",
+            "system([\"ls\", \"-l\", cmd])",
+        ] {
+            let (tree, source) = parse_ruby(safe_call);
+            let call = find_node_of_kind(tree.root_node(), "call").expect("expected call node");
+            assert!(
+                !check_ruby_unsafe_command_injection(&call, &source, support.as_ref()),
+                "expected {safe_call} to be classified as safe",
+            );
+        }
+    }
 }

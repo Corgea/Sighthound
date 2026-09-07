@@ -1,7 +1,8 @@
 [package]
 name = "sighthound"
 version = "0.1.1"
-edition = "2021"
+edition = "2024"
+rust-version = "1.88"
 authors = ["Corgea Team"]
 description = "A blazing fast vulnerability scanner for source code using tree-sitter"
 repository = "https://github.com/Corgea/Sighthound"
@@ -16,10 +17,9 @@ path = "src/main.rs"
 [[bin]]
 name = "harness"
 path = "harness.rs"
-edition = "2024"
 
 [features]
-default = ["python", "java", "javascript", "tsx", "typescript", "go", "ruby", "csharp", "html", "django", "php"]
+default = ["python", "java", "javascript", "tsx", "typescript", "go", "ruby", "csharp", "html", "django", "php", "objectscript", "sql"]
 python = ["tree-sitter-python"]
 java = ["tree-sitter-java"]
 javascript = ["tree-sitter-javascript"]
@@ -31,6 +31,8 @@ csharp = ["tree-sitter-c-sharp"]
 html = ["tree-sitter-html"]
 django = ["tree-sitter-html"]  # Reuse HTML parser for Django templates
 php = ["tree-sitter-php"]
+objectscript = ["dep:tree-sitter-objectscript", "dep:tree-sitter-objectscript-routine"]
+sql = ["tree-sitter-javascript"]  # Reuse the JS parser as a no-op host; SQL is matched textually
 
 [dependencies]
 tree-sitter = "0.26"
@@ -55,7 +57,6 @@ once_cell = "1.18"
 rayon = "1.8"
 indicatif = "0.17"
 glob = "0.3"
-crossbeam = "0.8"
 num_cpus = "1.16"
 syntect = { version = "5.1", default-features = false, features = [
     "default-syntaxes",
@@ -68,6 +69,8 @@ env_logger = "0.10"
 ignore = "0.4"
 lazy_static = "1.4"
 dbg_breakpoint="0.1.1"
+tree-sitter-objectscript = { version = "1.9.11", optional = true }
+tree-sitter-objectscript-routine = { version = "1.9.11", optional = true }
 [dev-dependencies]
 tempfile = "3.8"
 proptest = "1"
