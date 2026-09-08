@@ -152,11 +152,15 @@
             name: Some("Code injection via setTimeout/setInterval string"),
             category: Some("code-injection"),
             mode: "search",
-            // Gate `=` forces full-call matching. First arg must be a concatenated
-            // or interpolated string, not a constant (`setTimeout('tick')`) or
-            // identifier callback (`setTimeout(handler, n)`). Identifiers stay with taint.
+            // Gate `=` forces full-call matching. Dummy names pass the call-name
+            // prefilter for qualified `window.setTimeout` / `window.setInterval`
+            // (`regex:setTimeout\\(` is not a substring of that callee). First arg
+            // must be a concatenated or interpolated string, not a constant
+            // (`setTimeout('tick')`) or identifier callback (`setTimeout(handler, n)`).
             patterns: Some([
                 "settimeout-eval-sink=",
+                "window.setTimeout=",
+                "window.setInterval=",
                 "regex:setTimeout\\(\\s*['\"][^'\"]*['\"]\\s*\\+",
                 "regex:setTimeout\\(\\s*`[^`]*\\$\\{",
                 "regex:setInterval\\(\\s*['\"][^'\"]*['\"]\\s*\\+",

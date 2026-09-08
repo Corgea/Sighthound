@@ -14,5 +14,7 @@
     <div>{{ request.COOKIES.sid| mark_safe }}</div>
     <!-- TP: |safe on request data in an attribute value -->
     <input value="{{ request.GET.q|safe }}">
+    <!-- TN: |safe on a different expression than request.GET -->
+    <div>{{ request.GET.q }} {{ title|safe }}</div>
 </body>
 </html>

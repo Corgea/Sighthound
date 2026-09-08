@@ -43,6 +43,8 @@ fn innerhtml_helpers_are_not_cwe95_but_eval_is() {
     assert_findings_in_range(&cwe95, 23, 23, 1, "eval(location.hash) is CWE-95");
     assert_findings_in_range(&cwe95, 27, 27, 1, "vm.runInNewContext(userInput) is CWE-95");
     assert_findings_in_range(&cwe95, 103, 103, 1, "Function('return '+userInput) is CWE-95");
+    assert_findings_in_range(&cwe95, 108, 108, 1, "window.setTimeout(string concat) is CWE-95");
+    assert_findings_in_range(&cwe95, 112, 112, 1, "window.setInterval(string concat) is CWE-95");
     assert_no_findings_in_range(&cwe95, 30, 98, "DOM/HTMX/callback helpers are not CWE-95");
 
     let xss: Vec<_> = findings.iter().filter(|f| is_xss(f)).cloned().collect();
@@ -155,6 +157,12 @@ fn django_autoescape_and_htmx_are_not_xss_but_safe_filter_is() {
         xss.iter().map(|f| (f.line, f.snippet.as_str())).collect::<Vec<_>>()
     );
     assert_no_findings_in_range(&xss, 4, 10, "autoescape, json_script, hx-swap are not XSS");
+    assert_no_findings_in_range(
+        &xss,
+        18,
+        18,
+        "request.GET and |safe in adjacent expressions are not XSS",
+    );
     assert!(
         findings.iter().all(|f| !is_cwe95(f)),
         "django templates must not produce CWE-95, got: {:?}",
@@ -199,6 +207,12 @@ fn html_language_still_flags_django_safe_filter() {
         xss.iter().map(|f| (f.line, f.snippet.as_str())).collect::<Vec<_>>()
     );
     assert_no_findings_in_range(&xss, 4, 10, "autoescape, json_script, hx-swap are not XSS");
+    assert_no_findings_in_range(
+        &xss,
+        18,
+        18,
+        "request.GET and |safe in adjacent expressions are not XSS",
+    );
 }
 
 #[test]

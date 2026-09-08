@@ -102,3 +102,12 @@ function timeoutConst() {
 function functionConcat(userInput) {
     Function('return ' + userInput);
 }
+
+// TP CWE-95: qualified window timers with string concat
+function windowTimeoutUser(userInput) {
+    window.setTimeout('alert(' + userInput, 1000);
+}
+
+function windowIntervalUser(userInput) {
+    window.setInterval('alert(' + userInput, 1000);
+}
