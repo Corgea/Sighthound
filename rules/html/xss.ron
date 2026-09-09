@@ -20,6 +20,11 @@
         // All real sinks require a template literal (backtick) sink target, i.e.
         // dynamic/interpolated HTML, which avoids flagging assignments of static
         // string constants.
+        //
+        // Not sinks: HTMX `hx-swap="innerHTML"` (swap strategy, not reflected XSS),
+        // Django/Jinja default `{{ title }}` autoescape, or `json_script` /
+        // `<script type="application/json">` payloads. Unescaped `|safe` of
+        // request data is covered in django.ron.
         (
             id: Some("html-inline-dom-xss-001"),
             name: Some("DOM XSS via dynamic HTML sink in inline script"),

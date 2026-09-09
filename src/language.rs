@@ -112,6 +112,27 @@ pub fn get_language_support_for_path(
     get_language_support(language_name)
 }
 
+/// Match Django/Jinja filter text so search rules can key off `|safe` even
+/// when auto-detect classifies the file as `html` (`.html` → html, not django).
+#[cfg(any(feature = "html", feature = "django"))]
+fn django_template_name_from_text(text: &str) -> Option<&str> {
+    if text.contains("|safe") {
+        Some("|safe")
+    } else if text.contains("|mark_safe") {
+        Some("|mark_safe")
+    } else if text.contains("{% autoescape off %}") {
+        Some("{% autoescape off %}")
+    } else if text.contains("{{") && text.contains("}}") {
+        Some("{{")
+    } else if text.contains("{% include") {
+        Some("{% include")
+    } else if text.contains("{{") || text.contains("{%") {
+        Some("django_template")
+    } else {
+        None
+    }
+}
+
 fn direct_named_child_of_kind<'a>(node: &Node<'a>, kind: &str) -> Option<Node<'a>> {
     let mut cursor = node.walk();
 
@@ -561,7 +582,7 @@ impl LanguageSupport for HTMLLanguage {
         tree_sitter_html::LANGUAGE.into()
     }
     fn call_node_types(&self) -> &[&'static str] {
-        &["attribute", "start_tag", "script_element", "element"]
+        &["attribute", "start_tag", "script_element", "element", "text"]
     }
 
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
@@ -571,12 +592,19 @@ impl LanguageSupport for HTMLLanguage {
         // names like `th:utext`, `th:replace`, or tag names like `textarea`
         // resolve as the matchable "function" name for search rules.
         match node.kind() {
-            "attribute" => node
-                .child_by_field_name("name")
-                .or_else(|| {
-                    crate::common::CommonUtils::find_child(node, |c| c.kind() == "attribute_name")
+            "text" => django_template_name_from_text(get_node_text_slice(node, source)),
+            "attribute" => {
+                let attr_text = get_node_text_slice(node, source);
+                django_template_name_from_text(attr_text).or_else(|| {
+                    node.child_by_field_name("name")
+                        .or_else(|| {
+                            crate::common::CommonUtils::find_child(node, |c| {
+                                c.kind() == "attribute_name"
+                            })
+                        })
+                        .map(|child| get_node_text_slice(&child, source))
                 })
-                .map(|child| get_node_text_slice(&child, source)),
+            }
             "start_tag" | "element" => node
                 .child_by_field_name("name")
                 .or_else(|| {
@@ -589,6 +617,9 @@ impl LanguageSupport for HTMLLanguage {
     }
 
     fn get_arguments_node<'a>(&self, node: &'a Node) -> Option<Node<'a>> {
+        if node.kind() == "text" {
+            return Some(*node);
+        }
         if node.kind() == "attribute" {
             if let Some(value_node) = node.child_by_field_name("value") {
                 return Some(value_node);
@@ -636,28 +667,13 @@ impl LanguageSupport for DjangoTemplateLanguage {
 
     fn get_function_name<'a>(&self, node: &Node, source: &'a [u8]) -> Option<&'a str> {
         match node.kind() {
-            "text" => {
-                let text = get_node_text_slice(node, source);
-
-                // Check for Django template patterns (return static strings for consistent lifetimes)
-                if text.contains("|safe") {
-                    Some("|safe")
-                } else if text.contains("|mark_safe") {
-                    Some("|mark_safe")
-                } else if text.contains("{% autoescape off %}") {
-                    Some("{% autoescape off %}")
-                } else if text.contains("{{") && text.contains("}}") {
-                    Some("{{")
-                } else if text.contains("{% include") {
-                    Some("{% include")
-                } else if text.contains("{{") || text.contains("{%") {
-                    Some("django_template")
-                } else {
-                    None
-                }
-            }
+            "text" => django_template_name_from_text(get_node_text_slice(node, source)),
             "attribute" => {
-                node.child_by_field_name("name").map(|child| get_node_text_slice(&child, source))
+                let attr_text = get_node_text_slice(node, source);
+                django_template_name_from_text(attr_text).or_else(|| {
+                    node.child_by_field_name("name")
+                        .map(|child| get_node_text_slice(&child, source))
+                })
             }
             "script_element" => Some("script"),
             _ => None,

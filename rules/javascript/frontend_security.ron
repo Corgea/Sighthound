@@ -134,7 +134,10 @@
             category: Some("code-injection"),
             mode: "search",
             patterns: Some([
-                "*Function(*user*)", "*Function(*input*)", "*Function(*data*)", "*Function(*+*)"
+                "*Function(*user*)", "*Function(*input*)", "*Function(*data*)",
+                "new Function(*+*)", " Function(*+*)",
+                // Word boundary so `Function('return '+x)` matches but `myFunction` does not.
+                "regex:\\bFunction\\(.*\\+"
             ]),
             finding_type: Some("Code Injection"),
             severity: Some("Critical"),
@@ -143,6 +146,55 @@
             description: Some("Function constructor with dynamic content can lead to code injection"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             tags: Some(["code-injection", "frontend", "cwe-80", "cwe-95"])
+        ),
+        (
+            id: Some("js-code-injection-003"),
+            name: Some("Code injection via setTimeout/setInterval string"),
+            category: Some("code-injection"),
+            mode: "search",
+            // Gate `=` forces full-call matching. Dummy names pass the call-name
+            // prefilter for qualified `window.setTimeout` / `window.setInterval`
+            // (`regex:setTimeout\\(` is not a substring of that callee). First arg
+            // must be a concatenated or interpolated string, not a constant
+            // (`setTimeout('tick')`) or identifier callback (`setTimeout(handler, n)`).
+            patterns: Some([
+                "settimeout-eval-sink=",
+                "window.setTimeout=",
+                "window.setInterval=",
+                "regex:setTimeout\\(\\s*['\"][^'\"]*['\"]\\s*\\+",
+                "regex:setTimeout\\(\\s*`[^`]*\\$\\{",
+                "regex:setInterval\\(\\s*['\"][^'\"]*['\"]\\s*\\+",
+                "regex:setInterval\\(\\s*`[^`]*\\$\\{"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
+            description: Some("setTimeout/setInterval with a string argument evaluates attacker-controlled code"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["code-injection", "frontend", "cwe-95"])
+        ),
+        (
+            id: Some("js-code-injection-004"),
+            name: Some("Code injection via vm.runIn*"),
+            category: Some("code-injection"),
+            mode: "search",
+            // Dummy `=` names pass the call-name prefilter (escaped regex dots
+            // are not a substring of `vm.runInNewContext`).
+            patterns: Some([
+                "vm.runInNewContext=",
+                "vm.runInThisContext=",
+                "vm.runInContext=",
+                "regex:vm\\.runIn(?:New|This)?Context\\(\\s*[A-Za-z_$]",
+                "regex:vm\\.runIn(?:New|This)?Context\\(\\s*['\"]"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-95"),
+            description: Some("User-controlled input is evaluated as JavaScript via vm.runIn*"),
+            file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
+            tags: Some(["code-injection", "frontend", "cwe-95"])
         ),
         (
             id: Some("js-postmessage-001"),
@@ -299,10 +351,10 @@
             finding_type: Some("Dynamic Code Loading"),
             severity: Some("High"),
             confidence: Some("Medium"),
-            cwe_id: Some("cwe-95"),
+            cwe_id: Some("cwe-94"),
             description: Some("User-controlled module paths can lead to code injection"),
             file_types: Some((extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
-            tags: Some(["code-injection","dynamic-import","frontend","cwe-95"])
+            tags: Some(["code-injection","dynamic-import","frontend","cwe-94"])
         ),
         (
             id: Some("js-redos-001"),

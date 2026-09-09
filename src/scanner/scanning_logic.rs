@@ -1336,6 +1336,22 @@ impl ScanningLogic {
         let Some(sink_pattern) = ctx.rule_deduplicator.matches_sink_pattern(&node_text) else {
             return;
         };
+        if sink_pattern.contains("innerHTML")
+            && crate::scanner::utils::AstUtils::is_textcontent_escape_innerhtml_read(&node_text)
+        {
+            log::debug!(
+                "[SINK_ANALYSIS] Skipping innerHTML read after textContent write: '{}'",
+                node_text
+            );
+            return;
+        }
+        if crate::scanner::utils::AstUtils::is_timer_callback_eval_sink(&sink_pattern, &node_text) {
+            log::debug!(
+                "[SINK_ANALYSIS] Skipping setTimeout/setInterval function callback: '{}'",
+                node_text
+            );
+            return;
+        }
         log::debug!(
             "[SINK_ANALYSIS] Found sink '{}' with pattern '{}' at line {}",
             node_text,
@@ -2214,6 +2230,12 @@ impl ScanningLogic {
         let node_text = crate::parser::get_node_text(node, source);
 
         if !Self::rule_pattern_matches_node(rule, &node_text) {
+            return None;
+        }
+        let finding_type = rule.get_finding_type().to_lowercase();
+        if (finding_type.contains("xss") || rule.cwe_id.as_deref() == Some("cwe-79"))
+            && crate::scanner::utils::AstUtils::is_textcontent_escape_innerhtml_read(&node_text)
+        {
             return None;
         }
 
