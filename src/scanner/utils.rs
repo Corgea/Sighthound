@@ -644,13 +644,12 @@ impl AstUtils {
             return Self::paren_group_is_timer_callback(args);
         }
         for keyword in ["function", "async"] {
-            if let Some(rest) = args.strip_prefix(keyword) {
-                if rest.is_empty()
+            if args.strip_prefix(keyword).is_some_and(|rest| {
+                rest.is_empty()
                     || rest.starts_with('(')
                     || rest.starts_with(|c: char| c.is_whitespace())
-                {
-                    return true;
-                }
+            }) {
+                return true;
             }
         }
         let ident_end = args

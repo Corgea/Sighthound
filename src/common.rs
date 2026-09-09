@@ -68,10 +68,11 @@ impl CommonUtils {
 
         // `*.innerHTML` matches assignment to that property only (not any `=`
         // in the snippet). Optional TS `as` cast: `(el.innerHTML as T) = x`.
-        if let Some(property) = pattern.strip_prefix("*.") {
-            if Self::assignment_follows_dom_property(text, property) {
-                return true;
-            }
+        if pattern
+            .strip_prefix("*.")
+            .is_some_and(|property| Self::assignment_follows_dom_property(text, property))
+        {
+            return true;
         }
 
         Self::matches_unified_pattern(pattern, text)

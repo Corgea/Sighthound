@@ -3,23 +3,21 @@ fn main() {
 }
 
 fn emit_rerun(root: &str) {
-    let mut pending = vec![root.to_string()];
+    let mut pending = vec![std::path::PathBuf::from(root)];
     while let Some(path) = pending.pop() {
-        println!("cargo:rerun-if-changed={path}");
-        let entries = std::fs::read_dir(&path)
-            .unwrap_or_else(|error| panic!("failed to read directory '{path}': {error}"));
+        println!("cargo:rerun-if-changed={}", path.display());
+        let entries = std::fs::read_dir(&path).unwrap_or_else(|error| {
+            panic!("failed to read directory '{}': {error}", path.display())
+        });
         for entry in entries {
             let entry = entry.unwrap_or_else(|error| {
-                panic!("failed to read directory entry in '{path}': {error}")
+                panic!("failed to read directory entry in '{}': {error}", path.display())
             });
             let child = entry.path();
-            let Some(child_str) = child.to_str() else {
-                continue;
-            };
             if child.is_dir() {
-                pending.push(child_str.to_string());
+                pending.push(child);
             } else {
-                println!("cargo:rerun-if-changed={child_str}");
+                println!("cargo:rerun-if-changed={}", child.display());
             }
         }
     }
