@@ -216,6 +216,31 @@ fn html_language_still_flags_django_safe_filter() {
 }
 
 #[test]
+#[cfg(feature = "html")]
+fn textcontent_escape_in_script_does_not_hide_outerhtml() {
+    let staging = stage_dir();
+    write_staged_file(
+        staging.path(),
+        "page.html",
+        "<script>\nfunction escapeHtml(text) {\n    const div = document.createElement('div');\n    div.textContent = text;\n    return div.innerHTML;\n}\nel.outerHTML = `${user}`;\n</script>\n",
+    );
+    let findings = scan_language_unified_with_rules(
+        staging.path(),
+        "html",
+        Rules::load_from_directory("rules/html/").expect("load html rules"),
+    );
+    let xss: Vec<_> = findings.iter().filter(|f| is_xss(f)).cloned().collect();
+    assert!(
+        xss.iter().any(|f| f.snippet.contains("outerHTML")),
+        "outerHTML write next to textContent escape must stay XSS, got: {:?}",
+        findings
+            .iter()
+            .map(|f| (f.line, f.finding_type.as_str(), f.snippet.as_str()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 #[cfg(feature = "javascript")]
 fn request_body_to_ejs_render_is_cwe94_not_cwe95() {
     let staging = stage_dir();

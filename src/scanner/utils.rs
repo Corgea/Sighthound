@@ -616,10 +616,12 @@ impl AstUtils {
     }
 
     /// `el.textContent = x; return el.innerHTML` encodes HTML. Not XSS.
+    /// An `outerHTML` write in the same snippet is a separate sink.
     pub fn is_textcontent_escape_innerhtml_read(code: &str) -> bool {
         CommonUtils::assignment_follows_dom_property(code, "textContent")
             && code.contains(".innerHTML")
             && !CommonUtils::assignment_follows_dom_property(code, "innerHTML")
+            && !CommonUtils::assignment_follows_dom_property(code, "outerHTML")
     }
 
     /// Function/arrow timer args are not CWE-95. Parentheses around a value
@@ -869,6 +871,9 @@ mod tests {
             "div.textContent = text; return div.innerHTML"
         ));
         assert!(!AstUtils::is_textcontent_escape_innerhtml_read("el.innerHTML = location.hash"));
+        assert!(!AstUtils::is_textcontent_escape_innerhtml_read(
+            "div.textContent = text; return div.innerHTML; el.outerHTML = user"
+        ));
     }
 
     #[test]

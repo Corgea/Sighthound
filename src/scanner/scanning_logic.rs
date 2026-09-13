@@ -2240,7 +2240,10 @@ impl ScanningLogic {
             return None;
         }
         let finding_type = rule.get_finding_type().to_lowercase();
-        if (finding_type.contains("xss") || rule.cwe_id.as_deref() == Some("cwe-79"))
+        // JS/TS only: HTML `script_element` is the whole script, so this
+        // helper must not suppress sibling sinks (`outerHTML`, `document.write`).
+        if matches!(language_support.name(), "javascript" | "typescript")
+            && (finding_type.contains("xss") || rule.cwe_id.as_deref() == Some("cwe-79"))
             && crate::scanner::utils::AstUtils::is_textcontent_escape_innerhtml_read(&node_text)
         {
             return None;
