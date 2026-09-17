@@ -16,6 +16,7 @@ fn make_rule(pattern: Option<&str>, patterns: Option<Vec<&str>>) -> UnifiedRule 
         mode: "search".to_string(),
         pattern: pattern.map(|s| s.to_string()),
         patterns: patterns.map(|v| v.into_iter().map(|s| s.to_string()).collect()),
+        unless: None,
         sources: None,
         sinks: None,
         propagators: None,

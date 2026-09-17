@@ -183,6 +183,12 @@ pub struct UnifiedRule {
     #[serde(default)]
     pub patterns: Option<Vec<String>>,
 
+    // Exclusions for search mode: a positive match is dropped when any of these matches
+    // the matched span. Taint rules express the same idea with `sanitizers`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub unless: Option<Vec<String>>,
+
     // Taint analysis fields (used when mode = "taint")
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
