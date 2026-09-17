@@ -625,20 +625,29 @@ impl AstUtils {
     }
 
     /// Function/arrow timer args are not CWE-95. Parentheses around a value
-    /// (`(userInput)`) are not a callback.
+    /// (`(userInput)`) are not a callback. A later non-callback timer in the
+    /// same snippet is still a sink.
     pub fn is_timer_callback_eval_sink(sink_pattern: &str, node_text: &str) -> bool {
         if !sink_pattern.contains("setTimeout") && !sink_pattern.contains("setInterval") {
             return false;
         }
         let lower = node_text.to_ascii_lowercase();
-        ["settimeout", "setinterval"].iter().any(|name| {
-            lower.find(name).is_some_and(|idx| {
+        let mut saw_callback = false;
+        for name in ["settimeout", "setinterval"] {
+            let mut search = 0;
+            while let Some(rel) = lower.get(search..).and_then(|rest| rest.find(name)) {
+                let idx = search + rel;
                 let after_name = lower[idx + name.len()..].trim_start();
-                after_name
-                    .strip_prefix('(')
-                    .is_some_and(|args| Self::starts_with_timer_callback_arg(args.trim_start()))
-            })
-        })
+                if let Some(args) = after_name.strip_prefix('(') {
+                    if !Self::starts_with_timer_callback_arg(args.trim_start()) {
+                        return false;
+                    }
+                    saw_callback = true;
+                }
+                search = idx + name.len();
+            }
+        }
+        saw_callback
     }
 
     fn starts_with_timer_callback_arg(args: &str) -> bool {
@@ -900,5 +909,9 @@ mod tests {
         assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout((userInput), 1000)"));
         assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout((event.data), 1000)"));
         assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout(event.data, 1000)"));
+        assert!(!AstUtils::is_timer_callback_eval_sink(
+            sink,
+            "setTimeout(function () { paint(); }, 0); setTimeout('alert(' + userInput, 1000)"
+        ));
     }
 }

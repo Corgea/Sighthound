@@ -111,3 +111,15 @@ function windowTimeoutUser(userInput) {
 function windowIntervalUser(userInput) {
     window.setInterval('alert(' + userInput, 1000);
 }
+
+// TP: logical assign of a tainted intermediate (DOM sink)
+function innerHtmlLogicalAssign() {
+    const html = window.location.hash;
+    document.body.innerHTML ||= html;
+}
+
+// TP CWE-95: callback timer must not hide a later string-eval timer
+function mixedTimers(userInput) {
+    setTimeout(function () { paint(); }, 0);
+    setTimeout('alert(' + userInput, 1000);
+}

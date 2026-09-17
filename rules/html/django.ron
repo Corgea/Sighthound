@@ -3,7 +3,8 @@
         // Autoescaped `{{ var }}` is not XSS. Flag `|safe`/`|mark_safe` only on
         // request data inside one `{{ ... }}` (`[^}]*` cannot join adjacent
         // expressions). Dummy `=` names pass the `|safe` / `|mark_safe` / `{{`
-        // call-name prefilter. Spaced filters (`| safe`) resolve as `{{`.
+        // call-name prefilter (`django-{{=` contains `{{` but is not template
+        // syntax). Spaced filters (`| safe`) resolve as `{{`.
         (
             id: Some("html-django-safe-request-xss"),
             name: Some("Django |safe on request data"),
@@ -13,7 +14,7 @@
                 "django-safe-filter-sink=",
                 "|safe=",
                 "|mark_safe=",
-                "{{=",
+                "django-{{=",
                 "regex:\\{\\{[^}]*request\\.(GET|POST|COOKIES)[^}]*\\|\\s*(mark_)?safe[^}]*\\}\\}"
             ]),
             finding_type: Some("Cross-Site Scripting"),

@@ -16,5 +16,7 @@
     <input value="{{ request.GET.q|safe }}">
     <!-- TN: |safe on a different expression than request.GET -->
     <div>{{ request.GET.q }} {{ title|safe }}</div>
+    <!-- TN: {{= is not request data with |safe -->
+    <p>{{= heading }}</p>
 </body>
 </html>

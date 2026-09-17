@@ -82,7 +82,7 @@ impl CommonUtils {
         property == "innerHTML" || property == "outerHTML"
     }
 
-    /// `.innerHTML = x`, `.innerHTML+=x`, or `(el.innerHTML as T) = x`.
+    /// `.innerHTML = x`, `.innerHTML+=x`, `.innerHTML||=x`, or `(el.innerHTML as T) = x`.
     pub(crate) fn assignment_follows_dom_property(text: &str, property: &str) -> bool {
         Self::any_dom_property(text, property, Self::suffix_looks_like_dom_assignment)
     }
@@ -109,7 +109,12 @@ impl CommonUtils {
 
     fn suffix_looks_like_dom_assignment(after: &str) -> bool {
         let after = after.trim_start();
-        if after.starts_with("+=") || (after.starts_with('=') && !after.starts_with("==")) {
+        if after.starts_with("+=")
+            || after.starts_with("||=")
+            || after.starts_with("&&=")
+            || after.starts_with("??=")
+            || (after.starts_with('=') && !after.starts_with("=="))
+        {
             return true;
         }
         let Some(rest) = after.strip_prefix("as ") else {
@@ -812,6 +817,9 @@ mod tests {
             "(el.innerHTML as string) = x",
             "innerHTML"
         ));
+        assert!(CommonUtils::assignment_follows_dom_property("el.innerHTML ||= html", "innerHTML"));
+        assert!(CommonUtils::assignment_follows_dom_property("el.innerHTML &&= html", "innerHTML"));
+        assert!(CommonUtils::assignment_follows_dom_property("el.innerHTML ??= html", "innerHTML"));
         assert!(!CommonUtils::assignment_follows_dom_property(
             "(el.innerHTML as string) == x",
             "innerHTML"

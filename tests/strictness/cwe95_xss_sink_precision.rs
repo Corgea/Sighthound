@@ -45,10 +45,28 @@ fn innerhtml_helpers_are_not_cwe95_but_eval_is() {
     assert_findings_in_range(&cwe95, 103, 103, 1, "Function('return '+userInput) is CWE-95");
     assert_findings_in_range(&cwe95, 108, 108, 1, "window.setTimeout(string concat) is CWE-95");
     assert_findings_in_range(&cwe95, 112, 112, 1, "window.setInterval(string concat) is CWE-95");
+    assert_findings_in_range(&cwe95, 124, 124, 1, "later string-eval timer is CWE-95");
     assert_no_findings_in_range(&cwe95, 30, 98, "DOM/HTMX/callback helpers are not CWE-95");
 
     let xss: Vec<_> = findings.iter().filter(|f| is_xss(f)).cloned().collect();
     assert_findings_in_range(&xss, 32, 32, 1, "innerHTML = location.hash must remain XSS");
+    let logical: Vec<_> =
+        findings.iter().filter(|f| f.snippet.contains("innerHTML ||=")).cloned().collect();
+    assert_findings_in_range(
+        &logical,
+        116,
+        118,
+        1,
+        "innerHTML ||= tainted intermediate is a DOM sink",
+    );
+    assert!(
+        logical.iter().any(|f| f.cwe_id.as_deref() == Some("cwe-116") || is_xss(f)),
+        "innerHTML ||= must be a DOM/encoding sink, got: {:?}",
+        logical
+            .iter()
+            .map(|f| (f.line, f.cwe_id.as_deref(), f.finding_type.as_str()))
+            .collect::<Vec<_>>()
+    );
     assert_no_findings_in_range(
         &xss,
         36,
@@ -163,6 +181,7 @@ fn django_autoescape_and_htmx_are_not_xss_but_safe_filter_is() {
         18,
         "request.GET and |safe in adjacent expressions are not XSS",
     );
+    assert_no_findings_in_range(&xss, 20, 20, "{{= without request+|safe is not XSS");
     assert!(
         findings.iter().all(|f| !is_cwe95(f)),
         "django templates must not produce CWE-95, got: {:?}",
@@ -213,6 +232,7 @@ fn html_language_still_flags_django_safe_filter() {
         18,
         "request.GET and |safe in adjacent expressions are not XSS",
     );
+    assert_no_findings_in_range(&xss, 20, 20, "{{= without request+|safe is not XSS");
 }
 
 #[test]
