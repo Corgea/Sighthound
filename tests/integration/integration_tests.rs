@@ -573,4 +573,39 @@ def run(data):
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(stderr.contains("Invalid severity level: 'invalid_level'"), "got: {stderr}");
     }
+
+    #[test]
+    fn html_only_default_scan_succeeds_and_flags_django_safe() {
+        let bin_path = if let Ok(path) = std::env::var("CARGO_BIN_EXE_sighthound") {
+            std::path::PathBuf::from(path)
+        } else {
+            std::path::PathBuf::from("target/debug/sighthound")
+        };
+        if !bin_path.exists() {
+            return;
+        }
+
+        let mut html_file = NamedTempFile::with_suffix(".html").expect("temp html");
+        write!(html_file, "{}", include_str!("../test_files/django/fixtures/template_xss.html"))
+            .expect("write html");
+
+        let output = std::process::Command::new(&bin_path)
+            .args([html_file.path().to_str().unwrap(), "--output-format", "json"])
+            .output()
+            .expect("failed to run sighthound");
+        assert!(
+            output.status.success(),
+            "default scan of an HTML-only file must not fail when the pack has no taint rules: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("|safe") || stdout.contains("mark_safe"),
+            "django |safe TP must survive default (simple+taint) HTML scan, got: {stdout}"
+        );
+        assert!(
+            !stdout.contains("No taint flow rules found"),
+            "taint-empty HTML packs must skip taint, not error: {stdout}"
+        );
+    }
 }

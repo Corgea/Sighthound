@@ -88,6 +88,17 @@ impl TaintRuleDeduplicator {
             {
                 continue;
             }
+            if let Some(property) = pattern.strip_prefix("*.") {
+                // Skip textContent/innerText writes (sanitizers). Keep
+                // innerHTML/outerHTML writes so `el.innerHTML = location.hash`
+                // still pairs as a same-node source+sink.
+                if !CommonUtils::is_html_write_source_property(property)
+                    && CommonUtils::assignment_follows_dom_property(text, property)
+                    && !CommonUtils::dom_property_has_unassigned_use(text, property)
+                {
+                    continue;
+                }
+            }
 
             if CommonUtils::matches_taint_pattern(pattern, text) {
                 log::debug!("[SOURCE_MATCH] Matched pattern: '{}' in text: '{}'", pattern, text);

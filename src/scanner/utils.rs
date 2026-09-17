@@ -606,6 +606,85 @@ impl AstUtils {
         let html_sanitizers =
             ["DOMPurify.sanitize(", "validator.escape(", "xss(", "escapeHtml(", "encodeHTML("];
         html_sanitizers.iter().any(|pat| code.contains(pat))
+            || Self::is_textcontent_escape_innerhtml_read(code)
+    }
+
+    /// `el.textContent = x; return el.innerHTML` encodes HTML. Not XSS.
+    /// An `outerHTML` write in the same snippet is a separate sink.
+    pub fn is_textcontent_escape_innerhtml_read(code: &str) -> bool {
+        CommonUtils::assignment_follows_dom_property(code, "textContent")
+            && code.contains(".innerHTML")
+            && !CommonUtils::assignment_follows_dom_property(code, "innerHTML")
+            && !CommonUtils::assignment_follows_dom_property(code, "outerHTML")
+    }
+
+    /// Function/arrow timer args are not CWE-95. Parentheses around a value
+    /// (`(userInput)`) are not a callback. A later non-callback timer in the
+    /// same snippet is still a sink.
+    pub fn is_timer_callback_eval_sink(sink_pattern: &str, node_text: &str) -> bool {
+        if !sink_pattern.contains("setTimeout") && !sink_pattern.contains("setInterval") {
+            return false;
+        }
+        let lower = node_text.to_ascii_lowercase();
+        let mut saw_callback = false;
+        for name in ["settimeout", "setinterval"] {
+            let mut search = 0;
+            while let Some(rel) = lower.get(search..).and_then(|rest| rest.find(name)) {
+                let idx = search + rel;
+                let after_name = lower[idx + name.len()..].trim_start();
+                if let Some(args) = after_name.strip_prefix('(') {
+                    if !Self::starts_with_timer_callback_arg(args.trim_start()) {
+                        return false;
+                    }
+                    saw_callback = true;
+                }
+                search = idx + name.len();
+            }
+        }
+        saw_callback
+    }
+
+    fn starts_with_timer_callback_arg(args: &str) -> bool {
+        if args.starts_with('(') {
+            return Self::paren_group_is_timer_callback(args);
+        }
+        for keyword in ["function", "async"] {
+            if args.strip_prefix(keyword).is_some_and(|rest| {
+                rest.is_empty()
+                    || rest.starts_with('(')
+                    || rest.starts_with(|c: char| c.is_whitespace())
+            }) {
+                return true;
+            }
+        }
+        let ident_end = args
+            .find(|c: char| !c.is_ascii_alphanumeric() && c != '_' && c != '$')
+            .unwrap_or(args.len());
+        ident_end > 0 && args[ident_end..].trim_start().starts_with("=>")
+    }
+
+    fn paren_group_is_timer_callback(args: &str) -> bool {
+        let mut depth = 0;
+        for (i, c) in args.char_indices() {
+            match c {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        let inner = args.get(1..i).unwrap_or("").trim();
+                        let after = args.get(i + 1..).unwrap_or("").trim_start();
+                        // `(fn)()` / `(() => x)()` is an IIFE result, not a callback.
+                        if after.starts_with('(') {
+                            return false;
+                        }
+                        return after.starts_with("=>")
+                            || Self::starts_with_timer_callback_arg(inner);
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
     }
 
     fn check_python_sanitization(code: &str) -> bool {
@@ -787,5 +866,46 @@ mod tests {
             .expect("discovery should succeed");
 
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn textcontent_write_then_innerhtml_read_is_escape() {
+        assert!(AstUtils::is_textcontent_escape_innerhtml_read(
+            "div.textContent = text; return div.innerHTML"
+        ));
+        assert!(!AstUtils::is_textcontent_escape_innerhtml_read("el.innerHTML = location.hash"));
+        assert!(!AstUtils::is_textcontent_escape_innerhtml_read(
+            "div.textContent = text; return div.innerHTML; el.outerHTML = user"
+        ));
+    }
+
+    #[test]
+    fn timer_callback_skip_keeps_ident_and_string_eval() {
+        let sink = "setTimeout(";
+        assert!(AstUtils::is_timer_callback_eval_sink(
+            sink,
+            "setTimeout(function () { paint(); }, 0)"
+        ));
+        assert!(AstUtils::is_timer_callback_eval_sink(sink, "setTimeout(() => paint(), 0)"));
+        assert!(AstUtils::is_timer_callback_eval_sink(sink, "setTimeout(x => paint(x), 0)"));
+        assert!(AstUtils::is_timer_callback_eval_sink(
+            sink,
+            "setTimeout((function () { paint(); }), 0)"
+        ));
+        assert!(!AstUtils::is_timer_callback_eval_sink(
+            sink,
+            "setTimeout((function () { return userInput; })(), 0)"
+        ));
+        assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout((() => userInput)(), 0)"));
+        assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout(functionName, 1000)"));
+        assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout(userInput, 1000)"));
+        assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout(userInput)"));
+        assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout((userInput), 1000)"));
+        assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout((event.data), 1000)"));
+        assert!(!AstUtils::is_timer_callback_eval_sink(sink, "setTimeout(event.data, 1000)"));
+        assert!(!AstUtils::is_timer_callback_eval_sink(
+            sink,
+            "setTimeout(function () { paint(); }, 0); setTimeout('alert(' + userInput, 1000)"
+        ));
     }
 }

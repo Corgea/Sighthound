@@ -474,25 +474,14 @@
             ]),
             
             sinks: Some([
-                // Direct code execution
+                // Eval injection only. Template engines / dynamic require are not CWE-95.
                 "eval",
                 "Function",
                 "setTimeout",
                 "setInterval",
-                
-                // VM module
                 "vm.runInThisContext",
                 "vm.runInNewContext",
-                "vm.runInContext",
-                
-                // Dynamic requires
-                "require",
-                "import",
-                
-                // Template engines (unsafe usage)
-                "ejs.render",
-                "handlebars.compile",
-                "mustache.render"
+                "vm.runInContext"
             ]),
             
             sanitizers: Some([
@@ -525,6 +514,49 @@
             )),
             
             tags: Some(["code-injection", "cwe-94", "server-side", "backend"])
+        ),
+
+        (
+            id: Some("js-server-template-injection-001"),
+            name: Some("Server-side template injection"),
+            category: Some("code-injection"),
+            mode: "taint",
+            sources: Some([
+                "req.query.*",
+                "req.params.*",
+                "req.body.*",
+                "request.query.*",
+                "request.params.*",
+                "request.body.*",
+                "ctx.query.*",
+                "ctx.params.*",
+                "req.headers.*"
+            ]),
+            sinks: Some([
+                "ejs.render",
+                "handlebars.compile",
+                "mustache.render"
+            ]),
+            sanitizers: Some([
+                "validateCode",
+                "sanitizeCode",
+                "isValidCode"
+            ]),
+            finding_type: Some("Code Injection"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-94"),
+            description: Some("User-controlled request data is passed to a template engine"),
+            file_types: Some((
+                extensions: Some([".js", ".jsx", ".ts", ".tsx"]),
+                exclude_patterns: Some([
+                    "*.min.js", "*.min.jsx", "*.min.ts", "*.min.tsx",
+                    "*/public/*", "*/static/*", "*/assets/*", "*/dist/*",
+                    "*/build/*", "*/frontend/*", "*/client/*",
+                    "*/node_modules/*", "*/lib/*", "*/vendor/*"
+                ])
+            )),
+            tags: Some(["code-injection", "cwe-94", "ssti", "server-side", "backend"])
         )
     ]
 ) 

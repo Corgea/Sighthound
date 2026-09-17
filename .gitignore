@@ -74,6 +74,9 @@ release/
 # External benchmark corpus (separate/large repo, cloned locally)
 /fusion-benchmarks/
 
+# Local linux/mac export from `./build_all_platforms.sh` (binary + copied rules)
+/sighthound_release/
+
 # Generated benchmark scan artifacts (reproducible via bench/run_bench.py)
 /bench/results/
 /bench/*.json

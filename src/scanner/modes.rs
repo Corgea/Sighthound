@@ -541,6 +541,8 @@ pub fn run_taint_analysis_with_verbosity(
     // Some rule packs ship search-mode rules only (e.g. html, objectscript, sql). Skip the taint
     // pass instead of failing the scan and discarding the search-pass findings.
     if taint_rules_count == 0 {
+        // Combined default mode visits this as a second pass. Search-only packs
+        // must skip taint instead of aborting. `--taint-analysis` degrades the same way.
         if show_progress {
             crate::ui::warn(&format!(
                 "no taint-mode rules for {} - skipping taint analysis",

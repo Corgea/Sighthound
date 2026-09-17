@@ -96,14 +96,7 @@
                 "*.onload",
                 "*.onerror",
                 "*.setAttribute",
-                // Code execution
-                "eval(",
-                "Function(",
-                "setTimeout(",  // With string argument
-                "setInterval(",  // With string argument
-                
-                // Dynamic script loading
-                "import(",
+                // Script src assignment. eval/Function/setTimeout are CWE-95, not XSS.
                 "document.createElement(\"script\").src"
             ]),
             
@@ -1309,15 +1302,13 @@
                 "URLSearchParams(*innerHTML*",
                 "new URLSearchParams(*innerHTML*",
                 
-                // DOM element content patterns to innerHTML
-                "*.textContent*innerHTML*",
-                "*.innerText*innerHTML*",
-                "*.text*innerHTML*",
-                "option.text*innerHTML*",
-                "element.textContent*innerHTML*",
-                "firstMember.querySelector(*).textContent*innerHTML*",
-                "document.querySelector(*).textContent*innerHTML*",
-                "select.previousElementSibling.textContent*innerHTML*",
+                // DOM element content assigned to innerHTML (write). Reading
+                // innerHTML after a textContent write is the escapeHtml helper.
+                "*.innerHTML*=*.textContent*",
+                "*.innerHTML*=*textContent*",
+                "*.textContent*innerHTML*=*",
+                "*.innerText*innerHTML*=*",
+                "*.text*innerHTML*=*",
                 
                 // Template literal patterns with innerHTML
                 "`*${*searchParams.get(*}*`*innerHTML*",
@@ -1384,25 +1375,15 @@
             ]),
             
             sinks: Some([
-                // Code evaluation
+                // Eval injection only. DOM/HTML writes are CWE-79.
                 "eval(",
                 "Function(",
                 "new Function(",
                 "setTimeout(",
                 "setInterval(",
-                
-                // Dynamic imports
-                "import(",
-                "require(",
-                
-                // Script creation and execution
-                "document.createElement(\"script\")",
-                "*.appendChild",
-                "*.insertBefore",
-                
-                // WebAssembly
-                "WebAssembly.compile",
-                "WebAssembly.instantiate"
+                "vm.runInNewContext",
+                "vm.runInThisContext",
+                "vm.runInContext"
             ]),
             
             sanitizers: Some([
@@ -1791,26 +1772,15 @@
             ]),
             
             sinks: Some([
-                // Direct code execution
+                // Eval injection only. DOM/HTML writes are CWE-79.
                 "eval(",
                 "new Function(",
-                
-                // Timed execution with string
+                "Function(",
                 "setTimeout(",
                 "setInterval(",
-                
-                // Dynamic imports
-                "import(",
-                "require(",
-                
-                // Script creation and execution
-                "document.createElement",
-                "*.appendChild",
-                "*.insertBefore",
-                
-                // WebAssembly
-                "WebAssembly.compile",
-                "WebAssembly.instantiate"
+                "vm.runInNewContext",
+                "vm.runInThisContext",
+                "vm.runInContext"
             ]),
             
             sanitizers: Some([
@@ -2020,14 +1990,14 @@
             finding_type: Some("Dynamic Code Loading"),
             severity: Some("High"),
             confidence: Some("Medium"),
-            cwe_id: Some("cwe-95"),
+            cwe_id: Some("cwe-94"),
             
             description: Some("User-controlled module paths can lead to arbitrary code execution"),
             
             file_types: Some((
                 extensions: Some([".js", ".jsx", ".ts", ".tsx"]))),
             
-            tags: Some(["code-injection", "cwe-95", "dynamic-import"])
+            tags: Some(["code-injection", "cwe-94", "dynamic-import"])
         ),
 
         // ==================== CWE-601: URL Manipulation ====================
