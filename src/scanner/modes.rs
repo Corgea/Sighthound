@@ -156,15 +156,24 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
     }
 }
 
-/// For HTML/Django, load the canonical frontend DOM-XSS taint rule from the file rules
+/// For HTML, load the canonical frontend DOM-XSS taint rule from the file rules
 /// tree so embedded-script scanning has parity with embedded-rules mode. Returns `None`
 /// for other languages.
 fn load_file_dom_xss_taint_rule(language: &str, base_rules_dir: &str) -> Option<Rules> {
-    if !matches!(language, "html" | "django") {
+    if language != "html" {
         return None;
     }
     let javascript_rules_dir = format!("{}/javascript", base_rules_dir);
-    Rules::load_from_directory(&javascript_rules_dir).ok()?.frontend_dom_xss_rule_only()
+    let rule = Rules::load_from_directory(&javascript_rules_dir)
+        .ok()
+        .and_then(|rules| rules.frontend_dom_xss_rule_only());
+    if rule.is_none() {
+        eprintln!(
+            "Warning: canonical DOM-XSS taint rule not found in {}; embedded <script> scanning disabled",
+            javascript_rules_dir
+        );
+    }
+    rule
 }
 
 /// Load the backend-only security rules for JS/TS when `code_type` requires backend coverage.
