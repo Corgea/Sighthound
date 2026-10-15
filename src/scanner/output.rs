@@ -551,7 +551,7 @@ pub fn print_findings_text(
 
 #[cfg(test)]
 mod sarif_tests {
-    use super::{build_sarif_log, sarif_uri};
+    use super::{build_sarif_log, csv_field, sarif_uri};
     use crate::models::Finding;
     use std::path::Path;
 
@@ -675,5 +675,13 @@ mod sarif_tests {
         assert_eq!(sarif_uri("./src/app.py", Some(repository_root)), "src/app.py");
         assert_eq!(sarif_uri("/repo/src/app.py", Some(repository_root)), "src/app.py");
         assert_eq!(sarif_uri("backend/src/app.py", Some(repository_root)), "backend/src/app.py");
+    }
+    #[test]
+    fn escapes_csv_field_delimiters_quotes_and_newlines() {
+        assert_eq!(csv_field("plain"), "plain");
+        assert_eq!(csv_field("path,with,commas.py"), "\"path,with,commas.py\"");
+        assert_eq!(csv_field("say \"hello\""), "\"say \"\"hello\"\"\"");
+        assert_eq!(csv_field("first\nsecond"), "\"first\nsecond\"");
+        assert_eq!(csv_field("first\r\nsecond"), "\"first\r\nsecond\"");
     }
 }
