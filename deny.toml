@@ -1,0 +1,14 @@
+[graph]
+all-features = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+
+[bans]
+# Existing transitive duplicates are allowed; newly introduced wildcard
+# requirements are not.
+multiple-versions = "allow"
+wildcards = "deny"

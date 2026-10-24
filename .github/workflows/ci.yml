@@ -51,8 +51,11 @@ jobs:
       - name: Install supported cargo tools
         uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2 on 2026-10-15
         with:
-          tool: cargo-audit@0.22.2,cargo-llvm-cov@0.9.1
+          tool: cargo-audit@0.22.2,cargo-deny@0.20.2,cargo-llvm-cov@0.9.1
           fallback: none
+
+      - name: Check dependency sources and bans
+        run: cargo deny --locked check sources bans
 
       # cargo-modules is not in install-action's reviewed tool manifest. Install
       # the exact previously passing release without passing github.token to the
