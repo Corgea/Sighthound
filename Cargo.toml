@@ -65,7 +65,7 @@ syntect = { version = "5.1", default-features = false, features = [
 ] }
 memmap2 = "0.9"
 log = "0.4"
-env_logger = "0.10"
+env_logger = "0.11"
 ignore = "0.4"
 lazy_static = "1.4"
 dbg_breakpoint="0.1.1"
