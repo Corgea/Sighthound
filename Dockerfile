@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for building sighthound binary
 # Stage 1: Build the binary
-FROM rust:1.89-slim AS builder
+FROM rust:1.89-slim@sha256:8cffb8fe4e8a95cf0d6a2060375e5a28aff4c752155aa9f1f9193530769bdf66 AS builder
 
 # Install build dependencies including cross-compilation tools
 RUN apt-get update && apt-get install -y \
@@ -16,9 +16,6 @@ WORKDIR /app
 # Copy source code
 COPY . .
 
-# Remove Cargo.lock to avoid version conflicts in container
-RUN rm -f Cargo.lock
-
 # Set build-time environment variables
 ARG GIT_HASH
 ARG BUILD_DATE
@@ -27,10 +24,10 @@ ENV BUILD_DATE=${BUILD_DATE}
 
 # Build the release binary
 ENV CARGO_TARGET_DIR=/app/target
-RUN cargo build --release
+RUN cargo build --release --locked --bin sighthound
 
 # Runtime stage - minimal image for running the container
-FROM debian:bookworm-slim AS runtime
+FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8 AS runtime
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/sighthound /usr/local/bin/sighthound
 COPY --from=builder /app/rules /rules

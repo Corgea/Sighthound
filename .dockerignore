@@ -1,0 +1,14 @@
+# The release image needs only the manifest, locked dependency graph, build
+# script, scanner source, embedded rules, and redistributed license notices.
+# A whitelist prevents local secrets, Git metadata, caches, and editor/agent
+# state from being transmitted to a local or remote Docker builder.
+*
+!Cargo.toml
+!Cargo.lock
+!build.rs
+!src/
+!src/**
+!rules/
+!rules/**
+!LICENSE
+!THIRD-PARTY-NOTICES.md
