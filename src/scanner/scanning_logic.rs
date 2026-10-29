@@ -78,8 +78,8 @@ impl ScanningLogic {
         //
         // This must stay *inside* `check_rule_against_node`, before `scan_file_with_rules`
         // derives the dedup key from the returned finding — reversing that order silently
-        // breaks dedup. Only `line` is corrected; `column`, `end_line` and `end_column`
-        // stay node-derived on purpose.
+        // breaks dedup. `scan_file_with_rules` clamps the rest of the span to this line
+        // after dedup.
         if markup {
             let node_text = node_text.as_deref().expect("markup matching initializes node text");
             if let Some(range) = crate::rules::first_positive_match_range(rule, node_text) {
@@ -100,7 +100,7 @@ impl ScanningLogic {
         }
 
         if language_support.name() == "sql" {
-            Self::clamp_sql_finding_to_matched_line(&mut finding, source);
+            Self::clamp_finding_to_matched_line(&mut finding, source);
         }
 
         Some(finding)
@@ -235,6 +235,15 @@ impl ScanningLogic {
                         }
                     }
                 }
+            }
+        }
+
+        // Only after the loop: markup dedup keeps the tightest node by snippet length,
+        // which a clamped snippet no longer carries. A single-line node (an attribute,
+        // a one-line `<script>`) is already tighter than its line, so it keeps its span.
+        if markup {
+            for finding in findings.iter_mut().filter(|f| f.snippet.contains('\n')) {
+                Self::clamp_finding_to_matched_line(finding, source);
             }
         }
 
@@ -697,17 +706,19 @@ impl ScanningLogic {
         }
     }
 
-    /// SQL is matched as one whole-file node (`call_node_types() == ["program"]`), so the raw
-    /// finding carries the entire file as `snippet`/`function` and the file end as `end_line`.
-    /// Clamp the emitted finding to the matched line so consumers don't store the whole file
-    /// per finding; detection stays whole-file.
-    fn clamp_sql_finding_to_matched_line(finding: &mut crate::models::Finding, source: &[u8]) {
+    /// SQL is matched as one whole-file node (`call_node_types() == ["program"]`), and markup
+    /// against the text of a whole element, so the raw finding carries that entire node as
+    /// `snippet` and its end as `end_line`. For a template that is most of the file, and
+    /// consumers that key a finding on its snippet lose its triage on every unrelated edit.
+    /// Clamp the emitted finding to the matched line; detection stays node-wide.
+    fn clamp_finding_to_matched_line(finding: &mut crate::models::Finding, source: &[u8]) {
         let text = String::from_utf8_lossy(source);
         let Some(line_text) = text.lines().nth(finding.line.saturating_sub(1)) else {
             return;
         };
         finding.snippet = line_text.to_string();
         finding.function = line_text.to_string();
+        finding.column = 1;
         finding.end_line = finding.line;
         finding.end_column = line_text.chars().count() + 1;
         if let Some(sink_info) = &mut finding.sink_info {
@@ -2276,7 +2287,7 @@ impl ScanningLogic {
         );
 
         if language_support.name() == "sql" {
-            Self::clamp_sql_finding_to_matched_line(&mut finding, source);
+            Self::clamp_finding_to_matched_line(&mut finding, source);
         }
 
         Some(finding)
