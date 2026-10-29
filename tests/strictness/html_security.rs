@@ -292,3 +292,38 @@ fn html_security_rules_fire_in_default_mode() {
          with zero taint rules the taint pass must add nothing and drop nothing"
     );
 }
+
+/// A sink deep inside a multi-line `<script>` must report that one line, not the
+/// element. Consumers key a finding on its snippet, so a whole-element snippet (most of
+/// a template) re-keys the finding on every unrelated edit and drops its triage.
+#[cfg(all(feature = "html", feature = "django"))]
+#[test]
+fn multiline_markup_finding_is_clamped_to_the_sink_line() {
+    const SINK: &str = "        list.innerHTML = `<li>${rows[0].name}</li>`;";
+    let template = format!(
+        "{{% extends \"base.html\" %}}\n\
+         {{% block content %}}\n\
+         \x20   <script>\n\
+         \x20   function render(rows) {{\n\
+         \x20       const list = document.getElementById(\"list\");\n\
+         {SINK}\n\
+         \x20   }}\n\
+         </script>\n\
+         {{% endblock %}}\n"
+    );
+    let staging = stage_dir();
+    let path = write_staged_file(staging.path(), "template.html", &template);
+    let path = path.to_str().expect("staged path is not valid UTF-8");
+
+    for language in ["html", "django"] {
+        let findings =
+            run_cli_json(&["--output-format", "json", "--simple-analysis", path, language]);
+        let [finding] = findings.as_slice() else {
+            panic!("{language}: expected exactly one finding, got {findings:?}");
+        };
+        assert_eq!(finding["line"].as_u64(), Some(6), "{language}: {finding:?}");
+        assert_eq!(finding["end_line"].as_u64(), Some(6), "{language}: {finding:?}");
+        assert_eq!(finding["column"].as_u64(), Some(1), "{language}: {finding:?}");
+        assert_eq!(finding["snippet"].as_str(), Some(SINK), "{language}: {finding:?}");
+    }
+}
