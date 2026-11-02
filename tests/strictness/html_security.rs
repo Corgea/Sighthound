@@ -299,7 +299,7 @@ fn html_security_rules_fire_in_default_mode() {
 #[cfg(all(feature = "html", feature = "django"))]
 #[test]
 fn multiline_markup_finding_is_clamped_to_the_sink_line() {
-    const SINK: &str = "        list.innerHTML = `<li>${rows[0].name}</li>`;";
+    const SINK: &str = "        list.innerHTML = `<li>é ${rows[0].name}</li>`;";
     let template = format!(
         "{{% extends \"base.html\" %}}\n\
          {{% block content %}}\n\
@@ -324,6 +324,8 @@ fn multiline_markup_finding_is_clamped_to_the_sink_line() {
         assert_eq!(finding["line"].as_u64(), Some(6), "{language}: {finding:?}");
         assert_eq!(finding["end_line"].as_u64(), Some(6), "{language}: {finding:?}");
         assert_eq!(finding["column"].as_u64(), Some(1), "{language}: {finding:?}");
+        let end_column = SINK.len() as u64 + 1;
+        assert_eq!(finding["end_column"].as_u64(), Some(end_column), "{language}: {finding:?}");
         assert_eq!(finding["snippet"].as_str(), Some(SINK), "{language}: {finding:?}");
     }
 }

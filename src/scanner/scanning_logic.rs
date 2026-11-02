@@ -720,7 +720,7 @@ impl ScanningLogic {
         finding.function = line_text.to_string();
         finding.column = 1;
         finding.end_line = finding.line;
-        finding.end_column = line_text.chars().count() + 1;
+        finding.end_column = line_text.len() + 1;
         if let Some(sink_info) = &mut finding.sink_info {
             sink_info.function_name = line_text.to_string();
         }
