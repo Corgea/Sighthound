@@ -78,14 +78,18 @@ impl ScanningLogic {
         //
         // This must stay *inside* `check_rule_against_node`, before `scan_file_with_rules`
         // derives the dedup key from the returned finding — reversing that order silently
-        // breaks dedup. Only `line` is corrected; `column`, `end_line` and `end_column`
-        // stay node-derived on purpose.
+        // breaks dedup. `end_line` becomes the match's last line (or `line` when no range
+        // resolves); `scan_file_with_rules` clamps the rest of the span to these lines after
+        // dedup.
         if markup {
             let node_text = node_text.as_deref().expect("markup matching initializes node text");
             if let Some(range) = crate::rules::first_positive_match_range(rule, node_text) {
                 finding.line = node.start_position().row
                     + 1
                     + node_text[..range.start].bytes().filter(|b| *b == b'\n').count();
+                finding.end_line = finding.line + node_text[range].trim_end().matches('\n').count();
+            } else {
+                finding.end_line = finding.line;
             }
         }
 
@@ -100,7 +104,8 @@ impl ScanningLogic {
         }
 
         if language_support.name() == "sql" {
-            Self::clamp_sql_finding_to_matched_line(&mut finding, source);
+            finding.end_line = finding.line;
+            Self::clamp_finding_to_matched_lines(&mut finding, source);
         }
 
         Some(finding)
@@ -235,6 +240,15 @@ impl ScanningLogic {
                         }
                     }
                 }
+            }
+        }
+
+        // Only after the loop: markup dedup keeps the tightest node by snippet length,
+        // which a clamped snippet no longer carries. A single-line node (an attribute,
+        // a one-line `<script>`) is already tighter than its line, so it keeps its span.
+        if markup {
+            for finding in findings.iter_mut().filter(|f| f.snippet.contains('\n')) {
+                Self::clamp_finding_to_matched_lines(finding, source);
             }
         }
 
@@ -697,22 +711,29 @@ impl ScanningLogic {
         }
     }
 
-    /// SQL is matched as one whole-file node (`call_node_types() == ["program"]`), so the raw
-    /// finding carries the entire file as `snippet`/`function` and the file end as `end_line`.
-    /// Clamp the emitted finding to the matched line so consumers don't store the whole file
-    /// per finding; detection stays whole-file.
-    fn clamp_sql_finding_to_matched_line(finding: &mut crate::models::Finding, source: &[u8]) {
+    /// SQL is matched as one whole-file node (`call_node_types() == ["program"]`), and markup
+    /// against the text of a whole element, so the raw finding carries that entire node as
+    /// `snippet` and its end as `end_line`. For a template that is most of the file, and
+    /// consumers that key a finding on its snippet lose its triage on every unrelated edit.
+    /// Clamp the emitted finding to its matched lines (`line..=end_line`); detection stays
+    /// node-wide.
+    fn clamp_finding_to_matched_lines(finding: &mut crate::models::Finding, source: &[u8]) {
         let text = String::from_utf8_lossy(source);
-        let Some(line_text) = text.lines().nth(finding.line.saturating_sub(1)) else {
+        let start = finding.line.saturating_sub(1);
+        let lines: Vec<&str> =
+            text.lines().skip(start).take(finding.end_line.max(finding.line) - start).collect();
+        let Some(last_line) = lines.last() else {
             return;
         };
-        finding.snippet = line_text.to_string();
-        finding.function = line_text.to_string();
-        finding.end_line = finding.line;
-        finding.end_column = line_text.chars().count() + 1;
+        let matched = lines.join("\n");
+        finding.column = 1;
+        finding.end_line = finding.line + lines.len() - 1;
+        finding.end_column = last_line.len() + 1;
+        finding.function = matched.clone();
         if let Some(sink_info) = &mut finding.sink_info {
-            sink_info.function_name = line_text.to_string();
+            sink_info.function_name = matched.clone();
         }
+        finding.snippet = matched;
     }
 
     pub fn create_finding_with_rule(
@@ -2037,6 +2058,18 @@ impl ScanningLogic {
         taint_rules: &[&crate::rules::UnifiedRule],
         language_support: &dyn crate::language::LanguageSupport,
     ) -> Vec<crate::models::Finding> {
+        // Markup has no taint rules, and its findings need the whole-element matching, line
+        // attribution, dedup and clamp that only `scan_file_with_rules` does.
+        if language_support.search_semantics() == SearchSemantics::Markup {
+            return Self::scan_file_with_rules(
+                filepath,
+                source,
+                tree,
+                search_rules,
+                language_support,
+            );
+        }
+
         let mut findings = Vec::new();
         let mut processed_lines = std::collections::HashSet::new();
 
@@ -2276,7 +2309,8 @@ impl ScanningLogic {
         );
 
         if language_support.name() == "sql" {
-            Self::clamp_sql_finding_to_matched_line(&mut finding, source);
+            finding.end_line = finding.line;
+            Self::clamp_finding_to_matched_lines(&mut finding, source);
         }
 
         Some(finding)
