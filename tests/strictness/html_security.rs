@@ -292,3 +292,70 @@ fn html_security_rules_fire_in_default_mode() {
          with zero taint rules the taint pass must add nothing and drop nothing"
     );
 }
+
+/// A sink deep inside a multi-line `<script>` must report that one line, not the
+/// element. Consumers key a finding on its snippet, so a whole-element snippet (most of
+/// a template) re-keys the finding on every unrelated edit and drops its triage.
+#[cfg(all(feature = "html", feature = "django"))]
+#[test]
+fn multiline_markup_finding_is_clamped_to_the_sink_line() {
+    const SINK: &str = "        list.innerHTML = `<li>é ${rows[0].name}</li>`;";
+    let template = format!(
+        "{{% extends \"base.html\" %}}\n\
+         {{% block content %}}\n\
+         \x20   <script>\n\
+         \x20   function render(rows) {{\n\
+         \x20       const list = document.getElementById(\"list\");\n\
+         {SINK}\n\
+         \x20   }}\n\
+         </script>\n\
+         {{% endblock %}}\n"
+    );
+    let staging = stage_dir();
+    let path = write_staged_file(staging.path(), "template.html", &template);
+    let path = path.to_str().expect("staged path is not valid UTF-8");
+
+    // `--language-filter` scans take the taint-context path, which must clamp too.
+    for language in ["html", "django"] {
+        for filter in [&[][..], &["--language-filter", "html"][..]] {
+            let mut args = vec!["--output-format", "json", "--simple-analysis", path, language];
+            args.extend_from_slice(filter);
+            let findings = run_cli_json(&args);
+            let [finding] = findings.as_slice() else {
+                panic!("{args:?}: expected exactly one finding, got {findings:?}");
+            };
+            assert_eq!(finding["line"].as_u64(), Some(6), "{args:?}: {finding:?}");
+            assert_eq!(finding["end_line"].as_u64(), Some(6), "{args:?}: {finding:?}");
+            assert_eq!(finding["column"].as_u64(), Some(1), "{args:?}: {finding:?}");
+            let end_column = SINK.len() as u64 + 1;
+            assert_eq!(finding["end_column"].as_u64(), Some(end_column), "{args:?}: {finding:?}");
+            assert_eq!(finding["snippet"].as_str(), Some(SINK), "{args:?}: {finding:?}");
+        }
+    }
+}
+
+/// A match that spans lines inside one element keeps every line it spans, so a meta
+/// refresh split across lines still shows its `javascript:` URL.
+#[cfg(feature = "html")]
+#[test]
+fn multiline_markup_match_is_clamped_to_its_lines() {
+    let staging = stage_dir();
+    let path = write_staged_file(
+        staging.path(),
+        "page.html",
+        "<html>\n<head>\n<meta\n  http-equiv=\"refresh\"\n  content=\"0;url=javascript:alert(1)\">\n\
+         </head>\n</html>\n",
+    );
+    let path = path.to_str().expect("staged path is not valid UTF-8");
+
+    let findings = run_cli_json(&["--output-format", "json", "--simple-analysis", path, "html"]);
+    let [finding] = findings.as_slice() else {
+        panic!("expected exactly one finding, got {findings:?}");
+    };
+    let snippet = "  http-equiv=\"refresh\"\n  content=\"0;url=javascript:alert(1)\">";
+    assert_eq!(finding["line"].as_u64(), Some(4), "{finding:?}");
+    assert_eq!(finding["end_line"].as_u64(), Some(5), "{finding:?}");
+    assert_eq!(finding["column"].as_u64(), Some(1), "{finding:?}");
+    assert_eq!(finding["end_column"].as_u64(), Some(39), "{finding:?}");
+    assert_eq!(finding["snippet"].as_str(), Some(snippet), "{finding:?}");
+}
