@@ -40,6 +40,9 @@ Tree-sitter based static vulnerability scanner with pattern matching and taint-f
 | HTML | `.html`, `.htm`, `.twig`, `.ejs`, `.hbs`, ... | Yes | Yes |
 | Django templates | `.html` (Django syntax) | Yes | Yes (HTML rules) |
 | SQL | `.sql`, `.ddl`, `.dml` | No — textual matching | Yes (`.sql` files only) |
+| XML | `.xml`, `.xsd`, `.xsl`, `.xslt`, `.wsdl`, `.svg`, `.pom` | No — textual matching | Yes |
+| Properties | `.properties`, `.props` | No — textual matching | Yes |
+| Config | `.config`, `.conf`, `.cfg`, `.ini`, `.env`, `.json`, `.yaml`, `.yml`, `.toml` | No — textual matching | Yes |
 
 Not currently supported: Razor (`.cshtml`), C/C++ (`.c`, `.h`).
 
@@ -64,6 +67,9 @@ rather than against parsed statements.
 - Files under `tests/`, `test/`, `vendor/`, `build/`, `dist/` and `target/` are skipped
   before language detection (whole-path-component match); `--include-test-fixtures` reopens
   `tests/` and `test/` only.
+
+**XML, properties and config** are matched textually the same way, with the same limits. Their
+packs are search-only, and each rule is scoped by `file_types`.
 
 Expect both false positives (a benign `||` concatenation is reported, at `Low` severity) and
 false negatives (dynamic SQL that is not the first thing in the file is missed).

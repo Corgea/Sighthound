@@ -103,7 +103,7 @@ impl ScanningLogic {
             finding.sink_info = Some(sink_info);
         }
 
-        if language_support.name() == "sql" {
+        if language_support.matches_whole_file() {
             finding.end_line = finding.line;
             Self::clamp_finding_to_matched_lines(&mut finding, source);
         }
@@ -2308,7 +2308,7 @@ impl ScanningLogic {
             taint_context_info,
         );
 
-        if language_support.name() == "sql" {
+        if language_support.matches_whole_file() {
             finding.end_line = finding.line;
             Self::clamp_finding_to_matched_lines(&mut finding, source);
         }

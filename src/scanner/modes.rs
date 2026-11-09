@@ -538,7 +538,7 @@ pub fn run_taint_analysis_with_verbosity(
     // Check if we have taint flow rules
     let taint_rules_count = rules.rules.iter().filter(|r| r.is_taint_rule()).count();
 
-    // Some rule packs ship search-mode rules only (e.g. html, objectscript, sql). Skip the taint
+    // Some rule packs ship search-mode rules only (e.g. html, objectscript, sql, xml). Skip the taint
     // pass instead of failing the scan and discarding the search-pass findings.
     if taint_rules_count == 0 {
         // Combined default mode visits this as a second pass. Search-only packs

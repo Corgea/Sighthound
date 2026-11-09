@@ -1,0 +1,43 @@
+(
+    rules: [
+        (
+            id: Some("props-crypto-001"),
+            name: Some("Weak Encryption Configuration"),
+            category: Some("cryptography"),
+            mode: "search",
+            patterns: Some([
+                "encryption=false",
+                "ssl=false",
+                "tls=false",
+                "verify=false",
+                "secure=false",
+            ]),
+            finding_type: Some("Insecure Configuration"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-327"),
+            description: Some("Encryption or verification disabled in configuration - enable secure communication"),
+            file_types: Some((extensions: Some([".properties", ".props", ".config", ".conf", ".cfg", ".ini", ".env"]))),
+            tags: Some(["cryptography", "configuration", "cwe-327"])
+        ),
+        (
+            id: Some("props-debug-001"),
+            name: Some("Debug Mode Enabled"),
+            category: Some("configuration"),
+            mode: "search",
+            patterns: Some([
+                "debug=true",
+                "debug_mode=true",
+                "debugMode=true",
+                "DEBUG=true",
+            ]),
+            finding_type: Some("Insecure Configuration"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-489"),
+            description: Some("Debug mode enabled - may expose sensitive information in production"),
+            file_types: Some((extensions: Some([".properties", ".props", ".config", ".conf", ".cfg", ".ini", ".env"]))),
+            tags: Some(["configuration", "debug", "information-disclosure", "cwe-489"])
+        ),
+    ]
+)

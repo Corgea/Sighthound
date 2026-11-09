@@ -25,6 +25,11 @@ pub trait LanguageSupport: Send + Sync {
     fn search_semantics(&self) -> SearchSemantics {
         SearchSemantics::Ast
     }
+    /// Whether rules match the whole file as text, with no grammar of the language's own.
+    /// Such a finding carries the whole file as its node, so it is clamped to its matched line.
+    fn matches_whole_file(&self) -> bool {
+        false
+    }
 }
 
 pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSupport>> {
@@ -54,7 +59,13 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
         #[cfg(feature = "objectscript")]
         "objectscript" => Ok(Box::new(ObjectScriptLanguage::udl())),
         #[cfg(feature = "sql")]
-        "sql" => Ok(Box::new(SQLLanguage)),
+        "sql" => Ok(Box::new(TextLanguage { name: "sql", extension: ".sql" })),
+        #[cfg(feature = "xml")]
+        "xml" => Ok(Box::new(TextLanguage { name: "xml", extension: ".xml" })),
+        #[cfg(feature = "properties")]
+        "properties" => Ok(Box::new(TextLanguage { name: "properties", extension: ".properties" })),
+        #[cfg(feature = "config")]
+        "config" => Ok(Box::new(TextLanguage { name: "config", extension: ".config" })),
         _ => {
             let mut supported = Vec::new();
             #[cfg(feature = "python")]
@@ -83,6 +94,12 @@ pub fn get_language_support(language_name: &str) -> Result<Box<dyn LanguageSuppo
             supported.push("objectscript");
             #[cfg(feature = "sql")]
             supported.push("sql");
+            #[cfg(feature = "xml")]
+            supported.push("xml");
+            #[cfg(feature = "properties")]
+            supported.push("properties");
+            #[cfg(feature = "config")]
+            supported.push("config");
 
             anyhow::bail!(
                 "Unsupported language: {}. Supported languages: {}",
@@ -704,20 +721,26 @@ impl LanguageSupport for DjangoTemplateLanguage {
     }
 }
 
-// SQL Implementation — text-based matching; the JS grammar is a no-op host.
+// SQL, XML, properties and config — text-based matching; the JS grammar is a no-op host.
 // `call_node_types()` names the parse-tree root, so `traverse_calls_only` yields
 // exactly one node per file and `get_function_name` hands rules the whole file
 // as the text to match against.
-#[cfg(feature = "sql")]
-pub struct SQLLanguage;
+#[cfg(any(feature = "sql", feature = "xml", feature = "properties", feature = "config"))]
+pub struct TextLanguage {
+    name: &'static str,
+    extension: &'static str,
+}
 
-#[cfg(feature = "sql")]
-impl LanguageSupport for SQLLanguage {
+#[cfg(any(feature = "sql", feature = "xml", feature = "properties", feature = "config"))]
+impl LanguageSupport for TextLanguage {
     fn name(&self) -> &'static str {
-        "sql"
+        self.name
     }
     fn file_extension(&self) -> &'static str {
-        ".sql"
+        self.extension
+    }
+    fn matches_whole_file(&self) -> bool {
+        true
     }
     fn tree_sitter_language(&self) -> Language {
         tree_sitter_javascript::LANGUAGE.into()

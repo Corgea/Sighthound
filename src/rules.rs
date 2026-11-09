@@ -28,6 +28,27 @@ static RULES_HTML: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/html");
 static RULES_PHP: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/php");
 static RULES_OBJECTSCRIPT: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/objectscript");
 static RULES_SQL: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/sql");
+static RULES_XML: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/xml");
+static RULES_PROPERTIES: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/properties");
+static RULES_CONFIG: Dir = include_dir!("$CARGO_MANIFEST_DIR/rules/config");
+
+/// Embedded rule pack per language: the languages it serves, the pack, and its label for
+/// errors. `load_embedded_rules` adds the JavaScript backend pack on top.
+static EMBEDDED_PACKS: &[(&[&str], &Dir<'static>, &str)] = &[
+    (&["python"], &RULES_PYTHON, "Python"),
+    (&["javascript", "tsx", "typescript"], &RULES_JAVASCRIPT, "JavaScript"),
+    (&["java"], &RULES_JAVA, "Java"),
+    (&["csharp"], &RULES_CSHARP, "C#"),
+    (&["go"], &RULES_GO, "Go"),
+    (&["ruby"], &RULES_RUBY, "Ruby"),
+    (&["html", "django"], &RULES_HTML, "HTML"),
+    (&["php"], &RULES_PHP, "PHP"),
+    (&["objectscript"], &RULES_OBJECTSCRIPT, "ObjectScript"),
+    (&["sql"], &RULES_SQL, "SQL"),
+    (&["xml"], &RULES_XML, "XML"),
+    (&["properties"], &RULES_PROPERTIES, "properties"),
+    (&["config"], &RULES_CONFIG, "config"),
+];
 
 // Structure for centralized exclusion patterns
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -134,37 +155,20 @@ impl Rules {
 
     /// Load embedded rules for a specific language
     pub fn load_embedded_rules(language: &str, code_type: Option<&str>) -> Result<Self> {
-        let mut all_rules = Vec::new();
+        let Some((_, pack, label)) =
+            EMBEDDED_PACKS.iter().find(|(languages, ..)| languages.contains(&language))
+        else {
+            return Err(anyhow::anyhow!("No embedded rules available for language: {}", language));
+        };
+        let mut all_rules = Self::parse_embedded_dir(pack, label)?;
 
-        match language {
-            "python" => all_rules.extend(Self::parse_embedded_dir(&RULES_PYTHON, "Python")?),
-            "javascript" | "tsx" | "typescript" => {
-                all_rules.extend(Self::parse_embedded_dir(&RULES_JAVASCRIPT, "JavaScript")?);
-                // Legacy backend JS rules load only when explicitly non-frontend,
-                // matching the file-rules auto-detect path the benchmark measured.
-                if code_type.is_some_and(|ct| ct != "frontend") {
-                    all_rules.extend(Self::parse_embedded_dir(
-                        &RULES_BACKEND_JAVASCRIPT,
-                        "JavaScript backend",
-                    )?);
-                }
-            }
-            "java" => all_rules.extend(Self::parse_embedded_dir(&RULES_JAVA, "Java")?),
-            "csharp" => all_rules.extend(Self::parse_embedded_dir(&RULES_CSHARP, "C#")?),
-            "go" => all_rules.extend(Self::parse_embedded_dir(&RULES_GO, "Go")?),
-            "ruby" => all_rules.extend(Self::parse_embedded_dir(&RULES_RUBY, "Ruby")?),
-            "html" | "django" => all_rules.extend(Self::parse_embedded_dir(&RULES_HTML, "HTML")?),
-            "php" => all_rules.extend(Self::parse_embedded_dir(&RULES_PHP, "PHP")?),
-            "objectscript" => {
-                all_rules.extend(Self::parse_embedded_dir(&RULES_OBJECTSCRIPT, "ObjectScript")?)
-            }
-            "sql" => all_rules.extend(Self::parse_embedded_dir(&RULES_SQL, "SQL")?),
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "No embedded rules available for language: {}",
-                    language
-                ));
-            }
+        // Legacy backend JS rules load only when explicitly non-frontend,
+        // matching the file-rules auto-detect path the benchmark measured.
+        if matches!(language, "javascript" | "tsx" | "typescript")
+            && code_type.is_some_and(|ct| ct != "frontend")
+        {
+            all_rules
+                .extend(Self::parse_embedded_dir(&RULES_BACKEND_JAVASCRIPT, "JavaScript backend")?);
         }
 
         if all_rules.is_empty() {

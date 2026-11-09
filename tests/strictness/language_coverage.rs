@@ -375,6 +375,70 @@ fn sql_explicit_taint_analysis_returns_empty_findings_without_taint_rules() {
     );
 }
 
+// XML, properties and config are ported from the 0.1.2 fork that fusion vendors, and are
+// matched textually like SQL. Each unsafe fixture must keep the fork's findings, clamped to
+// the matched line; each safe fixture must stay clean. Lines were measured, not guessed.
+#[cfg(all(feature = "xml", feature = "properties", feature = "config"))]
+#[test]
+fn text_matched_ports_detect_unsafe_lines_and_leave_safe_clean() {
+    // Each fixture's extension is its language name.
+    let xml: &[(usize, &str)] = &[(2, "XML External Entity (XXE)"), (4, "Insecure Communication")];
+    let properties: &[(usize, &str)] =
+        &[(2, "Insecure Configuration"), (3, "Insecure Configuration")];
+    let config: &[(usize, &str)] = &[(7, "Insecure Communication")];
+    for (language, expected) in [("xml", xml), ("properties", properties), ("config", config)] {
+        let ext = language;
+        let dir = format!("tests/test_files/strictness_languages/{language}");
+        let staging = stage_dir();
+        stage_file(
+            staging.path(),
+            &format!("{dir}/unsafe.{ext}"),
+            &format!("case_unsafe.{ext}"),
+            &[],
+        );
+        stage_file(staging.path(), &format!("{dir}/safe.{ext}"), &format!("case_safe.{ext}"), &[]);
+
+        let rules = Rules::load_from_directory(&format!("rules/{language}/"))
+            .unwrap_or_else(|e| panic!("failed to load {language} rules: {e}"));
+        let findings = scan_language_simple_with_rules(staging.path(), language, rules);
+
+        let mut found: Vec<(usize, &str)> =
+            findings_in_file(&findings, &format!("case_unsafe.{ext}"))
+                .iter()
+                .map(|f| {
+                    assert_eq!(f.end_line, f.line, "{language}: finding not clamped: {f:?}");
+                    assert!(!f.snippet.contains('\n'), "{language}: finding not clamped: {f:?}");
+                    (f.line, f.finding_type.as_str())
+                })
+                .collect();
+        found.sort();
+        assert_eq!(found, expected, "{language}: unsafe fixture findings");
+        let safe = findings_in_file(&findings, &format!("case_safe.{ext}"));
+        assert!(safe.is_empty(), "{language}: safe fixture should be clean, got {safe:?}");
+    }
+}
+
+// Fusion runs auto-detect mode over a directory, so each extension must reach its pack there.
+#[cfg(all(feature = "xml", feature = "properties", feature = "config"))]
+#[test]
+fn text_matched_ports_are_auto_detected() {
+    let staging = stage_dir();
+    for (language, ext) in [("xml", "xml"), ("properties", "properties"), ("config", "config")] {
+        let fixture = format!("tests/test_files/strictness_languages/{language}/unsafe.{ext}");
+        stage_file(staging.path(), &fixture, &format!("case.{ext}"), &[]);
+    }
+    let root = staging.path().to_str().unwrap();
+
+    let findings = run_cli_json(&["--output-format", "json", root]);
+    for ext in ["xml", "properties", "config"] {
+        let name = format!("case.{ext}");
+        assert!(
+            findings.iter().any(|f| f["file"].as_str().is_some_and(|p| p.ends_with(&name))),
+            "auto-detect should scan {name}, got {findings:?}"
+        );
+    }
+}
+
 /// A language whose rule pack ships search rules but no `mode = "taint"` rules must not
 /// abort the scan. Scanning a SINGLE FILE is load-bearing: a directory scan merges in
 /// python/javascript taint rules, the zero-taint-rule guard never fires, and the test

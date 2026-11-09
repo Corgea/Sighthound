@@ -240,6 +240,61 @@ mod language_support_tests {
         }
     }
 
+    // ---- XML / properties / config registry wiring ----
+    //
+    // Ported from the 0.1.2 fork fusion vendors. Like SQL, these pin the registries so a
+    // pack that silently drops out of `main` fails here, not in production.
+
+    #[cfg(all(feature = "xml", feature = "properties", feature = "config"))]
+    #[test]
+    fn text_matched_ports_report_text_matching_shape() {
+        for (name, ext) in [("xml", ".xml"), ("properties", ".properties"), ("config", ".config")] {
+            let support = get_language_support(name).expect("language support available");
+            assert_eq!(support.name(), name);
+            assert_eq!(support.file_extension(), ext);
+            assert_eq!(support.call_node_types(), ["program"]);
+            assert!(support.matches_whole_file(), "{name} is matched as whole-file text");
+        }
+    }
+
+    #[cfg(all(feature = "xml", feature = "properties", feature = "config"))]
+    #[test]
+    fn text_matched_port_extensions_are_detected() {
+        use sighthound::scanner::utils::detect_language_from_path;
+        use std::path::Path;
+
+        let cases = [
+            ("xml", &["xml", "xsd", "xsl", "xslt", "wsdl", "svg", "pom"][..]),
+            ("properties", &["properties", "props"][..]),
+            ("config", &["config", "conf", "cfg", "ini", "env", "json", "yaml", "yml", "toml"][..]),
+        ];
+        for (language, exts) in cases {
+            for ext in exts {
+                let name = format!("a.{ext}");
+                assert_eq!(detect_language_from_path(Path::new(&name)), Some(language), "{name}");
+            }
+        }
+    }
+
+    #[cfg(all(feature = "xml", feature = "properties", feature = "config"))]
+    #[test]
+    fn text_matched_port_embedded_rules_load() {
+        use sighthound::rules::Rules;
+
+        for (language, id) in [
+            ("xml", "xml-xxe-001"),
+            ("properties", "props-crypto-001"),
+            ("config", "config-http-001"),
+        ] {
+            let rules = Rules::load_embedded_rules(language, None).expect("embedded rules load");
+            let ids: Vec<&str> = rules.rules.iter().filter_map(|r| r.id.as_deref()).collect();
+            assert!(
+                ids.contains(&id),
+                "embedded {language} rules should contain {id}, got {ids:?}"
+            );
+        }
+    }
+
     // ---- HTML `get_arguments_node` ----
 
     #[test]

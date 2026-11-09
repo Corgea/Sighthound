@@ -1,6 +1,6 @@
 Feature: New-language rule coverage
 
-  PHP, Go, Ruby, C#, and SQL each ship their own rule packs. Each language's
+  PHP, Go, Ruby, C#, SQL, XML, properties, and config each ship their own rule packs. Each language's
   unsafe fixture must yield at least one finding in its expected category.
 
   Scenario: PHP taint rules catch the unsafe fixture
@@ -29,3 +29,18 @@ Feature: New-language rule coverage
     Given a staged copy of the fixture "tests/test_files/strictness_languages/sql/unsafe.sql" as "sql_case.sql"
     When I scan the staging directory as "sql" using every rule in its rules directory
     Then the findings should include a "SQL Injection" finding in "sql_case.sql"
+
+  Scenario: XML rules catch the unsafe fixture
+    Given a staged copy of the fixture "tests/test_files/strictness_languages/xml/unsafe.xml" as "xml_case.xml"
+    When I scan the staging directory as "xml" using every rule in its rules directory
+    Then the findings should include a "XML External Entity (XXE)" finding in "xml_case.xml"
+
+  Scenario: Properties rules catch the unsafe fixture
+    Given a staged copy of the fixture "tests/test_files/strictness_languages/properties/unsafe.properties" as "props_case.properties"
+    When I scan the staging directory as "properties" using every rule in its rules directory
+    Then the findings should include a "Insecure Configuration" finding in "props_case.properties"
+
+  Scenario: Config rules catch the unsafe fixture
+    Given a staged copy of the fixture "tests/test_files/strictness_languages/config/unsafe.config" as "config_case.config"
+    When I scan the staging directory as "config" using every rule in its rules directory
+    Then the findings should include a "Insecure Communication" finding in "config_case.config"
