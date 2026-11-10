@@ -151,6 +151,23 @@ mod unless_exclusion_tests {
         assert!(!rule_matches_pattern_unified(&rule, "div.textContent = userInput"));
     }
 
+    // Text-matched languages match the whole file, so one pattern can hit many times. A
+    // vetoed occurrence must not hide an unvetoed one, before or after it.
+    #[test]
+    fn unless_vetoes_each_occurrence_separately() {
+        let rule = make_rule(vec!["regex:http://[^\\s<]+"], Some(vec!["http://localhost"]));
+
+        assert!(!rule_matches_pattern_unified(&rule, "<a>http://localhost:8080</a>"));
+        assert!(rule_matches_pattern_unified(
+            &rule,
+            "<a>http://localhost:8080</a>\n<b>http://evil.example.com</b>"
+        ));
+        assert!(rule_matches_pattern_unified(
+            &rule,
+            "<b>http://evil.example.com</b>\n<a>http://localhost:8080</a>"
+        ));
+    }
+
     #[test]
     fn empty_unless_list_never_suppresses() {
         let rule = make_rule(vec!["*.innerHTML*=*user*"], Some(vec![]));

@@ -50,6 +50,17 @@ static EMBEDDED_PACKS: &[(&[&str], &Dir<'static>, &str)] = &[
     (&["config"], &RULES_CONFIG, "config"),
 ];
 
+/// Rule packs a language loads beyond its own: packs whose rules also list some of its
+/// extensions (properties rules cover `.cfg`, `.ini`, `.env`, ...; XML rules cover
+/// `.config`). Each rule's `file_types` still decides which files it scans. Shared by the
+/// embedded and file-rule loaders.
+pub fn shared_rule_packs(language: &str) -> &'static [&'static str] {
+    match language {
+        "config" => &["properties", "xml"],
+        _ => &[],
+    }
+}
+
 // Structure for centralized exclusion patterns
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ExclusionPatterns {
@@ -155,12 +166,21 @@ impl Rules {
 
     /// Load embedded rules for a specific language
     pub fn load_embedded_rules(language: &str, code_type: Option<&str>) -> Result<Self> {
-        let Some((_, pack, label)) =
-            EMBEDDED_PACKS.iter().find(|(languages, ..)| languages.contains(&language))
-        else {
+        let pack = |name: &str| {
+            EMBEDDED_PACKS
+                .iter()
+                .find(|(languages, ..)| languages.contains(&name))
+                .map(|(_, pack, label)| (*pack, *label))
+        };
+        let Some((own_pack, own_label)) = pack(language) else {
             return Err(anyhow::anyhow!("No embedded rules available for language: {}", language));
         };
-        let mut all_rules = Self::parse_embedded_dir(pack, label)?;
+        let mut all_rules = Self::parse_embedded_dir(own_pack, own_label)?;
+        for (shared_pack, shared_label) in
+            shared_rule_packs(language).iter().filter_map(|s| pack(s))
+        {
+            all_rules.extend(Self::parse_embedded_dir(shared_pack, shared_label)?);
+        }
 
         // Legacy backend JS rules load only when explicitly non-frontend,
         // matching the file-rules auto-detect path the benchmark measured.
@@ -404,22 +424,44 @@ pub fn match_any_pattern(patterns: &[String], text: &str) -> bool {
 /// matching pattern covers, never against the whole line. Scoping matters —
 /// `el.addEventListener('x', h); div.innerHTML = userInput;` must still report the
 /// innerHTML sink even though `addEventListener` is an `unless` entry of that rule.
+/// Within one pattern a veto is per occurrence: an allowlisted `http://localhost` early in
+/// a file must not hide a plain `http://` URL later in it.
 pub fn rule_matches_pattern_unified(rule: &UnifiedRule, text: &str) -> bool {
     let mut matched = matching_patterns(rule, text).peekable();
     if matched.peek().is_none() {
         return false;
     }
 
-    let Some(unless) = rule.unless.as_ref() else {
+    if rule.unless.is_none() {
         return true;
-    };
+    }
 
-    // Every pattern that matched gets its span checked: a rule's patterns overlap, and a
+    // Every pattern that matched gets its spans checked: a rule's patterns overlap, and a
     // sanitizer sitting outside the narrowest match still belongs to the same expression.
-    !matched.any(|pattern| {
-        let scope = unless_scope_range(pattern, text).map_or(text, |range| &text[range]);
-        match_any_pattern(unless, scope)
+    // A pattern is vetoed only when every one of its occurrences is.
+    !matched.any(|pattern| match unless_scope_ranges(pattern, text) {
+        Some(ranges) => ranges.into_iter().all(|range| is_vetoed(rule, &text[range])),
+        None => is_vetoed(rule, text),
     })
+}
+
+/// Byte range of the earliest occurrence the rule reports in `text`: matched by one of its
+/// patterns and not vetoed by `unless`. `None` when no matching pattern resolves a span.
+///
+/// Whole-file languages use it to put a finding on the line it was matched on.
+pub(crate) fn first_reported_match_range(
+    rule: &UnifiedRule,
+    text: &str,
+) -> Option<std::ops::Range<usize>> {
+    matching_patterns(rule, text)
+        .filter_map(|pattern| unless_scope_ranges(pattern, text))
+        .flatten()
+        .filter(|range| !is_vetoed(rule, &text[range.clone()]))
+        .min_by_key(|range| range.start)
+}
+
+fn is_vetoed(rule: &UnifiedRule, scope: &str) -> bool {
+    rule.unless.as_ref().is_some_and(|unless| match_any_pattern(unless, scope))
 }
 
 /// The rule's patterns that match `text`: `pattern` before `patterns`, in file order.
@@ -434,7 +476,8 @@ fn matching_patterns<'a>(
         .filter(move |pattern| match_pattern(pattern, text))
 }
 
-/// Byte span of `pattern`'s match inside `text`, used *only* to scope `unless`.
+/// Byte spans of `pattern`'s matches inside `text`, used to scope `unless`: every
+/// occurrence for regex and substring patterns, the tightest span for globs.
 ///
 /// `None` means "no span recoverable for this pattern form"; the caller then widens the
 /// scope to the whole `text`, which is how `unless` behaved before match scoping.
@@ -442,24 +485,28 @@ fn matching_patterns<'a>(
 /// Deliberately separate from `pattern_match_range` below: that one feeds markup line
 /// attribution and must keep mirroring `matches_unified_pattern`'s "no range for glob"
 /// behaviour, or findings move lines.
-fn unless_scope_range(pattern: &str, text: &str) -> Option<std::ops::Range<usize>> {
-    if pattern == text {
-        return Some(0..text.len());
-    }
-    if let Some(stripped) = pattern.strip_prefix("regex:") {
-        return Regex::new(stripped).ok()?.find(text).map(|m| m.range());
-    }
-    if pattern.contains("\\\\") || pattern.contains("\\.") {
-        return Regex::new(pattern).ok()?.find(text).map(|m| m.range());
-    }
-    if pattern.contains('\\') {
+fn unless_scope_ranges(pattern: &str, text: &str) -> Option<Vec<std::ops::Range<usize>>> {
+    let regex_ranges = |regex: &str| -> Option<Vec<std::ops::Range<usize>>> {
+        Some(Regex::new(regex).ok()?.find_iter(text).map(|m| m.range()).collect())
+    };
+    let ranges = if pattern == text {
+        std::iter::once(0..text.len()).collect()
+    } else if let Some(stripped) = pattern.strip_prefix("regex:") {
+        regex_ranges(stripped)?
+    } else if pattern.contains("\\\\") || pattern.contains("\\.") {
+        regex_ranges(pattern)?
+    } else if pattern.contains('\\') {
         // Escaped taint form: matched by string surgery, no span to recover.
         return None;
-    }
-    tightest_segment_span(pattern, text)
+    } else if pattern.contains('*') {
+        vec![tightest_segment_span(pattern, text)?]
+    } else {
+        text.match_indices(pattern).map(|(start, found)| start..start + found.len()).collect()
+    };
+    (!ranges.is_empty()).then_some(ranges)
 }
 
-/// Tightest in-order span of a glob/substring pattern's literal segments.
+/// Tightest in-order span of a glob pattern's literal segments.
 ///
 /// Anchored right-to-left: the last segment is taken at its *last* occurrence and each
 /// earlier segment at its last occurrence before the one that follows it. Leftmost-first

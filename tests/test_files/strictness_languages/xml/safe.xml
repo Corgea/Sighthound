@@ -1,4 +1,7 @@
 <?xml version="1.0"?>
-<project>
+<!DOCTYPE project>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <url>https://example.com</url>
+  <dev>http://localhost:8080/api</dev>
+  <account>SYSTEM</account>
 </project>

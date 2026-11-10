@@ -19,7 +19,7 @@
             confidence: Some("High"),
             cwe_id: Some("cwe-295"),
             description: Some("SSL/TLS certificate verification disabled - enables man-in-the-middle attacks"),
-            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".xml", ".config", ".conf"]))),
+            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".config", ".conf"]))),
             tags: Some(["cryptography", "ssl", "tls", "cwe-295"])
         ),
         (
@@ -27,19 +27,17 @@
             name: Some("Permissive CORS Configuration"),
             category: Some("security-misconfiguration"),
             mode: "search",
+            // Regex, so `*` is a literal asterisk rather than a glob wildcard.
             patterns: Some([
-                "Access-Control-Allow-Origin: *",
-                "\"allow_origin\": \"*\"",
-                "'allow_origin': '*'",
-                "allow_origin: \"*\"",
-                "allowOrigin: \"*\"",
+                "regex:Access-Control-Allow-Origin:\\s*\\*",
+                "regex:[\"']?allow_?[oO]rigin[\"']?\\s*:\\s*[\"']\\*[\"']",
             ]),
             finding_type: Some("Security Misconfiguration"),
             severity: Some("Medium"),
             confidence: Some("High"),
             cwe_id: Some("cwe-942"),
             description: Some("Permissive CORS policy allows all origins - restrict to specific domains"),
-            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".xml", ".config", ".conf"]))),
+            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".config", ".conf"]))),
             tags: Some(["cors", "security-misconfiguration", "cwe-942"])
         ),
         (
@@ -59,7 +57,7 @@
             confidence: Some("High"),
             cwe_id: Some("cwe-489"),
             description: Some("Debug mode enabled - may expose sensitive information in production"),
-            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".xml", ".config", ".conf"]))),
+            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".config", ".conf"]))),
             tags: Some(["configuration", "debug", "cwe-489"])
         ),
         (
@@ -79,7 +77,7 @@
             confidence: Some("High"),
             cwe_id: Some("cwe-306"),
             description: Some("Authentication disabled in configuration - ensure proper access control"),
-            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".xml", ".config", ".conf"]))),
+            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".config", ".conf"]))),
             tags: Some(["authentication", "authorization", "cwe-306"])
         ),
         (
@@ -87,14 +85,13 @@
             name: Some("HTTP URL in Config"),
             category: Some("cryptography"),
             mode: "search",
+            // The whole URL, so `unless` sees the host.
             patterns: Some([
-                "\"http://",
-                "'http://",
-                "http://",
+                "regex:http://[^\\s\"'<>]+",
             ]),
             unless: Some([
-                "localhost",
-                "127.0.0.1",
+                "http://localhost",
+                "http://127.0.0.1",
                 "http://example",
             ]),
             finding_type: Some("Insecure Communication"),
@@ -102,7 +99,7 @@
             confidence: Some("Medium"),
             cwe_id: Some("cwe-319"),
             description: Some("HTTP URL found - use HTTPS for secure communication"),
-            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".xml", ".config", ".conf"]))),
+            file_types: Some((extensions: Some([".json", ".yaml", ".yml", ".toml", ".config", ".conf"]))),
             tags: Some(["cryptography", "http", "cwe-319"])
         ),
     ]

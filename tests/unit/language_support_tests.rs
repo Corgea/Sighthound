@@ -295,6 +295,38 @@ mod language_support_tests {
         }
     }
 
+    // Every rule that lists an extension must load for the language that extension is
+    // detected as, or auto-detect never runs it (properties and XML rules list `.config`,
+    // `.cfg`, `.ini`, ... which are detected as `config`).
+    #[cfg(all(feature = "xml", feature = "properties", feature = "config"))]
+    #[test]
+    fn text_matched_port_rules_load_for_every_extension_they_list() {
+        use sighthound::rules::Rules;
+        use sighthound::scanner::utils::detect_language_from_path;
+        use std::path::Path;
+
+        for pack in ["xml", "properties", "config"] {
+            let pack_rules = Rules::load_embedded_rules(pack, None).expect("embedded rules load");
+            for rule in pack_rules.rules.iter().filter(|r| {
+                r.id.as_deref().is_some_and(|id| {
+                    id.starts_with(pack) || (pack == "properties" && id.starts_with("props-"))
+                })
+            }) {
+                let id = rule.id.as_deref().unwrap();
+                let extensions = rule.file_types.as_ref().and_then(|f| f.extensions.as_ref());
+                for ext in extensions.into_iter().flatten() {
+                    let language = detect_language_from_path(Path::new(&format!("a{ext}")))
+                        .unwrap_or_else(|| panic!("{id}: {ext} is not detected"));
+                    let loaded = Rules::load_embedded_rules(language, None).expect("rules load");
+                    assert!(
+                        loaded.rules.iter().any(|r| r.id.as_deref() == Some(id)),
+                        "{id} lists {ext}, detected as {language}, but does not load for it"
+                    );
+                }
+            }
+        }
+    }
+
     // ---- HTML `get_arguments_node` ----
 
     #[test]

@@ -1,0 +1,5 @@
+cors:
+  allow_origin: "*"
+service:
+  local: "http://localhost:8080"
+  upstream: "http://api.internal.example.org/v1"

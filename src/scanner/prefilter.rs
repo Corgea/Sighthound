@@ -89,7 +89,8 @@ impl PreFilter {
         ];
 
         if skip_extensions.iter().any(|ext| path_lower.ends_with(ext)) {
-            return true;
+            // SVG is XML: the XML pack scans it for XXE.
+            return !(self.language == "xml" && path_lower.ends_with(".svg"));
         }
 
         // File names
