@@ -375,6 +375,95 @@ fn sql_explicit_taint_analysis_returns_empty_findings_without_taint_rules() {
     );
 }
 
+// XML, properties and config are ported from the 0.1.2 fork that fusion vendors, and are
+// matched textually like SQL. Each unsafe fixture reports its findings, clamped to the
+// matched line; each safe fixture stays clean. Lines were measured, not guessed. Rules come
+// from the embedded packs, so `config` files also get the properties and XML rules that
+// list their extensions.
+#[cfg(all(feature = "xml", feature = "properties", feature = "config"))]
+#[test]
+fn text_matched_ports_detect_unsafe_lines_and_leave_safe_clean() {
+    const XXE: &str = "XML External Entity (XXE)";
+    const HTTP: &str = "Insecure Communication";
+    const CONFIG: &str = "Insecure Configuration";
+    // (language, fixture, expected (line, finding type) pairs)
+    type Case = (&'static str, &'static str, &'static [(usize, &'static str)]);
+    let cases: &[Case] = &[
+        ("xml", "xml/unsafe.xml", &[(2, XXE), (5, HTTP), (6, "LDAP Injection Risk")]),
+        ("xml", "xml/unsafe_remote_dtd.xml", &[(2, XXE)]),
+        ("xml", "xml/unsafe.svg", &[(2, XXE)]),
+        ("xml", "xml/safe.xml", &[]),
+        ("properties", "properties/unsafe.properties", &[(2, CONFIG), (3, CONFIG)]),
+        ("properties", "properties/safe.properties", &[]),
+        ("config", "config/unsafe.config", &[(4, CONFIG), (7, HTTP)]),
+        ("config", "config/unsafe.ini", &[(2, CONFIG)]),
+        ("config", "config/unsafe.yml", &[(2, "Security Misconfiguration"), (5, HTTP)]),
+        ("config", "config/safe.config", &[]),
+        // One line with no trailing newline: a glob `*` would match any origin here.
+        ("config", "config/safe.yml", &[]),
+    ];
+    for (language, fixture, expected) in cases {
+        let name = format!("case_{}", fixture.rsplit('/').next().unwrap());
+        let staging = stage_dir();
+        stage_file(
+            staging.path(),
+            &format!("tests/test_files/strictness_languages/{fixture}"),
+            &name,
+            &[],
+        );
+
+        let rules = Rules::load_embedded_rules(language, None)
+            .unwrap_or_else(|e| panic!("failed to load {language} rules: {e}"));
+        let findings = scan_language_simple_with_rules(staging.path(), language, rules);
+
+        let mut found: Vec<(usize, &str)> = findings_in_file(&findings, &name)
+            .iter()
+            .map(|f| {
+                assert_eq!(f.end_line, f.line, "{fixture}: finding not clamped: {f:?}");
+                assert!(!f.snippet.contains('\n'), "{fixture}: finding not clamped: {f:?}");
+                (f.line, f.finding_type.as_str())
+            })
+            .collect();
+        found.sort();
+        assert_eq!(found, *expected, "{fixture}: findings");
+    }
+}
+
+// Fusion runs auto-detect mode over a directory, so each extension must reach the packs
+// whose rules list it, with embedded rules (the default) and with `--use-file-rules`.
+#[cfg(all(feature = "xml", feature = "properties", feature = "config"))]
+#[test]
+fn text_matched_ports_are_auto_detected() {
+    let staging = stage_dir();
+    let fixtures = [
+        ("xml/unsafe.xml", "case.xml", "XML External Entity (XXE)"),
+        ("xml/unsafe.svg", "case.svg", "XML External Entity (XXE)"),
+        ("properties/unsafe.properties", "case.properties", "Insecure Configuration"),
+        ("config/unsafe.config", "case.config", "Insecure Configuration"),
+        ("config/unsafe.ini", "case.ini", "Insecure Configuration"),
+    ];
+    for (fixture, name, _) in fixtures {
+        let fixture = format!("tests/test_files/strictness_languages/{fixture}");
+        stage_file(staging.path(), &fixture, name, &[]);
+    }
+    let root = staging.path().to_str().unwrap();
+
+    for extra in [None, Some("--use-file-rules")] {
+        let mut args = vec!["--output-format", "json", root];
+        args.extend(extra);
+        let findings = run_cli_json(&args);
+        for (_, name, finding_type) in fixtures {
+            assert!(
+                findings.iter().any(|f| {
+                    f["file"].as_str().is_some_and(|p| p.ends_with(name))
+                        && f["finding_type"] == finding_type
+                }),
+                "auto-detect {extra:?} should report {finding_type} in {name}, got {findings:?}"
+            );
+        }
+    }
+}
+
 /// A language whose rule pack ships search rules but no `mode = "taint"` rules must not
 /// abort the scan. Scanning a SINGLE FILE is load-bearing: a directory scan merges in
 /// python/javascript taint rules, the zero-taint-rule guard never fires, and the test

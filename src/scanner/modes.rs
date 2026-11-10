@@ -105,34 +105,9 @@ fn load_rules(cli: &Cli, context: &ScanContext) -> Result<Rules> {
         (None, None) => {
             // Auto-detect and merge rules from all languages
             let mut all_rules = Vec::new();
-
-            // Determine exclusion pattern type based on code_type
-            let pattern_type =
-                if cli.code_type.as_deref() == Some("backend") { "backend" } else { "frontend" };
-
             for language in &context.detected_languages {
-                let base_rules_dir = cli.rules_dir.as_deref().unwrap_or("rules");
-                let rules_dir = match language.as_str() {
-                    "tsx" => format!("{}/javascript", base_rules_dir),
-                    _ => format!("{}/{}", base_rules_dir, language),
-                };
-                if let Ok(rules) =
-                    Rules::load_from_directory_with_exclusions(&rules_dir, pattern_type)
-                {
+                if let Some(rules) = load_rules_for_detected_language(cli, language)? {
                     all_rules.push(rules);
-                }
-
-                // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
-                if matches!(language.as_str(), "javascript" | "tsx")
-                    && let Some(code_type) = &cli.code_type
-                    && code_type != "frontend"
-                {
-                    let base_rules_dir = cli.rules_dir.as_deref().unwrap_or("rules");
-                    let backend_rules_file =
-                        format!("{}/backend_javascript/backend_security.ron", base_rules_dir);
-                    if let Ok(backend_rules) = Rules::load_from_file(&backend_rules_file) {
-                        all_rules.push(backend_rules);
-                    }
                 }
             }
 
@@ -301,6 +276,15 @@ fn load_rules_for_detected_language(cli: &Cli, language: &str) -> Result<Option<
         if let Ok(base_rules) = Rules::load_from_directory_with_exclusions(&rules_dir, pattern_type)
         {
             all_rules.push(base_rules);
+        }
+
+        for shared in crate::rules::shared_rule_packs(language) {
+            let shared_dir = format!("{}/{}", base_rules_dir, shared);
+            if let Ok(shared_rules) =
+                Rules::load_from_directory_with_exclusions(&shared_dir, pattern_type)
+            {
+                all_rules.push(shared_rules);
+            }
         }
 
         // Load additional backend rules for JavaScript/TypeScript if code_type is backend or both
@@ -538,7 +522,7 @@ pub fn run_taint_analysis_with_verbosity(
     // Check if we have taint flow rules
     let taint_rules_count = rules.rules.iter().filter(|r| r.is_taint_rule()).count();
 
-    // Some rule packs ship search-mode rules only (e.g. html, objectscript, sql). Skip the taint
+    // Some rule packs ship search-mode rules only (e.g. html, objectscript, sql, xml). Skip the taint
     // pass instead of failing the scan and discarding the search-pass findings.
     if taint_rules_count == 0 {
         // Combined default mode visits this as a second pass. Search-only packs
@@ -713,6 +697,20 @@ mod tests {
 
         let rules = load_rules(&cli, &context).expect("auto-detected rules should load");
         assert!(!rules.rules.is_empty());
+    }
+
+    #[test]
+    fn load_rules_auto_detect_file_rules_include_shared_packs() {
+        let mut cli = base_cli();
+        cli.use_file_rules = true;
+        cli.language = None;
+        cli.rules_path = None;
+        let context = base_context(&["config"]);
+
+        let rules = load_rules(&cli, &context).expect("auto-detected rules should load");
+        for id in ["config-http-001", "props-debug-001", "xml-config-001"] {
+            assert!(rules.rules.iter().any(|r| r.id.as_deref() == Some(id)), "{id} missing");
+        }
     }
 
     #[test]

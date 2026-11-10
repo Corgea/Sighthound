@@ -1,6 +1,6 @@
 [package]
 name = "sighthound"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Corgea Team"]
@@ -19,7 +19,7 @@ name = "harness"
 path = "harness.rs"
 
 [features]
-default = ["python", "java", "javascript", "tsx", "typescript", "go", "ruby", "csharp", "html", "django", "php", "objectscript", "sql"]
+default = ["python", "java", "javascript", "tsx", "typescript", "go", "ruby", "csharp", "html", "django", "php", "objectscript", "sql", "xml", "properties", "config"]
 python = ["tree-sitter-python"]
 java = ["tree-sitter-java"]
 javascript = ["tree-sitter-javascript"]
@@ -33,6 +33,9 @@ django = ["tree-sitter-html"]  # Reuse HTML parser for Django templates
 php = ["tree-sitter-php"]
 objectscript = ["dep:tree-sitter-objectscript", "dep:tree-sitter-objectscript-routine"]
 sql = ["tree-sitter-javascript"]  # Reuse the JS parser as a no-op host; SQL is matched textually
+xml = ["tree-sitter-javascript"]  # Same no-op host; XML is matched textually
+properties = ["tree-sitter-javascript"]  # Same no-op host; properties are matched textually
+config = ["tree-sitter-javascript"]  # Same no-op host; config files are matched textually
 
 [dependencies]
 tree-sitter = "0.26"

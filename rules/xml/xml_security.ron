@@ -1,0 +1,186 @@
+(
+    rules: [
+        (
+            id: Some("xml-xxe-001"),
+            name: Some("XML External Entity (XXE) - DOCTYPE Declaration"),
+            category: Some("xxe"),
+            mode: "search",
+            // Any entity declaration, or a DOCTYPE that loads an external DTD (local or
+            // remote). Both are matched within one declaration, never across the file.
+            patterns: Some([
+                "<!ENTITY",
+                "regex:<!DOCTYPE\\s[^>\\[]*\\b(?:SYSTEM|PUBLIC)\\b",
+            ]),
+            finding_type: Some("XML External Entity (XXE)"),
+            severity: Some("Critical"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-611"),
+            description: Some("XML file declares entities or loads an external DTD, which may be vulnerable to XXE attacks"),
+            file_types: Some((extensions: Some([".xml", ".xsd", ".xsl", ".xslt", ".svg"]))),
+            tags: Some(["xxe", "xml", "injection", "cwe-611"])
+        ),
+        (
+            id: Some("xml-xxe-002"),
+            name: Some("XXE - External File Reference"),
+            category: Some("xxe"),
+            mode: "search",
+            patterns: Some([
+                "file://",
+                "php://",
+                "expect://",
+                "data://text",
+            ]),
+            finding_type: Some("XML External Entity (XXE)"),
+            severity: Some("Critical"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-611"),
+            description: Some("XML file contains external file references that may be exploited for XXE attacks"),
+            file_types: Some((extensions: Some([".xml", ".xsd", ".xsl", ".xslt", ".svg"]))),
+            tags: Some(["xxe", "xml", "file-access", "cwe-611"])
+        ),
+        (
+            id: Some("xml-insecure-001"),
+            name: Some("Insecure HTTP URL in XML"),
+            category: Some("insecure-communication"),
+            mode: "search",
+            // The whole URL, with any namespace declaration in front of it, so `unless`
+            // sees the host and the `xmlns` attribute.
+            patterns: Some([
+                "regex:(?:xmlns(?::[\\w.-]+)?\\s*=\\s*[\"'])?http://[^\\s\"'<>]+",
+            ]),
+            unless: Some([
+                "http://localhost",
+                "http://127.0.0.1",
+                "http://www.w3.org",
+                "http://schemas.",
+                "xmlns",
+            ]),
+            finding_type: Some("Insecure Communication"),
+            severity: Some("Medium"),
+            confidence: Some("Low"),
+            cwe_id: Some("cwe-319"),
+            description: Some("XML contains HTTP URLs that should use HTTPS for secure communication"),
+            file_types: Some((extensions: Some([".xml", ".config", ".wsdl"]))),
+            tags: Some(["insecure", "http", "communication", "cwe-319"])
+        ),
+        (
+            id: Some("xml-injection-001"),
+            name: Some("LDAP Injection Pattern in XML"),
+            category: Some("ldap-injection"),
+            mode: "search",
+            patterns: Some([
+                "ldap://",
+                "<ldapUrl>",
+                "<LdapUrl>",
+            ]),
+            finding_type: Some("LDAP Injection Risk"),
+            severity: Some("Medium"),
+            confidence: Some("Low"),
+            cwe_id: Some("cwe-90"),
+            description: Some("XML contains LDAP references that may be vulnerable to injection if user-controlled"),
+            file_types: Some((extensions: Some([".xml", ".config"]))),
+            tags: Some(["injection", "ldap", "cwe-90"])
+        ),
+        (
+            id: Some("xml-ssrf-001"),
+            name: Some("SSRF - Remote URL Reference"),
+            category: Some("ssrf"),
+            mode: "search",
+            // The whole attribute value, so `unless` sees the host.
+            patterns: Some([
+                "regex:schemaLocation\\s*=\\s*\"http[^\"]*\"",
+                "regex:<include\\b[^>]*\\bhref\\s*=\\s*\"http[^\"]*\"",
+            ]),
+            unless: Some([
+                "http://www.w3.org",
+                "http://schemas.",
+            ]),
+            finding_type: Some("SSRF Risk"),
+            severity: Some("Medium"),
+            confidence: Some("Low"),
+            cwe_id: Some("cwe-918"),
+            description: Some("XML contains remote URL references that may be exploited for SSRF attacks"),
+            file_types: Some((extensions: Some([".xml", ".xsd", ".wsdl"]))),
+            tags: Some(["ssrf", "remote-url", "cwe-918"])
+        ),
+        (
+            id: Some("xml-config-001"),
+            name: Some("Debug Mode Enabled"),
+            category: Some("insecure-configuration"),
+            mode: "search",
+            patterns: Some([
+                "debug=\"true\"",
+                "debug>true<",
+                "<debug>1<",
+            ]),
+            finding_type: Some("Insecure Configuration"),
+            severity: Some("Medium"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-489"),
+            description: Some("Debug mode is enabled in XML configuration - should be disabled in production"),
+            file_types: Some((extensions: Some([".xml", ".config"]))),
+            tags: Some(["configuration", "debug", "cwe-489"])
+        ),
+        (
+            id: Some("xml-config-002"),
+            name: Some("SSL/TLS Verification Disabled"),
+            category: Some("insecure-configuration"),
+            mode: "search",
+            patterns: Some([
+                "verifySSL=\"false\"",
+                "sslVerify=\"false\"",
+                "verify-ssl>false<",
+                "ssl-verify>false<",
+            ]),
+            finding_type: Some("Insecure Configuration"),
+            severity: Some("High"),
+            confidence: Some("High"),
+            cwe_id: Some("cwe-295"),
+            description: Some("SSL/TLS certificate verification is disabled - enables man-in-the-middle attacks"),
+            file_types: Some((extensions: Some([".xml", ".config"]))),
+            tags: Some(["ssl", "tls", "mitm", "cwe-295"])
+        ),
+        (
+            id: Some("xml-db-001"),
+            name: Some("Database Connection String"),
+            category: Some("sensitive-data"),
+            mode: "search",
+            patterns: Some([
+                "<connectionString>",
+                "connectionString=\"",
+                "jdbc:",
+                "Data Source=",
+            ]),
+            finding_type: Some("Database Credentials"),
+            severity: Some("Medium"),
+            confidence: Some("Medium"),
+            cwe_id: Some("cwe-200"),
+            description: Some("XML contains database connection strings that may expose credentials"),
+            file_types: Some((extensions: Some([".xml", ".config"]))),
+            tags: Some(["database", "credentials", "connection-string", "cwe-200"])
+        ),
+        (
+            id: Some("xml-path-001"),
+            name: Some("Absolute File Path"),
+            category: Some("path-disclosure"),
+            mode: "search",
+            patterns: Some([
+                "<path>/",
+                "regex:path=\"/[^\"]*\"",
+                "<file>/",
+                "<directory>/",
+            ]),
+            // `path="/"` is the web root, not a disclosed file path.
+            unless: Some([
+                "path=\"/\"",
+            ]),
+            finding_type: Some("Path Disclosure"),
+            severity: Some("Low"),
+            confidence: Some("Low"),
+            cwe_id: Some("cwe-538"),
+            description: Some("XML contains absolute file paths that may disclose system information"),
+            file_types: Some((extensions: Some([".xml", ".config"]))),
+            tags: Some(["path-disclosure", "information-disclosure", "cwe-538"])
+        ),
+    ]
+)

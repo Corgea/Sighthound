@@ -265,6 +265,13 @@ pub fn detect_language_from_path(file_path: &Path) -> Option<&'static str> {
         // SQL, DDL and DML scripts (text-matched, no SQL grammar)
         "sql" | "ddl" | "dml" => Some("sql"),
 
+        // XML, properties and config files (text-matched, like SQL)
+        "xml" | "xsd" | "xsl" | "xslt" | "wsdl" | "svg" | "pom" => Some("xml"),
+        "properties" | "props" => Some("properties"),
+        "config" | "conf" | "cfg" | "ini" | "env" | "json" | "yaml" | "yml" | "toml" => {
+            Some("config")
+        }
+
         // JavaScript extensions (including modern variants)
         "js" | "mjs" | "cjs" | "jsx" => Some("javascript"),
 

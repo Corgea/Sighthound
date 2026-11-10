@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <dev>http://localhost:8080</dev>
+  <url>http://example.com</url>
+  <ldapUrl>ldap://ldap.example.com/dc=example</ldapUrl>
+</project>

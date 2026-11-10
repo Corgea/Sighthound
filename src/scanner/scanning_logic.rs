@@ -103,12 +103,30 @@ impl ScanningLogic {
             finding.sink_info = Some(sink_info);
         }
 
-        if language_support.name() == "sql" {
-            finding.end_line = finding.line;
-            Self::clamp_finding_to_matched_lines(&mut finding, source);
+        if language_support.matches_whole_file() {
+            let text = node_text.as_deref().unwrap_or(func_name);
+            Self::place_whole_file_finding(&mut finding, rule, node, text, source);
         }
 
         Some(finding)
+    }
+
+    /// A whole-file language's finding goes on the line its match sits on, clamped to it.
+    /// The heuristic line search cannot resolve regex or glob patterns; the match can.
+    fn place_whole_file_finding(
+        finding: &mut crate::models::Finding,
+        rule: &crate::rules::UnifiedRule,
+        node: &tree_sitter::Node,
+        text: &str,
+        source: &[u8],
+    ) {
+        if let Some(range) = crate::rules::first_reported_match_range(rule, text) {
+            finding.line = node.start_position().row
+                + 1
+                + text[..range.start].bytes().filter(|b| *b == b'\n').count();
+        }
+        finding.end_line = finding.line;
+        Self::clamp_finding_to_matched_lines(finding, source);
     }
 
     fn rule_needs_full_context(rule: &crate::rules::UnifiedRule) -> bool {
@@ -187,7 +205,7 @@ impl ScanningLogic {
                     .enumerate()
                     .filter(|(_, rule)| match &markup_text {
                         Some(text) => crate::rules::rule_matches_pattern_unified(rule, text),
-                        None => Self::rule_might_match_function(rule, func_name),
+                        None => Self::rule_might_match_node(rule, func_name, language_support),
                     })
                     .map(|(idx, rule)| (idx, *rule))
                     .collect();
@@ -560,6 +578,16 @@ impl ScanningLogic {
     }
 
     /// Check if a rule might match the function name (optimized pattern-based pre-filter)
+    /// Cheap prefilter before `check_rule_against_node`. A whole-file language's node is the
+    /// file, matched in full there; the call-name prefilter would drop `regex:` patterns.
+    fn rule_might_match_node(
+        rule: &crate::rules::UnifiedRule,
+        func_name: &str,
+        language_support: &dyn crate::language::LanguageSupport,
+    ) -> bool {
+        language_support.matches_whole_file() || Self::rule_might_match_function(rule, func_name)
+    }
+
     fn rule_might_match_function(rule: &crate::rules::UnifiedRule, func_name: &str) -> bool {
         let patterns_to_check = if let Some(patterns) = &rule.patterns {
             patterns.as_slice()
@@ -2308,7 +2336,7 @@ impl ScanningLogic {
             taint_context_info,
         );
 
-        if language_support.name() == "sql" {
+        if language_support.matches_whole_file() {
             finding.end_line = finding.line;
             Self::clamp_finding_to_matched_lines(&mut finding, source);
         }
