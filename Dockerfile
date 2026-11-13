@@ -27,7 +27,7 @@ ENV CARGO_TARGET_DIR=/app/target
 RUN cargo build --release --locked --bin sighthound
 
 # Runtime stage - minimal image for running the container
-FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8 AS runtime
+FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc AS runtime
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/sighthound /usr/local/bin/sighthound
 COPY --from=builder /app/rules /rules
