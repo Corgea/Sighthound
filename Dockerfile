@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for building sighthound binary
 # Stage 1: Build the binary
-FROM rust:1.89-slim@sha256:8cffb8fe4e8a95cf0d6a2060375e5a28aff4c752155aa9f1f9193530769bdf66 AS builder
+FROM rust:1.99-slim@sha256:f6c4a35d21dbb3c89d7a8d056c193e94fc09037f2b58dd858b09c39a47dd02d7 AS builder
 
 # Install build dependencies including cross-compilation tools
 RUN apt-get update && apt-get install -y \
