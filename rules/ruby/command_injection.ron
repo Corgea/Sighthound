@@ -25,6 +25,12 @@
                     value: "",
                     condition_type: Some("argument_not_sanitized"),
                     patterns: Some(["Shellwords.escape", "shellescape", "Shellwords.split"])
+                ),
+                (
+                    field: "arguments",
+                    operator: "is_unsafe_command",
+                    value: "",
+                    condition_type: Some("ruby_unsafe_command_injection"),
                 )
             ]),
             finding_type: Some("Command Injection"),
@@ -60,6 +66,12 @@
                     value: "",
                     condition_type: Some("argument_not_sanitized"),
                     patterns: Some(["Shellwords.escape", "shellescape"])
+                ),
+                (
+                    field: "arguments",
+                    operator: "is_unsafe_command",
+                    value: "",
+                    condition_type: Some("ruby_unsafe_command_injection"),
                 )
             ]),
             finding_type: Some("Command Injection"),
@@ -112,6 +124,14 @@
             ]),
             sanitizers: Some([
                 "Shellwords.escape", "shellescape", "Shellwords.split", "Integer("
+            ]),
+            conditions: Some([
+                (
+                    field: "arguments",
+                    operator: "is_unsafe_command",
+                    value: "",
+                    condition_type: Some("ruby_unsafe_command_injection"),
+                )
             ]),
             finding_type: Some("Command Injection"),
             severity: Some("Critical"),

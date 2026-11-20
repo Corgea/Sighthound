@@ -323,7 +323,6 @@ fn csv_quoted_field(value: &str) -> String {
 fn csv_field(value: &str) -> String {
     if value.contains([',', '"', '\r', '\n']) { csv_quoted_field(value) } else { value.to_string() }
 }
-
 pub fn print_findings_csv(findings: &[Finding]) -> Result<()> {
     let stdout = std::io::stdout();
     let mut out = BufWriter::new(stdout.lock());

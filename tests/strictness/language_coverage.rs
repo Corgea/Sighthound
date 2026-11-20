@@ -472,3 +472,78 @@ fn finding_key_set(findings: &[Value]) -> BTreeSet<(String, u64, String, String)
         })
         .collect()
 }
+
+#[cfg(feature = "ruby")]
+#[test]
+fn ruby_rules_taint_and_search_validation() {
+    let staging = stage_dir();
+    stage_file(
+        staging.path(),
+        "tests/test_files/strictness_languages/ruby/unsafe.rb",
+        "ruby_case_unsafe.rb",
+        &[],
+    );
+    stage_file(
+        staging.path(),
+        "tests/test_files/strictness_languages/ruby/safe.rb",
+        "ruby_case_safe.rb",
+        &[],
+    );
+
+    let rules = Rules::load_from_directory("rules/ruby/").expect("failed to load ruby rules");
+    let findings = scan_language_unified_with_rules(staging.path(), "ruby", rules);
+
+    let unsafe_findings = findings_in_file(&findings, "ruby_case_unsafe.rb");
+    let safe_findings = findings_in_file(&findings, "ruby_case_safe.rb");
+
+    // Print findings for debugging purposes
+    println!(
+        "UNSAFE FINDINGS: {:?}",
+        unsafe_findings.iter().map(|f| (f.line, &f.finding_type, &f.tags)).collect::<Vec<_>>()
+    );
+    println!(
+        "SAFE FINDINGS: {:?}",
+        safe_findings.iter().map(|f| (f.line, &f.finding_type, &f.tags)).collect::<Vec<_>>()
+    );
+
+    // All safe patterns (array literals, multiple arguments, escaped) must be CLEAN!
+    assert!(
+        safe_findings.is_empty(),
+        "safe.rb should be clean from all findings, got {}: {:?}",
+        safe_findings.len(),
+        safe_findings
+            .iter()
+            .map(|f| (f.line, f.finding_type.as_str(), f.snippet.as_str()))
+            .collect::<Vec<_>>()
+    );
+
+    // Unsafe patterns must trigger findings
+    let unsafe_lines: BTreeSet<usize> = unsafe_findings.iter().map(|f| f.line).collect();
+
+    // Assert key unsafe lines trigger findings
+    assert!(unsafe_lines.contains(&4), "line 4 must trigger finding");
+    assert!(unsafe_lines.contains(&5), "line 5 must trigger finding");
+    assert!(unsafe_lines.contains(&6), "line 6 must trigger finding");
+    assert!(unsafe_lines.contains(&7), "line 7 must trigger finding");
+    assert!(unsafe_lines.contains(&8), "line 8 must trigger finding");
+    assert!(unsafe_lines.contains(&9), "line 9 must trigger finding");
+    assert!(unsafe_lines.contains(&12), "line 12 must trigger finding");
+    assert!(unsafe_lines.contains(&25), "line 25 must trigger finding");
+    assert!(unsafe_lines.contains(&26), "line 26 must trigger finding");
+    assert!(unsafe_lines.contains(&29), "line 29 must trigger finding");
+    assert!(unsafe_lines.contains(&30), "line 30 must trigger finding");
+    assert!(unsafe_lines.contains(&31), "line 31 must trigger finding");
+    assert!(unsafe_lines.contains(&32), "line 32 must trigger finding (clustered -lc)");
+    assert!(unsafe_lines.contains(&33), "line 33 must trigger finding (clustered -ec)");
+    assert!(unsafe_lines.contains(&35), "line 35 must trigger finding (SQL injection)");
+
+    assert!(
+        unsafe_findings.len() >= 10,
+        "unsafe.rb should trigger at least 10 findings, got {}: {:?}",
+        unsafe_findings.len(),
+        unsafe_findings
+            .iter()
+            .map(|f| (f.line, f.finding_type.as_str(), f.snippet.as_str()))
+            .collect::<Vec<_>>()
+    );
+}
