@@ -47,4 +47,48 @@ mod exclusion_patterns_tests {
         assert_eq!(p.get_patterns("backend"), Vec::<String>::new());
         assert_eq!(p.get_patterns("common"), Vec::<String>::new());
     }
+
+    #[test]
+    fn apply_centralized_exclusions_does_not_hardcode_js_extensions() {
+        let mut rules = sighthound::rules::Rules {
+            rules: vec![sighthound::UnifiedRule {
+                id: Some("test-rule".to_string()),
+                name: Some("Generic Rule".to_string()),
+                description: None,
+                category: None,
+                mode: "search".to_string(),
+                pattern: Some("eval(".to_string()),
+                patterns: None,
+                sources: None,
+                sinks: None,
+                propagators: None,
+                sanitizers: None,
+                finding_type: None,
+                severity: None,
+                confidence: None,
+                file_types: None,
+                conditions: None,
+                tags: None,
+                cwe_id: None,
+                message: None,
+            }],
+        };
+
+        rules.apply_centralized_exclusions(&patterns(), "backend");
+        let file_types = rules.rules[0].file_types.as_ref();
+        assert!(file_types.unwrap().extensions.is_none());
+        assert_eq!(
+            file_types.unwrap().exclude_patterns.as_ref().unwrap(),
+            &vec!["*.min.js".to_string(), "*_test.go".to_string()]
+        );
+
+        // Exercise applicability: non-JS files match, but excluded files are skipped
+        assert!(sighthound::scanner::utils::rule_applies_to_file(file_types, "src/main.py"));
+        assert!(sighthound::scanner::utils::rule_applies_to_file(file_types, "src/service.go"));
+        assert!(!sighthound::scanner::utils::rule_applies_to_file(file_types, "src/app.min.js"));
+        assert!(!sighthound::scanner::utils::rule_applies_to_file(
+            file_types,
+            "src/handler_test.go"
+        ));
+    }
 }

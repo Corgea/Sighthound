@@ -338,19 +338,14 @@ impl Rules {
                     }
                 }
             } else {
-                // If rule doesn't have file_types, create one with centralized exclusions
+                // If rule doesn't have file_types, create one with centralized exclusions without restricting extensions
                 rule.file_types = Some(FileTypes {
                     python: None,
                     java: None,
                     javascript: None,
                     tsx: None,
                     html: None,
-                    extensions: Some(vec![
-                        ".js".to_string(),
-                        ".jsx".to_string(),
-                        ".ts".to_string(),
-                        ".tsx".to_string(),
-                    ]),
+                    extensions: None,
                     include_patterns: None,
                     exclude_patterns: Some(patterns.clone()),
                 });
